@@ -40,7 +40,7 @@ public static class RingMeshBuilder
             float cosA1 = Mathf.Cos(a1);
             float sinA1 = Mathf.Sin(a1);
 
-            // --- Top face (Y = +halfH), CCW winding viewed from above ---
+            // --- Top face (Y = +halfH), CW winding viewed from above ---
             Vector3 tOA = new(outerR * cosA0, halfH, outerR * sinA0);
             Vector3 tOB = new(outerR * cosA1, halfH, outerR * sinA1);
             Vector3 tIA = new(innerR * cosA0, halfH, innerR * sinA0);
@@ -61,14 +61,14 @@ public static class RingMeshBuilder
             Vector3 outerNormalB = new(cosA1, 0, sinA1);
             Vector3 outerNormalMid = ((outerNormalA + outerNormalB) * 0.5f).Normalized();
 
-            AddQuad(st, tOA, tOB, bOB, bOA, outerNormalMid);
+            AddQuad(st, bOA, bOB, tOB, tOA, outerNormalMid);
 
             // --- Inner curved face (facing inward radially) ---
             Vector3 innerNormalA = new(-cosA0, 0, -sinA0);
             Vector3 innerNormalB = new(-cosA1, 0, -sinA1);
             Vector3 innerNormalMid = ((innerNormalA + innerNormalB) * 0.5f).Normalized();
 
-            AddQuad(st, tIB, tIA, bIA, bIB, innerNormalMid);
+            AddQuad(st, bIB, bIA, tIA, tIB, innerNormalMid);
         }
 
         // --- Start radial side face (at startAngle) ---
@@ -83,7 +83,7 @@ public static class RingMeshBuilder
             Vector3 sBO = new(outerR * cosS, -halfH, outerR * sinS);
             Vector3 sBI = new(innerR * cosS, -halfH, innerR * sinS);
 
-            AddQuad(st, sTI, sTO, sBO, sBI, -sideNormal);
+            AddQuad(st, sBI, sBO, sTO, sTI, -sideNormal);
         }
 
         // --- End radial side face (at endAngle) ---
@@ -98,7 +98,7 @@ public static class RingMeshBuilder
             Vector3 eBO = new(outerR * cosE, -halfH, outerR * sinE);
             Vector3 eBI = new(innerR * cosE, -halfH, innerR * sinE);
 
-            AddQuad(st, eTO, eTI, eBI, eBO, sideNormal);
+            AddQuad(st, eBO, eBI, eTI, eTO, sideNormal);
         }
 
         return st.Commit();
@@ -106,8 +106,8 @@ public static class RingMeshBuilder
 
     /// <summary>
     /// Adds a quad (two triangles) to the SurfaceTool.
-    /// Vertices a, b, c, d should be in CCW order when viewed from the normal direction.
-    /// Triangle 1: A, B, C. Triangle 2: A, C, D.
+    /// Vertices a, b, c, d should be in CW order when viewed from the normal direction
+    /// (Godot front-face convention). Triangle 1: A, B, C. Triangle 2: A, C, D.
     /// </summary>
     private static void AddQuad(SurfaceTool st, Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 normal)
     {
