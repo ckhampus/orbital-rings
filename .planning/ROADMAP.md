@@ -50,7 +50,11 @@ Plans:
   3. Outer and inner rows are visually distinct — readable at a glance which row a segment belongs to
   4. Segment numbers or position indicators are visible to the player on the ring surface
   5. The walkway corridor is present as a navigable strip between the two rows, authored ready for citizen pathfinding
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 02-01-PLAN.md -- Ring mesh and segment grid: SegmentGrid data model, RingMeshBuilder, RingVisual with 24 colored segments + walkway, replace CSG placeholder
+- [ ] 02-02-PLAN.md -- Segment interaction and tooltip: polar-math hover/click detection, hover/selection visual feedback, screen-space tooltip
 
 ### Phase 3: Economy Foundation
 **Goal**: The credit economy is live, balanced via a spreadsheet before any numbers are hardcoded, and all rates are editable in Resource files without recompile
@@ -132,7 +136,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation and Project Architecture | 2/3 | Gap closure | - |
-| 2. Ring Geometry and Segment Grid | 0/TBD | Not started | - |
+| 2. Ring Geometry and Segment Grid | 0/2 | Planned | - |
 | 3. Economy Foundation | 0/TBD | Not started | - |
 | 4. Room Placement and Build Interaction | 0/TBD | Not started | - |
 | 5. Citizens and Navigation | 0/TBD | Not started | - |
