@@ -1,6 +1,10 @@
-[gd_scene load_steps=2 format=3 uid="uid://ringscene01"]
+[gd_scene load_steps=3 format=3 uid="uid://ringscene01"]
 
 [ext_resource type="Script" path="res://Scripts/Ring/RingVisual.cs" id="1_ringvisual"]
+[ext_resource type="Script" path="res://Scripts/Ring/SegmentInteraction.cs" id="2_seginteraction"]
 
 [node name="Ring" type="Node3D"]
 script = ExtResource("1_ringvisual")
+
+[node name="SegmentInteraction" type="Node" parent="."]
+script = ExtResource("2_seginteraction")
