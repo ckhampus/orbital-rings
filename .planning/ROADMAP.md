@@ -12,7 +12,7 @@ Orbital Rings is built from the ground up in eight phases, each delivering a coh
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [x] **Phase 1: Foundation and Project Architecture** - Establish signal bus, data schema, camera, and architectural patterns before any gameplay code is written
+- [ ] **Phase 1: Foundation and Project Architecture** - Establish signal bus, data schema, camera, and architectural patterns before any gameplay code is written
 - [ ] **Phase 2: Ring Geometry and Segment Grid** - Build the polar segment grid, ring mesh, and visual segment differentiation that everything else sits on
 - [ ] **Phase 3: Economy Foundation** - Implement the credit economy, passive income, balance spreadsheet, and EconomyManager Autoload
 - [ ] **Phase 4: Room Placement and Build Interaction** - Wire room placement into the ring, all 5 categories with placeholder art, demolish, and satisfying placement feedback
@@ -33,11 +33,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Resource subclasses for RoomDefinition, WishTemplate, and CitizenData exist and are editable in the Godot Inspector
   4. A quick-test scene with 2-3 placeholder objects loads in under 3 seconds and serves as the iteration sandbox
   5. Signal disconnect pattern is established in a base class or documented convention before any gameplay signal is connected
-**Plans**: 2 plans
+**Plans**: 3 plans
 
 Plans:
 - [x] 01-01-PLAN.md -- Core architecture: GameEvents Autoload, SafeNode base class, Resource subclasses
 - [x] 01-02-PLAN.md -- Camera system: OrbitalCamera, environment setup, QuickTest scene
+- [ ] 01-03-PLAN.md -- Gap closure: ambient light fix, flat disc geometry, touchpad/keyboard zoom
 
 ### Phase 2: Ring Geometry and Segment Grid
 **Goal**: The ring is visible, its 24 segments are selectable by mouse click using polar math (not trimesh collision), and inner vs. outer positions are visually readable
@@ -130,7 +131,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation and Project Architecture | 2/2 | Complete | 2026-03-02 |
+| 1. Foundation and Project Architecture | 2/3 | Gap closure | - |
 | 2. Ring Geometry and Segment Grid | 0/TBD | Not started | - |
 | 3. Economy Foundation | 0/TBD | Not started | - |
 | 4. Room Placement and Build Interaction | 0/TBD | Not started | - |
@@ -141,4 +142,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 ---
 *Roadmap created: 2026-03-02*
-*Last updated: 2026-03-02 after 01-02 completion (Phase 1 complete)*
+*Last updated: 2026-03-02 after UAT gap closure planning*
