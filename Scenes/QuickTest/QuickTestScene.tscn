@@ -20,7 +20,7 @@ shadow_enabled = true
 
 [node name="CameraRig" type="Node3D" parent="." unique_id=1861080985]
 script = ExtResource("2_cam")
-TiltAngleDeg = 45.0
+TiltAngleDeg = 20.0
 
 [node name="Camera3D" type="Camera3D" parent="CameraRig" unique_id=2034811885]
 
