@@ -64,6 +64,18 @@ RUN curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh &&
   rm /tmp/dotnet-install.sh && \
   ln -sf /usr/local/share/dotnet/dotnet /usr/local/bin/dotnet
 
+# Install Godot .NET binary (headless-capable via --headless flag)
+ARG GODOT_VERSION=4.6.1
+RUN ARCH=$(dpkg --print-architecture) && \
+  if [ "$ARCH" = "amd64" ]; then GODOT_ARCH="x86_64"; else GODOT_ARCH="$ARCH"; fi && \
+  GODOT_RELEASE="Godot_v${GODOT_VERSION}-stable" && \
+  wget -q "https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}-stable/${GODOT_RELEASE}_mono_linux_${GODOT_ARCH}.zip" && \
+  unzip -q "${GODOT_RELEASE}_mono_linux_${GODOT_ARCH}.zip" && \
+  mv "${GODOT_RELEASE}_mono_linux_${GODOT_ARCH}/${GODOT_RELEASE}_mono_linux.${GODOT_ARCH}" /usr/local/bin/godot && \
+  mv "${GODOT_RELEASE}_mono_linux_${GODOT_ARCH}/GodotSharp" /usr/local/bin/GodotSharp && \
+  rm -rf "${GODOT_RELEASE}_mono_linux_${GODOT_ARCH}" "${GODOT_RELEASE}_mono_linux_${GODOT_ARCH}.zip" && \
+  chmod +x /usr/local/bin/godot
+
 # Install csharp-language-server as a shared global tool
 RUN dotnet tool install --tool-path /usr/local/share/dotnet-global-tools csharp-ls
 ENV PATH="$PATH:/usr/local/share/dotnet-global-tools"
