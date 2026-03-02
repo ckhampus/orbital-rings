@@ -9,7 +9,7 @@ Requirements for initial release (single playable ring proving the core loop).
 
 ### Ring Structure
 
-- [ ] **RING-01**: Player sees a flat donut ring divided into 12 outer and 12 inner segments with a walkway between them
+- [x] **RING-01**: Player sees a flat donut ring divided into 12 outer and 12 inner segments with a walkway between them
 - [x] **RING-02**: Player can orbit the camera horizontally around the ring and zoom in/out at a fixed tilt angle
 - [ ] **RING-03**: Segments are visually distinct (numbered positions, inner vs outer clearly readable)
 
@@ -104,7 +104,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| RING-01 | Phase 2 | Pending |
+| RING-01 | Phase 2 | Complete |
 | RING-02 | Phase 1 | In Progress |
 | RING-03 | Phase 2 | Pending |
 | BLDG-01 | Phase 4 | Pending |
