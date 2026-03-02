@@ -10,27 +10,27 @@ See: .planning/PROJECT.md (updated 2026-03-02)
 ## Current Position
 
 Phase: 1 of 8 (Foundation and Project Architecture)
-Plan: 1 of 2 in current phase
-Status: Executing
-Last activity: 2026-03-02 — Completed 01-01-PLAN.md (core architecture)
+Plan: 2 of 2 in current phase (PHASE COMPLETE)
+Status: Phase 1 Complete
+Last activity: 2026-03-02 — Completed 01-02-PLAN.md (camera system and QuickTest scene)
 
-Progress: [█░░░░░░░░░] 6%
+Progress: [█░░░░░░░░░] 12%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1
-- Average duration: 4 min
-- Total execution time: 0.07 hours
+- Total plans completed: 2
+- Average duration: 10 min
+- Total execution time: 0.32 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 1 | 1 | 4min | 4min |
+| 1 | 2 | 19min | 10min |
 
 **Recent Trend:**
-- Last 5 plans: 4min
+- Last 5 plans: 4min, 15min
 - Trend: baseline
 
 *Updated after each plan completion*
@@ -49,6 +49,9 @@ Recent decisions affecting current work:
 - [Init]: No tutorial — citizens' wishes are the implicit tutorial
 - [01-01]: Pure C# event delegates for signal bus instead of Godot [Signal] — avoids marshalling overhead and IsConnected bugs
 - [01-01]: Arrays initialized to System.Array.Empty<string>() to prevent null serialization pitfall in Godot Resources
+- [01-02]: Spherical coordinate camera positioning with LookAt(origin) instead of flat Z-offset — ensures correct viewing angle at any tilt/zoom
+- [01-02]: _Input instead of _UnhandledInput for camera mouse events — more reliable event delivery
+- [01-02]: Programmatic input action registration in _Ready() — avoids fragile project.godot [input] serialization
 
 ### Pending Todos
 
@@ -63,5 +66,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-02
-Stopped at: Completed 01-01-PLAN.md (core architecture: GameEvents, SafeNode, 4 Resource subclasses)
+Stopped at: Completed 01-02-PLAN.md (camera system, QuickTest scene — Phase 1 complete)
 Resume file: None
