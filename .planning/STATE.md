@@ -10,28 +10,28 @@ See: .planning/PROJECT.md (updated 2026-03-02)
 ## Current Position
 
 Phase: 1 of 8 (Foundation and Project Architecture)
-Plan: 0 of TBD in current phase
-Status: Ready to plan
-Last activity: 2026-03-02 — Roadmap created, requirements mapped, STATE.md initialized
+Plan: 1 of 2 in current phase
+Status: Executing
+Last activity: 2026-03-02 — Completed 01-01-PLAN.md (core architecture)
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [█░░░░░░░░░] 6%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 0
-- Average duration: — min
-- Total execution time: — hours
+- Total plans completed: 1
+- Average duration: 4 min
+- Total execution time: 0.07 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 1 | 1 | 4min | 4min |
 
 **Recent Trend:**
-- Last 5 plans: —
-- Trend: —
+- Last 5 plans: 4min
+- Trend: baseline
 
 *Updated after each plan completion*
 
@@ -47,6 +47,8 @@ Recent decisions affecting current work:
 - [Init]: Named citizens but no traits/routines — personality without complex AI scheduling
 - [Init]: Single currency (credits) — cozy promise requires no resource stress
 - [Init]: No tutorial — citizens' wishes are the implicit tutorial
+- [01-01]: Pure C# event delegates for signal bus instead of Godot [Signal] — avoids marshalling overhead and IsConnected bugs
+- [01-01]: Arrays initialized to System.Array.Empty<string>() to prevent null serialization pitfall in Godot Resources
 
 ### Pending Todos
 
@@ -61,5 +63,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-02
-Stopped at: Roadmap created and written to .planning/ROADMAP.md; requirements traceability updated in .planning/REQUIREMENTS.md
+Stopped at: Completed 01-01-PLAN.md (core architecture: GameEvents, SafeNode, 4 Resource subclasses)
 Resume file: None

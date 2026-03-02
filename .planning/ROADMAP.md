@@ -36,7 +36,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 2 plans
 
 Plans:
-- [ ] 01-01-PLAN.md -- Core architecture: GameEvents Autoload, SafeNode base class, Resource subclasses
+- [x] 01-01-PLAN.md -- Core architecture: GameEvents Autoload, SafeNode base class, Resource subclasses
 - [ ] 01-02-PLAN.md -- Camera system: OrbitalCamera, environment setup, QuickTest scene
 
 ### Phase 2: Ring Geometry and Segment Grid
@@ -130,7 +130,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation and Project Architecture | 0/2 | Planned | - |
+| 1. Foundation and Project Architecture | 1/2 | In Progress | - |
 | 2. Ring Geometry and Segment Grid | 0/TBD | Not started | - |
 | 3. Economy Foundation | 0/TBD | Not started | - |
 | 4. Room Placement and Build Interaction | 0/TBD | Not started | - |
@@ -141,4 +141,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 ---
 *Roadmap created: 2026-03-02*
-*Last updated: 2026-03-02 after initial creation*
+*Last updated: 2026-03-02 after 01-01 completion*

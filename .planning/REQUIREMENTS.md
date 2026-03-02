@@ -105,7 +105,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | RING-01 | Phase 2 | Pending |
-| RING-02 | Phase 1 | Pending |
+| RING-02 | Phase 1 | In Progress |
 | RING-03 | Phase 2 | Pending |
 | BLDG-01 | Phase 4 | Pending |
 | BLDG-02 | Phase 4 | Pending |
