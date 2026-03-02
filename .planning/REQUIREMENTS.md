@@ -104,37 +104,37 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| RING-01 | — | Pending |
-| RING-02 | — | Pending |
-| RING-03 | — | Pending |
-| BLDG-01 | — | Pending |
-| BLDG-02 | — | Pending |
-| BLDG-03 | — | Pending |
-| BLDG-04 | — | Pending |
-| BLDG-05 | — | Pending |
-| BLDG-06 | — | Pending |
-| ECON-01 | — | Pending |
-| ECON-02 | — | Pending |
-| ECON-03 | — | Pending |
-| ECON-04 | — | Pending |
-| ECON-05 | — | Pending |
-| CTZN-01 | — | Pending |
-| CTZN-02 | — | Pending |
-| CTZN-03 | — | Pending |
-| CTZN-04 | — | Pending |
-| WISH-01 | — | Pending |
-| WISH-02 | — | Pending |
-| WISH-03 | — | Pending |
-| WISH-04 | — | Pending |
-| PROG-01 | — | Pending |
-| PROG-02 | — | Pending |
-| PROG-03 | — | Pending |
+| RING-01 | Phase 2 | Pending |
+| RING-02 | Phase 1 | Pending |
+| RING-03 | Phase 2 | Pending |
+| BLDG-01 | Phase 4 | Pending |
+| BLDG-02 | Phase 4 | Pending |
+| BLDG-03 | Phase 4 | Pending |
+| BLDG-04 | Phase 4 | Pending |
+| BLDG-05 | Phase 4 | Pending |
+| BLDG-06 | Phase 4 | Pending |
+| ECON-01 | Phase 3 | Pending |
+| ECON-02 | Phase 3 | Pending |
+| ECON-03 | Phase 3 | Pending |
+| ECON-04 | Phase 3 | Pending |
+| ECON-05 | Phase 3 | Pending |
+| CTZN-01 | Phase 5 | Pending |
+| CTZN-02 | Phase 5 | Pending |
+| CTZN-03 | Phase 5 | Pending |
+| CTZN-04 | Phase 5 | Pending |
+| WISH-01 | Phase 6 | Pending |
+| WISH-02 | Phase 6 | Pending |
+| WISH-03 | Phase 6 | Pending |
+| WISH-04 | Phase 6 | Pending |
+| PROG-01 | Phase 7 | Pending |
+| PROG-02 | Phase 7 | Pending |
+| PROG-03 | Phase 7 | Pending |
 
 **Coverage:**
 - v1 requirements: 25 total
-- Mapped to phases: 0
-- Unmapped: 25 ⚠️
+- Mapped to phases: 25
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-03-02*
-*Last updated: 2026-03-02 after initial definition*
+*Last updated: 2026-03-02 after roadmap creation — all 25 requirements mapped*
