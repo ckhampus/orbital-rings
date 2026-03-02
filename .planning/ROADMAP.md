@@ -33,7 +33,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Resource subclasses for RoomDefinition, WishTemplate, and CitizenData exist and are editable in the Godot Inspector
   4. A quick-test scene with 2-3 placeholder objects loads in under 3 seconds and serves as the iteration sandbox
   5. Signal disconnect pattern is established in a base class or documented convention before any gameplay signal is connected
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 01-01-PLAN.md -- Core architecture: GameEvents Autoload, SafeNode base class, Resource subclasses
+- [ ] 01-02-PLAN.md -- Camera system: OrbitalCamera, environment setup, QuickTest scene
 
 ### Phase 2: Ring Geometry and Segment Grid
 **Goal**: The ring is visible, its 24 segments are selectable by mouse click using polar math (not trimesh collision), and inner vs. outer positions are visually readable
@@ -126,7 +130,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation and Project Architecture | 0/TBD | Not started | - |
+| 1. Foundation and Project Architecture | 0/2 | Planned | - |
 | 2. Ring Geometry and Segment Grid | 0/TBD | Not started | - |
 | 3. Economy Foundation | 0/TBD | Not started | - |
 | 4. Room Placement and Build Interaction | 0/TBD | Not started | - |
