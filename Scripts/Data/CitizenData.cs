@@ -14,9 +14,9 @@ public partial class CitizenData : Resource
   /// </summary>
   public enum BodyType
   {
-    Tall,
-    Short,
-    Round
+	Tall,
+	Short,
+	Round
   }
 
   [ExportGroup("Identity")]

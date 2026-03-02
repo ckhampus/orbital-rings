@@ -1,30 +1,31 @@
-[gd_scene load_steps=5 format=3 uid="uid://quicktestscene01"]
+[gd_scene format=3 uid="uid://dmfcut7cit0mq"]
 
-[ext_resource type="Environment" path="res://Resources/Environment/DefaultEnvironment.tres" id="1_env"]
-[ext_resource type="Script" path="res://Scripts/Camera/OrbitalCamera.cs" id="2_cam"]
-[ext_resource type="PackedScene" path="res://Scenes/Ring/Ring.tscn" id="3_ring"]
-[ext_resource type="Script" path="res://Scripts/UI/SegmentTooltip.cs" id="4_tooltip"]
+[ext_resource type="Environment" uid="uid://cmirfq04r2ctg" path="res://Resources/Environment/DefaultEnvironment.tres" id="1_env"]
+[ext_resource type="Script" uid="uid://dnrhst8pnjsbm" path="res://Scripts/Camera/OrbitalCamera.cs" id="2_cam"]
+[ext_resource type="PackedScene" uid="uid://bswc7inj8s2ht" path="res://Scenes/Ring/Ring.tscn" id="3_ring"]
+[ext_resource type="Script" uid="uid://c61pt15u8658w" path="res://Scripts/UI/SegmentTooltip.cs" id="4_tooltip"]
 
-[node name="QuickTestScene" type="Node3D"]
+[node name="QuickTestScene" type="Node3D" unique_id=884004654]
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=814426413]
 environment = ExtResource("1_env")
 
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=915253001]
 transform = Transform3D(1, 0, 0, 0, 0.707107, 0.707107, 0, -0.707107, 0.707107, 0, 10, 0)
-light_color = Color(1.0, 0.98, 0.95, 1)
+light_color = Color(1, 0.98, 0.95, 1)
 light_energy = 1.2
 shadow_enabled = true
 
-[node name="Ring" parent="." instance=ExtResource("3_ring")]
+[node name="Ring" parent="." unique_id=1620800922 instance=ExtResource("3_ring")]
 
-[node name="CameraRig" type="Node3D" parent="."]
+[node name="CameraRig" type="Node3D" parent="." unique_id=1861080985]
 script = ExtResource("2_cam")
+TiltAngleDeg = 45.0
 
-[node name="Camera3D" type="Camera3D" parent="CameraRig"]
+[node name="Camera3D" type="Camera3D" parent="CameraRig" unique_id=2034811885]
 
-[node name="TooltipLayer" type="CanvasLayer" parent="."]
+[node name="TooltipLayer" type="CanvasLayer" parent="." unique_id=1571741361]
 layer = 10
 
-[node name="SegmentTooltip" type="PanelContainer" parent="TooltipLayer"]
+[node name="SegmentTooltip" type="PanelContainer" parent="TooltipLayer" unique_id=1285651752]
 script = ExtResource("4_tooltip")
