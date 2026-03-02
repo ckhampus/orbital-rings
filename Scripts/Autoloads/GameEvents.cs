@@ -38,6 +38,32 @@ public partial class GameEvents : Node
   public void EmitCameraOrbitStopped() => CameraOrbitStopped?.Invoke();
 
   // ---------------------------------------------------------------------------
+  // Segment Events (Phase 2)
+  // ---------------------------------------------------------------------------
+
+  /// <param name="index">Segment clock position (0-11).</param>
+  /// <param name="isOuter">True if outer row, false if inner row.</param>
+  public event Action<int, bool> SegmentHovered;
+  public event Action SegmentUnhovered;
+
+  /// <param name="index">Segment clock position (0-11).</param>
+  /// <param name="isOuter">True if outer row, false if inner row.</param>
+  public event Action<int, bool> SegmentSelected;
+  public event Action SegmentDeselected;
+
+  public void EmitSegmentHovered(int index, bool isOuter)
+    => SegmentHovered?.Invoke(index, isOuter);
+
+  public void EmitSegmentUnhovered()
+    => SegmentUnhovered?.Invoke();
+
+  public void EmitSegmentSelected(int index, bool isOuter)
+    => SegmentSelected?.Invoke(index, isOuter);
+
+  public void EmitSegmentDeselected()
+    => SegmentDeselected?.Invoke();
+
+  // ---------------------------------------------------------------------------
   // Room Events (Phase 4)
   // ---------------------------------------------------------------------------
 

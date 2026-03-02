@@ -1,22 +1,8 @@
-[gd_scene load_steps=7 format=3 uid="uid://quicktestscene01"]
+[gd_scene load_steps=4 format=3 uid="uid://quicktestscene01"]
 
 [ext_resource type="Environment" path="res://Resources/Environment/DefaultEnvironment.tres" id="1_env"]
 [ext_resource type="Script" path="res://Scripts/Camera/OrbitalCamera.cs" id="2_cam"]
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ring01"]
-albedo_color = Color(0.85, 0.75, 0.85, 1)
-
-[sub_resource type="BoxMesh" id="BoxMesh_box01"]
-size = Vector3(0.6, 0.4, 0.6)
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_box01"]
-albedo_color = Color(0.9, 0.8, 0.6, 1)
-
-[sub_resource type="BoxMesh" id="BoxMesh_box02"]
-size = Vector3(0.5, 0.5, 0.5)
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_box02"]
-albedo_color = Color(0.7, 0.85, 0.8, 1)
+[ext_resource type="PackedScene" path="res://Scenes/Ring/Ring.tscn" id="3_ring"]
 
 [node name="QuickTestScene" type="Node3D"]
 
@@ -29,29 +15,7 @@ light_color = Color(1.0, 0.98, 0.95, 1)
 light_energy = 1.2
 shadow_enabled = true
 
-[node name="PlaceholderRing" type="CSGCombiner3D" parent="."]
-
-[node name="OuterDisc" type="CSGCylinder3D" parent="PlaceholderRing"]
-radius = 6.0
-height = 0.3
-sides = 48
-material = SubResource("StandardMaterial3D_ring01")
-
-[node name="InnerHole" type="CSGCylinder3D" parent="PlaceholderRing"]
-operation = 2
-radius = 3.0
-height = 0.5
-sides = 48
-
-[node name="PlaceholderBox1" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, 0.35, 0)
-mesh = SubResource("BoxMesh_box01")
-surface_material_override/0 = SubResource("StandardMaterial3D_box01")
-
-[node name="PlaceholderBox2" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.5, 0.4, 0)
-mesh = SubResource("BoxMesh_box02")
-surface_material_override/0 = SubResource("StandardMaterial3D_box02")
+[node name="Ring" parent="." instance=ExtResource("3_ring")]
 
 [node name="CameraRig" type="Node3D" parent="."]
 script = ExtResource("2_cam")
