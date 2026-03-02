@@ -1,0 +1,116 @@
+using System;
+using Godot;
+
+namespace OrbitalRings.Autoloads;
+
+/// <summary>
+/// Centralized signal bus for all cross-system communication.
+/// Registered as an Autoload in project.godot -- access via GameEvents.Instance.
+///
+/// Uses pure C# event delegates (not Godot [Signal]) to avoid:
+/// - Marshalling overhead crossing C#/engine boundary
+/// - IsConnected bugs with custom C# signals (GitHub #76690)
+/// - Disconnect errors on unconnected signals (GitHub #72994)
+///
+/// All events use null-safe Emit helpers via ?.Invoke() pattern.
+/// </summary>
+public partial class GameEvents : Node
+{
+  /// <summary>
+  /// Singleton instance, set in _Ready(). Guaranteed non-null after scene loads
+  /// because Autoloads initialize before any scene nodes enter the tree.
+  /// </summary>
+  public static GameEvents Instance { get; private set; }
+
+  public override void _Ready()
+  {
+    Instance = this;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Camera Events
+  // ---------------------------------------------------------------------------
+
+  public event Action CameraOrbitStarted;
+  public event Action CameraOrbitStopped;
+
+  public void EmitCameraOrbitStarted() => CameraOrbitStarted?.Invoke();
+  public void EmitCameraOrbitStopped() => CameraOrbitStopped?.Invoke();
+
+  // ---------------------------------------------------------------------------
+  // Room Events (Phase 4)
+  // ---------------------------------------------------------------------------
+
+  /// <param name="roomType">The RoomDefinition.RoomId of the placed room.</param>
+  /// <param name="segmentIndex">Ring segment index where the room was placed.</param>
+  public event Action<string, int> RoomPlaced;
+
+  /// <param name="segmentIndex">Ring segment index of the demolished room.</param>
+  public event Action<int> RoomDemolished;
+
+  public void EmitRoomPlaced(string roomType, int segmentIndex)
+    => RoomPlaced?.Invoke(roomType, segmentIndex);
+
+  public void EmitRoomDemolished(int segmentIndex)
+    => RoomDemolished?.Invoke(segmentIndex);
+
+  // ---------------------------------------------------------------------------
+  // Citizen Events (Phase 5)
+  // ---------------------------------------------------------------------------
+
+  /// <param name="citizenName">Display name of the arriving citizen.</param>
+  public event Action<string> CitizenArrived;
+
+  /// <param name="citizenName">Display name of the departing citizen.</param>
+  public event Action<string> CitizenDeparted;
+
+  public void EmitCitizenArrived(string citizenName)
+    => CitizenArrived?.Invoke(citizenName);
+
+  public void EmitCitizenDeparted(string citizenName)
+    => CitizenDeparted?.Invoke(citizenName);
+
+  // ---------------------------------------------------------------------------
+  // Wish Events (Phase 6)
+  // ---------------------------------------------------------------------------
+
+  /// <param name="citizenName">Name of the citizen who generated the wish.</param>
+  /// <param name="wishType">The WishTemplate.WishId of the generated wish.</param>
+  public event Action<string, string> WishGenerated;
+
+  /// <param name="citizenName">Name of the citizen whose wish was fulfilled.</param>
+  /// <param name="wishType">The WishTemplate.WishId of the fulfilled wish.</param>
+  public event Action<string, string> WishFulfilled;
+
+  public void EmitWishGenerated(string citizenName, string wishType)
+    => WishGenerated?.Invoke(citizenName, wishType);
+
+  public void EmitWishFulfilled(string citizenName, string wishType)
+    => WishFulfilled?.Invoke(citizenName, wishType);
+
+  // ---------------------------------------------------------------------------
+  // Economy Events (Phase 3)
+  // ---------------------------------------------------------------------------
+
+  /// <param name="newBalance">Updated credit balance after the change.</param>
+  public event Action<int> CreditsChanged;
+
+  /// <param name="newHappiness">Updated station happiness value (0.0 - 1.0+).</param>
+  public event Action<float> HappinessChanged;
+
+  public void EmitCreditsChanged(int newBalance)
+    => CreditsChanged?.Invoke(newBalance);
+
+  public void EmitHappinessChanged(float newHappiness)
+    => HappinessChanged?.Invoke(newHappiness);
+
+  // ---------------------------------------------------------------------------
+  // Progression Events (Phase 7)
+  // ---------------------------------------------------------------------------
+
+  /// <param name="roomType">The RoomDefinition.RoomId of the unlocked blueprint.</param>
+  public event Action<string> BlueprintUnlocked;
+
+  public void EmitBlueprintUnlocked(string roomType)
+    => BlueprintUnlocked?.Invoke(roomType);
+}

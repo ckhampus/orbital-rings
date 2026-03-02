@@ -14,6 +14,10 @@ config/name="Orbital Rings"
 config/features=PackedStringArray("4.6", "Forward Plus")
 config/icon="res://icon.svg"
 
+[autoload]
+
+GameEvents="*res://Scripts/Autoloads/GameEvents.cs"
+
 [dotnet]
 
 project/assembly_name="Orbital Rings"
