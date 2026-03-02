@@ -8,8 +8,9 @@ namespace OrbitalRings.Camera;
 /// idle auto-orbit, and WASD/right-click-drag input around a central point.
 ///
 /// Attach to a Node3D ("CameraRig") at world origin with a child Camera3D.
-/// The rig rotates on Y (orbit), the child Camera3D is offset on Z (zoom)
-/// and tilted on X (fixed overhead angle).
+/// The rig rotates on Y (orbit). The child Camera3D is positioned using
+/// spherical coordinates (tilt angle + distance) so it always looks at the
+/// origin from an elevated vantage point.
 ///
 /// Does NOT extend SafeNode — the camera manages its own lifecycle as a
 /// scene-level node, not a signal consumer.
@@ -64,12 +65,13 @@ public partial class OrbitalCamera : Node3D
     _targetZoom = ZoomMax;
     _currentZoom = ZoomMax;
 
-    // Fixed tilt angle (strategy-game overhead view)
-    _camera.RotationDegrees = new Vector3(-TiltAngleDeg, 0, 0);
-    _camera.Position = new Vector3(0, 0, _currentZoom);
+    // Position camera using spherical coordinates and look at origin.
+    // The CameraRig sits at world origin; Camera3D is offset so it
+    // looks down at the pivot from the correct tilt angle and distance.
+    UpdateCameraTransform();
   }
 
-  public override void _UnhandledInput(InputEvent @event)
+  public override void _Input(InputEvent @event)
   {
     // Right-click press/release: toggle drag mode
     if (@event is InputEventMouseButton mb)
@@ -124,7 +126,9 @@ public partial class OrbitalCamera : Node3D
 
     // Smooth zoom (lerp toward target)
     _currentZoom = Mathf.Lerp(_currentZoom, _targetZoom, ZoomSmoothing * dt);
-    _camera.Position = new Vector3(0, 0, _currentZoom);
+
+    // Update camera position and orientation to maintain tilt + distance
+    UpdateCameraTransform();
 
     // Idle orbit: gentle auto-orbit after timeout with no input
     _idleTimer += dt;
@@ -153,6 +157,25 @@ public partial class OrbitalCamera : Node3D
   private void ResetIdleTimer()
   {
     _idleTimer = 0f;
+  }
+
+  /// <summary>
+  /// Position the Camera3D using spherical coordinates so it looks down
+  /// at the CameraRig pivot (world origin) from the configured tilt angle
+  /// and current zoom distance.
+  ///
+  /// Y = zoom * sin(tilt) = height above ground
+  /// Z = zoom * cos(tilt) = horizontal distance from pivot
+  /// Then LookAt(origin) to point the camera correctly.
+  /// </summary>
+  private void UpdateCameraTransform()
+  {
+    float tiltRad = Mathf.DegToRad(TiltAngleDeg);
+    float height = _currentZoom * Mathf.Sin(tiltRad);
+    float distance = _currentZoom * Mathf.Cos(tiltRad);
+
+    _camera.Position = new Vector3(0, height, distance);
+    _camera.LookAt(Vector3.Zero, Vector3.Up);
   }
 
   /// <summary>
