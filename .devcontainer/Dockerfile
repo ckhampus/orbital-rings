@@ -52,6 +52,22 @@ RUN ARCH=$(dpkg --print-architecture) && \
   sudo dpkg -i "git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb" && \
   rm "git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb"
 
+# Install .NET 10 SDK via dotnet-install.sh (works on all architectures)
+ENV DOTNET_ROOT=/usr/local/share/dotnet
+ENV DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
+ENV DOTNET_NOLOGO=1
+ENV DOTNET_GENERATE_ASPNET_CERTIFICATE=false
+ENV DOTNET_CLI_TELEMETRY_OPTOUT=1
+RUN curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh && \
+  chmod +x /tmp/dotnet-install.sh && \
+  /tmp/dotnet-install.sh --channel 10.0 --install-dir /usr/local/share/dotnet && \
+  rm /tmp/dotnet-install.sh && \
+  ln -sf /usr/local/share/dotnet/dotnet /usr/local/bin/dotnet
+
+# Install csharp-language-server as a shared global tool
+RUN dotnet tool install --tool-path /usr/local/share/dotnet-global-tools csharp-ls
+ENV PATH="$PATH:/usr/local/share/dotnet-global-tools"
+
 # Set up non-root user
 USER node
 

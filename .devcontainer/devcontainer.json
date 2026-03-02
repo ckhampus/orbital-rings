@@ -16,6 +16,7 @@
     "vscode": {
       "extensions": [
         "anthropic.claude-code",
+        "ms-dotnettools.csdevkit",
         "dbaeumer.vscode-eslint",
         "esbenp.prettier-vscode",
         "eamodio.gitlens"
