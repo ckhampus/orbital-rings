@@ -102,7 +102,12 @@ Plans:
   3. Citizens visibly drift toward and enter rooms that are relevant to their current state (proximity-based, not teleport)
   4. Clicking a citizen opens a panel showing their name and current wish (or "no wish" if none active)
   5. When a citizen is removed (for testing), its signal connections are cleaned up with zero orphan nodes reported in the Godot debugger
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 05-01-PLAN.md -- Core citizen system: GameEvents updates, CitizenNames, CitizenAppearance, CitizenNode walking, CitizenManager Autoload with 5 starter citizens
+- [ ] 05-02-PLAN.md -- Citizen behavior and interaction: room visit drift-fade animation, click detection, CitizenInfoPanel popup, emission glow
+- [ ] 05-03-PLAN.md -- Human verification checkpoint for complete citizen system
 
 ### Phase 6: Wish System
 **Goal**: Citizens generate wishes expressed as speech bubbles, those wishes remain visible and harmless until fulfilled, and wishes span all four defined categories
@@ -150,7 +155,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 2. Ring Geometry and Segment Grid | 2/2 | Complete | 2026-03-02 |
 | 3. Economy Foundation | 3/3 | Complete | 2026-03-03 |
 | 4. Room Placement and Build Interaction | 4/4 | Complete | 2026-03-03 |
-| 5. Citizens and Navigation | 0/TBD | Not started | - |
+| 5. Citizens and Navigation | 0/3 | Not started | - |
 | 6. Wish System | 0/TBD | Not started | - |
 | 7. Happiness and Progression | 0/TBD | Not started | - |
 | 8. Polish and Loop Closure | 0/TBD | Not started | - |
