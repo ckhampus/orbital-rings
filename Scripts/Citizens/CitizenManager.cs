@@ -3,6 +3,7 @@ using Godot;
 using OrbitalRings.Autoloads;
 using OrbitalRings.Core;
 using OrbitalRings.Data;
+using OrbitalRings.Ring;
 
 namespace OrbitalRings.Citizens;
 
@@ -10,6 +11,9 @@ namespace OrbitalRings.Citizens;
 /// Autoload singleton managing citizen lifecycle: spawning, tracking, and removal.
 /// Spawns 5 starter citizens at game start with distinct appearances, evenly spaced
 /// around the walkway ring. Updates EconomyManager with citizen count for income calculation.
+///
+/// Handles click detection via ray-plane intersection and polar proximity,
+/// showing CitizenInfoPanel with emission glow on selected citizen.
 ///
 /// Extends SafeNode for consistent signal lifecycle management.
 /// Access via CitizenManager.Instance (set in _Ready, before scene nodes enter tree).
@@ -28,7 +32,7 @@ public partial class CitizenManager : SafeNode
     /// <summary>Current number of active citizens.</summary>
     public int CitizenCount => _citizens.Count;
 
-    /// <summary>Read-only access to citizen list (for click detection iteration in Plan 02).</summary>
+    /// <summary>Read-only access to citizen list (for click detection iteration).</summary>
     public IReadOnlyList<CitizenNode> Citizens => _citizens;
 
     // -------------------------------------------------------------------------
@@ -48,6 +52,12 @@ public partial class CitizenManager : SafeNode
     };
 
     // -------------------------------------------------------------------------
+    // Ring reference (for SegmentGrid access)
+    // -------------------------------------------------------------------------
+
+    private SegmentGrid _grid;
+
+    // -------------------------------------------------------------------------
     // Lifecycle
     // -------------------------------------------------------------------------
 
@@ -55,6 +65,18 @@ public partial class CitizenManager : SafeNode
     {
         base._Ready();
         Instance = this;
+
+        // Find the RingVisual and cache its grid for citizen visit occupancy checks
+        // Same pattern as BuildManager: FindChild from Root
+        var ringVisual = GetTree().Root.FindChild("Ring", true, false) as RingVisual;
+        if (ringVisual != null)
+        {
+            _grid = ringVisual.Grid;
+        }
+        else
+        {
+            GD.PushWarning("CitizenManager: RingVisual not found. Room visits will be disabled.");
+        }
 
         // Spawn 5 starter citizens evenly spaced around the ring
         SpawnStarterCitizens(5);
@@ -94,10 +116,10 @@ public partial class CitizenManager : SafeNode
                 data.SecondaryColor = Palette[GD.RandRange(0, Palette.Length - 1)];
             }
 
-            // Create and initialize CitizenNode
+            // Create and initialize CitizenNode with grid reference for room visits
             var citizen = new CitizenNode();
             float startAngle = (float)i / count * Mathf.Tau;
-            citizen.Initialize(data, startAngle);
+            citizen.Initialize(data, startAngle, _grid);
 
             AddChild(citizen);
             _citizens.Add(citizen);
