@@ -755,14 +755,118 @@ public partial class BuildPanel : PanelContainer
 
     /// <summary>
     /// Called when a new room blueprint is unlocked by HappinessManager.
-    /// Re-loads all room definitions (now includes newly unlocked rooms)
-    /// and refreshes the current tab to show new rooms immediately.
-    /// Tab glow effect handled in Plan 02.
+    /// Re-loads all room definitions (now includes newly unlocked rooms),
+    /// refreshes the current tab, glows the relevant category tab, and
+    /// shows a centered "New rooms available!" notification.
     /// </summary>
     private void OnBlueprintUnlocked(string roomType)
     {
         LoadRoomDefinitions();
         PopulateRoomCards(Categories[_activeTabIndex]);
+
+        // Find and glow the category tab for the newly unlocked room
+        var def = ResourceLoader.Load<RoomDefinition>($"res://Resources/Rooms/{roomType}.tres");
+        if (def != null)
+        {
+            int tabIndex = System.Array.IndexOf(Categories, def.Category);
+            GlowTab(tabIndex);
+        }
+
+        // Show centered notification (only once per milestone, not per room --
+        // but since BlueprintUnlocked fires per-room, we debounce via frame check)
+        if (!_unlockNotificationShownThisFrame)
+        {
+            _unlockNotificationShownThisFrame = true;
+            ShowUnlockNotification();
+
+            // Reset the flag next frame so future milestones can show it again
+            CallDeferred(MethodName.ResetUnlockNotificationFlag);
+        }
+    }
+
+    /// <summary>Per-frame debounce flag for unlock notification (multiple rooms unlock at once).</summary>
+    private bool _unlockNotificationShownThisFrame;
+
+    private void ResetUnlockNotificationFlag()
+    {
+        _unlockNotificationShownThisFrame = false;
+    }
+
+    /// <summary>
+    /// Applies a brief warm gold glow to the specified category tab button,
+    /// then fades back to the normal inactive style after 1.5 seconds.
+    /// Uses per-tab StyleBoxFlat instances to avoid shared-material contamination.
+    /// </summary>
+    private void GlowTab(int tabIndex)
+    {
+        if (tabIndex < 0 || tabIndex >= _tabButtons.Count) return;
+        var btn = _tabButtons[tabIndex];
+
+        Color glowColor = new Color(0.9f, 0.8f, 0.3f, 0.95f);
+
+        var glowStyle = new StyleBoxFlat
+        {
+            BgColor = glowColor,
+            CornerRadiusTopLeft = 4,
+            CornerRadiusTopRight = 4,
+            ContentMarginLeft = 8,
+            ContentMarginRight = 8,
+            ContentMarginTop = 4,
+            ContentMarginBottom = 4
+        };
+        btn.AddThemeStyleboxOverride("normal", glowStyle);
+        btn.AddThemeStyleboxOverride("hover", glowStyle);
+        btn.AddThemeStyleboxOverride("pressed", glowStyle);
+
+        // Fade back to normal after 1.5s
+        var tween = btn.CreateTween();
+        tween.TweenCallback(Callable.From(() =>
+        {
+            var normalStyle = new StyleBoxFlat
+            {
+                BgColor = InactiveTabBg,
+                CornerRadiusTopLeft = 4,
+                CornerRadiusTopRight = 4,
+                ContentMarginLeft = 8,
+                ContentMarginRight = 8,
+                ContentMarginTop = 4,
+                ContentMarginBottom = 4
+            };
+            btn.AddThemeStyleboxOverride("normal", normalStyle);
+            btn.AddThemeStyleboxOverride("hover", normalStyle);
+            btn.AddThemeStyleboxOverride("pressed", normalStyle);
+        })).SetDelay(1.5f);
+    }
+
+    /// <summary>
+    /// Shows a centered "New rooms available!" floating label that drifts up
+    /// and fades over ~3 seconds. Added to the parent CanvasLayer (BuildUILayer).
+    /// Per locked decision: centered floating text drifts up and fades (~3s).
+    /// </summary>
+    private void ShowUnlockNotification()
+    {
+        var label = new Label();
+        label.Text = "New rooms available!";
+        label.AddThemeColorOverride("font_color", new Color(1.0f, 0.9f, 0.4f));
+        label.AddThemeFontSizeOverride("font_size", 24);
+        label.HorizontalAlignment = HorizontalAlignment.Center;
+        label.MouseFilter = MouseFilterEnum.Ignore;
+
+        // Add to parent CanvasLayer (BuildUILayer) so it floats above the panel
+        GetParent().AddChild(label);
+
+        var viewport = GetViewport().GetVisibleRect().Size;
+        label.Position = new Vector2(viewport.X / 2 - 120, viewport.Y / 3);
+
+        var tween = label.CreateTween();
+        tween.SetParallel(true);
+        tween.TweenProperty(label, "position:y", label.Position.Y - 80f, 2.5f)
+            .SetEase(Tween.EaseType.Out);
+        tween.TweenProperty(label, "modulate:a", 0.0f, 2.5f)
+            .SetEase(Tween.EaseType.In)
+            .SetDelay(0.5f);
+        tween.SetParallel(false);
+        tween.TweenCallback(Callable.From(label.QueueFree));
     }
 
     // -------------------------------------------------------------------------

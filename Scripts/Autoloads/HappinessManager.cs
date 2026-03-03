@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Godot;
 using OrbitalRings.Citizens;
 using OrbitalRings.Data;
+using OrbitalRings.UI;
 
 namespace OrbitalRings.Autoloads;
 
@@ -92,6 +93,12 @@ public partial class HappinessManager : Node
     /// </summary>
     private readonly Dictionary<int, int> _housingRoomCapacities = new();
 
+    /// <summary>
+    /// CanvasLayer for displaying arrival floating text from this Autoload.
+    /// Created in _Ready() since Autoloads aren't in the scene tree's UI layer.
+    /// </summary>
+    private CanvasLayer _arrivalCanvasLayer;
+
     // -------------------------------------------------------------------------
     // Public API
     // -------------------------------------------------------------------------
@@ -140,6 +147,10 @@ public partial class HappinessManager : Node
 
         // Scan for any pre-placed housing rooms at startup
         InitializeHousingCapacity();
+
+        // Create CanvasLayer for arrival floating text (same layer as HUDLayer)
+        _arrivalCanvasLayer = new CanvasLayer { Layer = 5 };
+        AddChild(_arrivalCanvasLayer);
     }
 
     public override void _ExitTree()
@@ -211,7 +222,8 @@ public partial class HappinessManager : Node
 
     /// <summary>
     /// Periodic check (~60s): roll a probability based on happiness.
-    /// If successful and population is below housing capacity, spawn a citizen.
+    /// If successful and population is below housing capacity, spawn a citizen
+    /// with fade-in animation and floating arrival text.
     /// </summary>
     private void OnArrivalCheck()
     {
@@ -224,8 +236,34 @@ public partial class HappinessManager : Node
         float chance = _happiness * ArrivalProbabilityScale;
         if (GD.Randf() < chance)
         {
-            CitizenManager.Instance?.SpawnCitizen();
+            var citizen = CitizenManager.Instance?.SpawnCitizen();
+            if (citizen != null)
+            {
+                // Fade-in animation (locked decision: "new citizen capsule fades in on walkway")
+                citizen.Modulate = new Color(1, 1, 1, 0);
+                var fadeTween = citizen.CreateTween();
+                fadeTween.TweenProperty(citizen, "modulate:a", 1.0f, 0.5f)
+                    .SetEase(Tween.EaseType.Out);
+
+                // Floating arrival text
+                string name = citizen.Data?.CitizenName ?? "A citizen";
+                SpawnArrivalText($"{name} has arrived!");
+            }
         }
+    }
+
+    /// <summary>
+    /// Spawns a floating "Name has arrived!" text at screen center using
+    /// the reusable FloatingText class. Warm mint color for arrival fanfare.
+    /// </summary>
+    private void SpawnArrivalText(string message)
+    {
+        var floater = new FloatingText();
+        _arrivalCanvasLayer.AddChild(floater);
+
+        var viewport = GetViewport().GetVisibleRect().Size;
+        Vector2 center = new Vector2(viewport.X / 2 - 80, viewport.Y / 2 - 60);
+        floater.Setup(message, new Color(0.6f, 0.9f, 0.7f), center);
     }
 
     // -------------------------------------------------------------------------
