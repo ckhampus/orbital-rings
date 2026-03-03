@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 1: Foundation and Project Architecture** - Establish signal bus, data schema, camera, and architectural patterns before any gameplay code is written
 - [ ] **Phase 2: Ring Geometry and Segment Grid** - Build the polar segment grid, ring mesh, and visual segment differentiation that everything else sits on
 - [ ] **Phase 3: Economy Foundation** - Implement the credit economy, passive income, balance spreadsheet, and EconomyManager Autoload
-- [ ] **Phase 4: Room Placement and Build Interaction** - Wire room placement into the ring, all 5 categories with placeholder art, demolish, and satisfying placement feedback
+- [x] **Phase 4: Room Placement and Build Interaction** - Wire room placement into the ring, all 5 categories with placeholder art, demolish, and satisfying placement feedback
 - [ ] **Phase 5: Citizens and Navigation** - Spawn named walking citizens on the ring walkway with a navigation approach proven by prototype
 - [ ] **Phase 6: Wish System** - Citizens express wishes via speech bubbles; wishes linger harmlessly and are visible on click
 - [ ] **Phase 7: Happiness and Progression** - Wish fulfillment raises happiness, happiness drives citizen arrival and blueprint unlocks
@@ -87,10 +87,10 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 04-01-PLAN.md -- Room data layer, BuildManager Autoload, and RoomVisual rendering system
-- [ ] 04-02-PLAN.md -- BuildPanel bottom toolbar UI and SegmentInteraction build mode delegation
-- [ ] 04-03-PLAN.md -- PlacementFeedback with tween animations, particles, and procedural audio
-- [ ] 04-04-PLAN.md -- Human verification checkpoint for complete build loop
+- [x] 04-01-PLAN.md -- Room data layer, BuildManager Autoload, and RoomVisual rendering system
+- [x] 04-02-PLAN.md -- BuildPanel bottom toolbar UI and SegmentInteraction build mode delegation
+- [x] 04-03-PLAN.md -- PlacementFeedback with tween animations, particles, and procedural audio
+- [x] 04-04-PLAN.md -- Human verification checkpoint for complete build loop
 
 ### Phase 5: Citizens and Navigation
 **Goal**: Named citizens with distinct appearances walk the ring walkway continuously and enter rooms based on spatial proximity, with navigation proven by prototype before full implementation
@@ -149,7 +149,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 1. Foundation and Project Architecture | 3/3 | Complete | 2026-03-02 |
 | 2. Ring Geometry and Segment Grid | 2/2 | Complete | 2026-03-02 |
 | 3. Economy Foundation | 3/3 | Complete | 2026-03-03 |
-| 4. Room Placement and Build Interaction | 0/4 | Not started | - |
+| 4. Room Placement and Build Interaction | 4/4 | Complete | 2026-03-03 |
 | 5. Citizens and Navigation | 0/TBD | Not started | - |
 | 6. Wish System | 0/TBD | Not started | - |
 | 7. Happiness and Progression | 0/TBD | Not started | - |
@@ -157,4 +157,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 ---
 *Roadmap created: 2026-03-02*
-*Last updated: 2026-03-03 after Phase 3 completion*
+*Last updated: 2026-03-03 after Phase 4 completion*
