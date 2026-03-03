@@ -138,7 +138,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 07-01-PLAN.md -- Core progression system: HappinessManager Autoload, CitizenManager.SpawnCitizen refactor, BuildPanel unlock filtering
+- [x] 07-01-PLAN.md -- Core progression system: HappinessManager Autoload, CitizenManager.SpawnCitizen refactor, BuildPanel unlock filtering
 - [ ] 07-02-PLAN.md -- HUD and feedback: HappinessBar, PopulationDisplay, arrival fanfare, unlock notifications, human verification
 
 ### Phase 8: Polish and Loop Closure
@@ -166,9 +166,9 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 4. Room Placement and Build Interaction | 4/4 | Complete | 2026-03-03 |
 | 5. Citizens and Navigation | 3/3 | Complete | 2026-03-03 |
 | 6. Wish System | 3/3 | Complete | 2026-03-03 |
-| 7. Happiness and Progression | 0/2 | Not started | - |
+| 7. Happiness and Progression | 1/2 | In progress | - |
 | 8. Polish and Loop Closure | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-03-02*
-*Last updated: 2026-03-03 after Phase 7 planning*
+*Last updated: 2026-03-03 after 07-01 execution*

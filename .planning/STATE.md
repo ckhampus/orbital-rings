@@ -7,8 +7,8 @@ last_updated: "2026-03-03T20:03:52Z"
 progress:
   total_phases: 6
   completed_phases: 6
-  total_plans: 18
-  completed_plans: 18
+  total_plans: 19
+  completed_plans: 19
 ---
 
 # Project State
@@ -22,19 +22,19 @@ See: .planning/PROJECT.md (updated 2026-03-02)
 
 ## Current Position
 
-Phase: 6 of 8 (Wish System) -- COMPLETE
-Plan: 3 of 3 complete in current phase
-Status: Phase 6 complete. All wish system success criteria verified by human. Phase 7 next.
-Last activity: 2026-03-03 - Completed quick task 3: Camera tilt adjustment
+Phase: 7 of 8 (Happiness and Progression)
+Plan: 1 of 1 complete in current phase
+Status: Phase 7 Plan 01 complete. HappinessManager Autoload created with progression engine.
+Last activity: 2026-03-03 - Completed 07-01: Core Progression Engine
 
-Progress: [█████████████░] 86%
+Progress: [██████████████░] 90%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 18
+- Total plans completed: 19
 - Average duration: 3.4 min
-- Total execution time: 1.02 hours
+- Total execution time: 1.07 hours
 
 **By Phase:**
 
@@ -46,9 +46,10 @@ Progress: [█████████████░] 86%
 | 4 | 4 | 9min | 2.3min |
 | 5 | 3/3 | 6min | 2min |
 | 6 | 3/3 | 6min | 2min |
+| 7 | 1/1 | 3min | 3min |
 
 **Recent Trend:**
-- Last 5 plans: 3min, 1min, 2min, 3min, 1min
+- Last 5 plans: 1min, 2min, 3min, 1min, 3min
 - Trend: steady
 
 *Updated after each plan completion*
@@ -122,6 +123,10 @@ Recent decisions affecting current work:
 - [06-02]: Deterministic text variant via citizen name hash -- same citizen always shows same text for same wish type
 - [06-03]: CitizenInfoPanel uses citizen.CurrentWish directly instead of WishBoard.GetWishForCitizen() -- WishBoard lookup was failing silently, direct property access is simpler and reliable
 - [06-03]: Wish system approved by human verification -- all 6 checks passed (generation, info display, fulfillment, lingering, category variety, badge visibility)
+- [07-01]: HappinessGainBase = 0.08 with diminishing returns formula gain = base / (1 + h) -- calibrated for 25% unlock at ~wish 4, 60% at ~wish 12
+- [07-01]: Housing capacity tracked via RoomPlaced/RoomDemolished event subscriptions with Dictionary<int, int> -- avoids polling BuildManager every 60s
+- [07-01]: Starter capacity constant of 5 ensures initial citizens always have housing without housing rooms
+- [07-01]: BuildPanel locked rooms hidden (not greyed out) -- filters via HappinessManager.IsRoomUnlocked in LoadRoomDefinitions
 
 ### Pending Todos
 
@@ -144,5 +149,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Completed quick task 3 (camera tilt adjustment)
-Resume file: .planning/quick/3-i-want-to-be-able-adjust-the-tilt-of-the/3-SUMMARY.md
+Stopped at: Completed 07-01-PLAN.md (Core Progression Engine)
+Resume file: .planning/phases/07-happiness-and-progression/07-01-SUMMARY.md

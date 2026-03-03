@@ -46,9 +46,9 @@ Requirements for initial release (single playable ring proving the core loop).
 
 ### Progression
 
-- [ ] **PROG-01**: Station happiness is tracked and visible to the player
-- [ ] **PROG-02**: New citizens arrive passively as happiness grows
-- [ ] **PROG-03**: New room blueprints unlock at happiness milestones (at least 2-3 unlock moments)
+- [x] **PROG-01**: Station happiness is tracked and visible to the player
+- [x] **PROG-02**: New citizens arrive passively as happiness grows
+- [x] **PROG-03**: New room blueprints unlock at happiness milestones (at least 2-3 unlock moments)
 
 ## v2 Requirements
 
@@ -126,9 +126,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WISH-02 | Phase 6 | Complete |
 | WISH-03 | Phase 6 | Complete |
 | WISH-04 | Phase 6 | Complete |
-| PROG-01 | Phase 7 | Pending |
-| PROG-02 | Phase 7 | Pending |
-| PROG-03 | Phase 7 | Pending |
+| PROG-01 | Phase 7 | Complete |
+| PROG-02 | Phase 7 | Complete |
+| PROG-03 | Phase 7 | Complete |
 
 **Coverage:**
 - v1 requirements: 25 total
