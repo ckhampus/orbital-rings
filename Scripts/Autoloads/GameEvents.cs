@@ -139,11 +139,29 @@ public partial class GameEvents : Node
   /// <param name="citizenName">Display name of the departing citizen.</param>
   public event Action<string> CitizenDeparted;
 
+  /// <param name="citizenName">Display name of the clicked citizen.</param>
+  public event Action<string> CitizenClicked;
+
+  /// <param name="citizenName">Display name of the citizen entering a room.</param>
+  public event Action<string> CitizenEnteredRoom;
+
+  /// <param name="citizenName">Display name of the citizen exiting a room.</param>
+  public event Action<string> CitizenExitedRoom;
+
   public void EmitCitizenArrived(string citizenName)
     => CitizenArrived?.Invoke(citizenName);
 
   public void EmitCitizenDeparted(string citizenName)
     => CitizenDeparted?.Invoke(citizenName);
+
+  public void EmitCitizenClicked(string citizenName)
+    => CitizenClicked?.Invoke(citizenName);
+
+  public void EmitCitizenEnteredRoom(string citizenName)
+    => CitizenEnteredRoom?.Invoke(citizenName);
+
+  public void EmitCitizenExitedRoom(string citizenName)
+    => CitizenExitedRoom?.Invoke(citizenName);
 
   // ---------------------------------------------------------------------------
   // Wish Events (Phase 6)
