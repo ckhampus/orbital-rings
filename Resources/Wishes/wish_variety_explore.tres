@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="WishTemplate" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/Data/WishTemplate.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+WishId = "wish_variety_explore"
+Category = 3
+TextVariants = PackedStringArray("It'd be nice to try something different around here", "I wish there were more things to do on the station", "A change of pace would really lift my spirits")
+FulfillingRoomIds = PackedStringArray("workshop", "garden_nook", "star_lounge")

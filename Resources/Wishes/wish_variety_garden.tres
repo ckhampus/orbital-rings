@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="WishTemplate" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/Data/WishTemplate.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+WishId = "wish_variety_garden"
+Category = 3
+TextVariants = PackedStringArray("I'd love to see some greenery around here", "Growing something living would brighten this place up", "A little garden would be such a nice change")
+FulfillingRoomIds = PackedStringArray("garden_nook")

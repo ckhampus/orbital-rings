@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="WishTemplate" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/Data/WishTemplate.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+WishId = "wish_comfort_loft"
+Category = 1
+TextVariants = PackedStringArray("I'd love a room with a view of the stars", "A lofty space to relax in sounds dreamy", "Waking up to a starfield view would be amazing")
+FulfillingRoomIds = PackedStringArray("sky_loft")

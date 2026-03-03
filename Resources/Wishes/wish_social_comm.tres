@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="WishTemplate" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/Data/WishTemplate.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+WishId = "wish_social_comm"
+Category = 0
+TextVariants = PackedStringArray("I wish I could send messages back home", "It'd be nice to stay connected with the outside", "A way to reach out to old friends would be great")
+FulfillingRoomIds = PackedStringArray("comm_relay")
