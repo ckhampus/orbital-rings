@@ -73,7 +73,7 @@ public partial class CitizenManager : SafeNode
     /// Click proximity threshold in world units.
     /// Generous for small capsules to ensure comfortable click targets.
     /// </summary>
-    private const float ClickProximityThreshold = 0.4f;
+    private const float ClickProximityThreshold = 0.8f;
 
     // -------------------------------------------------------------------------
     // Lifecycle
