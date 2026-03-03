@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-03T18:46:12.959Z"
+last_updated: "2026-03-03T20:03:52Z"
 progress:
   total_phases: 6
   completed_phases: 6
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-03-02)
 Phase: 6 of 8 (Wish System) -- COMPLETE
 Plan: 3 of 3 complete in current phase
 Status: Phase 6 complete. All wish system success criteria verified by human. Phase 7 next.
-Last activity: 2026-03-03 - Completed quick task 2: Bigger hitbox for citizens
+Last activity: 2026-03-03 - Completed quick task 3: Camera tilt adjustment
 
 Progress: [█████████████░] 86%
 
@@ -139,9 +139,10 @@ None yet.
 |---|-------------|------|--------|-----------|
 | 1 | Sometimes citizen walk into a segment where there isn't a room | 2026-03-03 | 6a53319 | [1-sometimes-citizen-walk-into-a-segment-wh](./quick/1-sometimes-citizen-walk-into-a-segment-wh/) |
 | 2 | Bigger hitbox for citizens (ClickProximityThreshold 0.4 to 0.8) | 2026-03-03 | 09f0948 | [2-i-want-a-bigger-hitbox-for-citizens-it-i](./quick/2-i-want-a-bigger-hitbox-for-citizens-it-i/) |
+| 3 | Camera tilt adjustment (W/S keys + middle-mouse, 20-60 deg) | 2026-03-03 | efa59ad | [3-i-want-to-be-able-adjust-the-tilt-of-the](./quick/3-i-want-to-be-able-adjust-the-tilt-of-the/) |
 
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Completed quick task 2 (bigger citizen hitbox)
-Resume file: .planning/quick/2-i-want-a-bigger-hitbox-for-citizens-it-i/2-SUMMARY.md
+Stopped at: Completed quick task 3 (camera tilt adjustment)
+Resume file: .planning/quick/3-i-want-to-be-able-adjust-the-tilt-of-the/3-SUMMARY.md
