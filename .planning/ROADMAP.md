@@ -84,7 +84,13 @@ Plans:
   4. Player can demolish any placed room and see credits returned as a partial refund (less than full cost)
   5. Larger rooms (2-3 segments) are visibly more effective in their stat display and cost more, but cost per segment is lower than a 1-segment room
   6. The ring correctly rejects placement attempts on occupied segments or segments that would exceed the ring boundary
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 04-01-PLAN.md -- Room data layer, BuildManager Autoload, and RoomVisual rendering system
+- [ ] 04-02-PLAN.md -- BuildPanel bottom toolbar UI and SegmentInteraction build mode delegation
+- [ ] 04-03-PLAN.md -- PlacementFeedback with tween animations, particles, and procedural audio
+- [ ] 04-04-PLAN.md -- Human verification checkpoint for complete build loop
 
 ### Phase 5: Citizens and Navigation
 **Goal**: Named citizens with distinct appearances walk the ring walkway continuously and enter rooms based on spatial proximity, with navigation proven by prototype before full implementation
@@ -143,7 +149,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 1. Foundation and Project Architecture | 3/3 | Complete | 2026-03-02 |
 | 2. Ring Geometry and Segment Grid | 2/2 | Complete | 2026-03-02 |
 | 3. Economy Foundation | 3/3 | Complete | 2026-03-03 |
-| 4. Room Placement and Build Interaction | 0/TBD | Not started | - |
+| 4. Room Placement and Build Interaction | 0/4 | Not started | - |
 | 5. Citizens and Navigation | 0/TBD | Not started | - |
 | 6. Wish System | 0/TBD | Not started | - |
 | 7. Happiness and Progression | 0/TBD | Not started | - |
