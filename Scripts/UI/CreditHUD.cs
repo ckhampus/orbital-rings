@@ -9,9 +9,9 @@ namespace OrbitalRings.UI;
 /// floating +N/-N numbers on income/spend/refund, and an income
 /// breakdown tooltip on hover.
 ///
-/// Builds all child nodes programmatically in _Ready(). Manually subscribes
-/// to GameEvents in _EnterTree/_ExitTree (cannot extend SafeNode because
-/// SafeNode extends Node, not Control).
+/// Builds all child nodes programmatically in _Ready(). Subscribes to
+/// GameEvents in _Ready() (not _EnterTree — autoload singletons may not be
+/// initialized yet in C#). Unsubscribes in _ExitTree().
 ///
 /// CanvasLayer layer 5 ensures it renders above 3D but below TooltipLayer (10).
 /// </summary>
@@ -93,16 +93,20 @@ public partial class CreditHUD : MarginContainer
 
         // Build the tooltip panel (hidden by default)
         BuildTooltipPanel();
-    }
 
-    public override void _EnterTree()
-    {
+        // Subscribe to economy events here in _Ready (not _EnterTree) to guarantee
+        // autoload singletons are initialized. _EnterTree can fire before autoload
+        // _Ready in some Godot 4 C# configurations.
         if (GameEvents.Instance != null)
         {
             GameEvents.Instance.CreditsChanged += OnCreditsChanged;
             GameEvents.Instance.IncomeTicked += OnIncomeTicked;
             GameEvents.Instance.CreditsSpent += OnCreditsSpent;
             GameEvents.Instance.CreditsRefunded += OnCreditsRefunded;
+        }
+        else
+        {
+            GD.PushWarning("CreditHUD: GameEvents.Instance is null in _Ready — economy events won't update the HUD.");
         }
     }
 
