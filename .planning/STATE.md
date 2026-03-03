@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-03-02)
 Phase: 6 of 8 (Wish System) -- COMPLETE
 Plan: 3 of 3 complete in current phase
 Status: Phase 6 complete. All wish system success criteria verified by human. Phase 7 next.
-Last activity: 2026-03-03 - Completed quick task 1: Sometimes citizen walk into a segment where there isn't a room
+Last activity: 2026-03-03 - Completed quick task 2: Bigger hitbox for citizens
 
 Progress: [█████████████░] 86%
 
@@ -138,9 +138,10 @@ None yet.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 1 | Sometimes citizen walk into a segment where there isn't a room | 2026-03-03 | 6a53319 | [1-sometimes-citizen-walk-into-a-segment-wh](./quick/1-sometimes-citizen-walk-into-a-segment-wh/) |
+| 2 | Bigger hitbox for citizens (ClickProximityThreshold 0.4 to 0.8) | 2026-03-03 | 09f0948 | [2-i-want-a-bigger-hitbox-for-citizens-it-i](./quick/2-i-want-a-bigger-hitbox-for-citizens-it-i/) |
 
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Completed quick task 1 (visit animation angular walk fix)
-Resume file: .planning/quick/1-sometimes-citizen-walk-into-a-segment-wh/1-SUMMARY.md
+Stopped at: Completed quick task 2 (bigger citizen hitbox)
+Resume file: .planning/quick/2-i-want-a-bigger-hitbox-for-citizens-it-i/2-SUMMARY.md
