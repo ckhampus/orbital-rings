@@ -8,7 +8,7 @@ progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 12
-  completed_plans: 10
+  completed_plans: 11
 ---
 
 # Project State
@@ -23,18 +23,18 @@ See: .planning/PROJECT.md (updated 2026-03-02)
 ## Current Position
 
 Phase: 4 of 8 (Room Placement and Build Interaction)
-Plan: 3 of 4 in current phase (04-01, 04-03 complete)
+Plan: 3 of 4 in current phase (04-01, 04-02, 04-03 complete)
 Status: Phase 4 in progress
-Last activity: 2026-03-03 — Completed 04-03-PLAN.md (placement feedback)
+Last activity: 2026-03-03 — Completed 04-02-PLAN.md (build panel UI and segment interaction wiring)
 
-Progress: [████████░░] 83%
+Progress: [█████████░] 92%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 10
-- Average duration: 4.4 min
-- Total execution time: 0.73 hours
+- Total plans completed: 11
+- Average duration: 4.2 min
+- Total execution time: 0.78 hours
 
 **By Phase:**
 
@@ -43,10 +43,10 @@ Progress: [████████░░] 83%
 | 1 | 3 | 21min | 7min |
 | 2 | 2 | 8min | 4min |
 | 3 | 3 | 10min | 3.3min |
-| 4 | 2 | 5min | 2.5min |
+| 4 | 3 | 8min | 2.7min |
 
 **Recent Trend:**
-- Last 5 plans: 3min, 2min, 5min, 4min, 1min
+- Last 5 plans: 2min, 5min, 4min, 1min, 3min
 - Trend: steady
 
 *Updated after each plan completion*
@@ -93,6 +93,10 @@ Recent decisions affecting current work:
 - [04-01]: RoomVisual as static helper class (not Node) since room block meshes are children of RingVisual
 - [04-01]: Per-room independent StandardMaterial3D instances to avoid shared-material contamination pitfall
 - [04-01]: Ghost preview does not modify SegmentGrid occupancy — only confirm action writes occupancy
+- [04-02]: BuildPanel as PanelContainer with programmatic UI (following CreditHUD pattern) rather than scene-based layout
+- [04-02]: Live cost label uses camera.UnprojectPosition for 3D-to-2D tracking of ghost mesh position
+- [04-02]: SegmentInteraction delegates to BuildManager via singleton Instance rather than node path lookup
+- [04-02]: Hover highlighting suppressed during Placing mode (ghost preview provides feedback), preserved during Demolish mode
 - [04-03]: All feedback audio procedurally generated via AudioStreamWav — zero external .wav/.ogg assets needed
 - [04-03]: PlacementFeedback instantiated as BuildManager child (Autoload) — no .tscn scene dependency
 - [04-03]: GPUParticles3D one-shot uses Restart()+Emitting workaround with Finished event self-cleanup
@@ -110,5 +114,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Completed 04-03-PLAN.md
-Resume file: .planning/phases/04-room-placement-and-build-interaction/04-03-SUMMARY.md
+Stopped at: Completed 04-02-PLAN.md
+Resume file: .planning/phases/04-room-placement-and-build-interaction/04-02-SUMMARY.md
