@@ -1,5 +1,7 @@
 using Godot;
+using OrbitalRings.Autoloads;
 using OrbitalRings.Citizens;
+using OrbitalRings.Data;
 
 namespace OrbitalRings.UI;
 
@@ -8,12 +10,14 @@ namespace OrbitalRings.UI;
 /// Appears when a citizen is clicked in Normal mode, positioned near the citizen
 /// in screen space. Follows the SegmentTooltip pattern (programmatic UI, no .tscn).
 ///
-/// For v1, wish text is always "No wish" (placeholder for Phase 6).
+/// Shows active wish text from WishBoard with category-colored label, or "No wish" (muted)
+/// when citizen has no active wish. Text variant selection is deterministic per citizen name.
 /// MouseFilter set to Ignore so the panel never intercepts clicks.
 /// </summary>
 public partial class CitizenInfoPanel : PanelContainer
 {
     private Label _nameLabel;
+    private Label _categoryLabel;
     private Label _wishLabel;
 
     public override void _Ready()
@@ -51,6 +55,15 @@ public partial class CitizenInfoPanel : PanelContainer
         _nameLabel.AddThemeFontSizeOverride("font_size", 16);
         vbox.AddChild(_nameLabel);
 
+        // Category label (small, colored by category -- hidden when no wish)
+        _categoryLabel = new Label
+        {
+            MouseFilter = MouseFilterEnum.Ignore,
+            Visible = false
+        };
+        _categoryLabel.AddThemeFontSizeOverride("font_size", 11);
+        vbox.AddChild(_categoryLabel);
+
         // Wish label (smaller, muted color)
         _wishLabel = new Label
         {
@@ -66,14 +79,35 @@ public partial class CitizenInfoPanel : PanelContainer
 
     /// <summary>
     /// Shows the panel near the given citizen's screen-space position.
-    /// Displays citizen name and wish placeholder.
+    /// Displays citizen name, wish text from WishBoard, and category label.
     /// </summary>
     /// <param name="citizen">The citizen to show info for.</param>
     /// <param name="screenPos">Mouse position for initial positioning fallback.</param>
     public void ShowForCitizen(CitizenNode citizen, Vector2 screenPos)
     {
         _nameLabel.Text = citizen.Data.CitizenName;
-        _wishLabel.Text = "No wish";  // Placeholder for Phase 6 wish display
+
+        // Display wish text from WishBoard (Phase 6 integration)
+        var wish = WishBoard.Instance?.GetWishForCitizen(citizen.Data.CitizenName);
+        if (wish != null && wish.TextVariants.Length > 0)
+        {
+            // Pick a consistent text variant based on citizen name hash
+            // (same citizen always shows same text for same wish)
+            int variantIndex = Mathf.Abs(citizen.Data.CitizenName.GetHashCode()) % wish.TextVariants.Length;
+            _wishLabel.Text = wish.TextVariants[variantIndex];
+            _wishLabel.AddThemeColorOverride("font_color", new Color(0.85f, 0.83f, 0.78f));
+
+            // Show category with accent color
+            _categoryLabel.Text = wish.Category.ToString();
+            _categoryLabel.AddThemeColorOverride("font_color", GetCategoryColor(wish.Category));
+            _categoryLabel.Visible = true;
+        }
+        else
+        {
+            _wishLabel.Text = "No wish";
+            _wishLabel.AddThemeColorOverride("font_color", new Color(0.65f, 0.63f, 0.60f));
+            _categoryLabel.Visible = false;
+        }
 
         // Position above and to the right of the citizen in screen space
         var camera = GetViewport().GetCamera3D();
@@ -105,5 +139,20 @@ public partial class CitizenInfoPanel : PanelContainer
     public new void Hide()
     {
         Visible = false;
+    }
+
+    /// <summary>
+    /// Returns an accent color for the wish category matching the icon color palette.
+    /// </summary>
+    private static Color GetCategoryColor(WishTemplate.WishCategory category)
+    {
+        return category switch
+        {
+            WishTemplate.WishCategory.Social => new Color(0.95f, 0.59f, 0.48f),     // coral
+            WishTemplate.WishCategory.Comfort => new Color(0.48f, 0.66f, 0.95f),     // soft blue
+            WishTemplate.WishCategory.Curiosity => new Color(0.95f, 0.79f, 0.30f),   // amber
+            WishTemplate.WishCategory.Variety => new Color(0.44f, 0.81f, 0.59f),     // soft green
+            _ => new Color(0.65f, 0.63f, 0.60f)
+        };
     }
 }
