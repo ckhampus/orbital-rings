@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-03-02)
 Phase: 6 of 8 (Wish System) -- COMPLETE
 Plan: 3 of 3 complete in current phase
 Status: Phase 6 complete. All wish system success criteria verified by human. Phase 7 next.
-Last activity: 2026-03-03 — Completed 06-03 (wish system human verification)
+Last activity: 2026-03-03 - Completed quick task 1: Sometimes citizen walk into a segment where there isn't a room
 
 Progress: [█████████████░] 86%
 
@@ -132,6 +132,12 @@ None yet.
 - [Phase 2 RESOLVED]: Polar math segment selection implemented via Plane.IntersectsRay + Atan2 in SegmentInteraction.cs. No trimesh collision used. Phantom hit concern eliminated.
 - [Phase 5 RESOLVED]: Circular walkway navigation uses angle-based polar coordinates (angle += speed * delta). NavigationAgent3D skipped entirely — walkway is a 1D circular path, not a 2D navigable surface. No navmesh baking needed.
 - [Phase 3 RESOLVED]: Economy balance spreadsheet produced in 03-01. sqrt scaling + 1.3x happiness cap confirmed: 30-cit/5-cit ratio = 3.3x (under 10x threshold). All EconomyConfig defaults match spreadsheet.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 1 | Sometimes citizen walk into a segment where there isn't a room | 2026-03-03 | 6a53319 | [1-sometimes-citizen-walk-into-a-segment-wh](./quick/1-sometimes-citizen-walk-into-a-segment-wh/) |
 
 ## Session Continuity
 
