@@ -18,7 +18,7 @@ Requirements for initial release (single playable ring proving the core loop).
 - [x] **BLDG-01**: Player can place a room into 1-3 adjacent empty segments in the outer or inner row
 - [x] **BLDG-02**: Player can choose from 5 room categories: Housing, Life Support, Work, Comfort, Utility
 - [x] **BLDG-03**: Each room category has at least 2 specific room types with visually distinct placeholder art
-- [ ] **BLDG-04**: Player hears a satisfying snap sound and sees a visual response when placing a room
+- [x] **BLDG-04**: Player hears a satisfying snap sound and sees a visual response when placing a room
 - [x] **BLDG-05**: Player can demolish any room and receive a partial credit refund
 - [x] **BLDG-06**: Larger rooms (2-3 segments) are more effective but cost more, with a slight size discount
 
@@ -110,7 +110,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | BLDG-01 | Phase 4 | Complete |
 | BLDG-02 | Phase 4 | Complete |
 | BLDG-03 | Phase 4 | Complete |
-| BLDG-04 | Phase 4 | Pending |
+| BLDG-04 | Phase 4 | Complete |
 | BLDG-05 | Phase 4 | Complete |
 | BLDG-06 | Phase 4 | Complete |
 | ECON-01 | Phase 3 | Complete |
