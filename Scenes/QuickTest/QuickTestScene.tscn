@@ -5,6 +5,7 @@
 [ext_resource type="PackedScene" uid="uid://bswc7inj8s2ht" path="res://Scenes/Ring/Ring.tscn" id="3_ring"]
 [ext_resource type="Script" uid="uid://c61pt15u8658w" path="res://Scripts/UI/SegmentTooltip.cs" id="4_tooltip"]
 [ext_resource type="Script" uid="uid://b7lncsr0fml0j" path="res://Scripts/UI/CreditHUD.cs" id="5_credithud"]
+[ext_resource type="Script" path="res://Scripts/Build/BuildPanel.cs" id="6_buildpanel"]
 
 [node name="QuickTestScene" type="Node3D" unique_id=884004654]
 
@@ -36,6 +37,18 @@ offset_left = -200.0
 offset_bottom = 50.0
 grow_horizontal = 0
 script = ExtResource("5_credithud")
+
+[node name="BuildUILayer" type="CanvasLayer" parent="."]
+layer = 8
+
+[node name="BuildPanel" type="PanelContainer" parent="BuildUILayer"]
+anchors_preset = 7
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -120.0
+grow_vertical = 0
+script = ExtResource("6_buildpanel")
 
 [node name="TooltipLayer" type="CanvasLayer" parent="." unique_id=1571741361]
 layer = 10
