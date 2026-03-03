@@ -89,8 +89,10 @@ public partial class BuildManager : Node
             GD.PushWarning("BuildManager: RingVisual not found in scene tree. Build features disabled until Ring is present.");
         }
 
-        // PlacementFeedback will be instantiated here by Plan 03
-        // AddChild(new PlacementFeedback());
+        // Instantiate PlacementFeedback as a child of BuildManager (Autoload)
+        var feedback = new PlacementFeedback();
+        feedback.Name = "PlacementFeedback";
+        AddChild(feedback);
     }
 
     public override void _Input(InputEvent @event)
