@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: unknown
-last_updated: "2026-03-03T09:31:53.074Z"
+status: in-progress
+last_updated: "2026-03-03T10:55:23.903Z"
 progress:
-  total_phases: 3
+  total_phases: 4
   completed_phases: 3
-  total_plans: 8
-  completed_plans: 8
+  total_plans: 12
+  completed_plans: 9
 ---
 
 # Project State
@@ -18,23 +18,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-02)
 
 **Core value:** The wish-driven building loop: citizens express wishes, the player builds rooms to fulfill them, happiness rises, new citizens arrive, new wishes emerge.
-**Current focus:** Phase 4 context gathered — Room Placement and Build Interaction ready for planning.
+**Current focus:** Phase 4 in progress — Room Placement and Build Interaction.
 
 ## Current Position
 
-Phase: 3 of 8 (Economy Foundation) -- COMPLETE
-Plan: 3 of 3 in current phase (03-03 complete)
-Status: Phase 3 complete, ready for Phase 4
-Last activity: 2026-03-03 — Completed 03-03-PLAN.md (credit HUD)
+Phase: 4 of 8 (Room Placement and Build Interaction)
+Plan: 1 of 4 in current phase (04-01 complete)
+Status: Phase 4 in progress
+Last activity: 2026-03-03 — Completed 04-01-PLAN.md (room data, build manager, room visual)
 
-Progress: [████████░░] 80%
+Progress: [████████░░] 75%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
+- Total plans completed: 9
 - Average duration: 5 min
-- Total execution time: 0.65 hours
+- Total execution time: 0.72 hours
 
 **By Phase:**
 
@@ -43,9 +43,10 @@ Progress: [████████░░] 80%
 | 1 | 3 | 21min | 7min |
 | 2 | 2 | 8min | 4min |
 | 3 | 3 | 10min | 3.3min |
+| 4 | 1 | 4min | 4min |
 
 **Recent Trend:**
-- Last 5 plans: 5min, 3min, 3min, 2min, 5min
+- Last 5 plans: 3min, 3min, 2min, 5min, 4min
 - Trend: steady
 
 *Updated after each plan completion*
@@ -87,6 +88,11 @@ Recent decisions affecting current work:
 - [03-03]: Explicit Timer.Start() over Autostart=true — Autostart property set before AddChild() is unreliable in Godot 4 C#
 - [03-03]: No sound on income tick — user decision: visual-only feedback (gold flash + floating text)
 - [03-03]: Balance-only display (no income rate) — user decision: income breakdown available via hover tooltip
+- [04-01]: BuildMode enum in GameEvents.cs (not BuildManager) to avoid circular namespace dependency
+- [04-01]: All Phase 4 events frontloaded in GameEvents in Plan 01 to prevent parallel write conflicts between Plans 02/03
+- [04-01]: RoomVisual as static helper class (not Node) since room block meshes are children of RingVisual
+- [04-01]: Per-room independent StandardMaterial3D instances to avoid shared-material contamination pitfall
+- [04-01]: Ghost preview does not modify SegmentGrid occupancy — only confirm action writes occupancy
 
 ### Pending Todos
 
@@ -101,5 +107,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Phase 4 context gathered
-Resume file: .planning/phases/04-room-placement-and-build-interaction/04-CONTEXT.md
+Stopped at: Completed 04-01-PLAN.md
+Resume file: .planning/phases/04-room-placement-and-build-interaction/04-01-SUMMARY.md
