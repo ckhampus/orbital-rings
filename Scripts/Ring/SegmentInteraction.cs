@@ -8,6 +8,9 @@ namespace OrbitalRings.Ring;
 /// Mouse-to-segment detection using polar math (ray-plane intersection + Atan2).
 /// Provides hover highlighting, click selection, and Escape deselection.
 ///
+/// When BuildManager is in Placing or Demolish mode, delegates clicks and hovers
+/// to BuildManager instead of using normal selection behavior.
+///
 /// Extends SafeNode for future-proofing (currently emits events but doesn't consume them).
 /// Attach as a child of RingVisual in Ring.tscn.
 ///
@@ -70,23 +73,49 @@ public partial class SegmentInteraction : OrbitalRings.Core.SafeNode
 			_lastMousePos = mm.Position;
 			UpdateHover();
 		}
-		// Left-click: select hovered segment
+		// Left-click: delegate based on build mode or select hovered segment
 		else if (@event is InputEventMouseButton mb
 				 && mb.ButtonIndex == MouseButton.Left
 				 && mb.Pressed)
 		{
 			if (_hoveredFlatIndex >= 0)
 			{
-				SelectSegment(_hoveredFlatIndex);
-				GetViewport().SetInputAsHandled();
+				// Check if UI is consuming this click (BuildPanel MouseFilter.Stop is the
+				// primary guard; this is a safety fallback)
+				if (IsMouseOverUi())
+					return;
+
+				var buildMgr = OrbitalRings.Build.BuildManager.Instance;
+				if (buildMgr != null && buildMgr.CurrentMode != BuildMode.Normal)
+				{
+					// Delegate to BuildManager in build modes
+					buildMgr.OnSegmentClicked(_hoveredFlatIndex);
+					GetViewport().SetInputAsHandled();
+				}
+				else
+				{
+					// Normal selection behavior
+					SelectSegment(_hoveredFlatIndex);
+					GetViewport().SetInputAsHandled();
+				}
 			}
 		}
-		// Escape: deselect current segment
+		// Escape: route to BuildManager if in build mode, otherwise deselect
 		else if (@event is InputEventKey key
 				 && key.Pressed
 				 && key.Keycode == Key.Escape)
 		{
-			DeselectSegment();
+			var buildMgr = OrbitalRings.Build.BuildManager.Instance;
+			if (buildMgr != null && buildMgr.CurrentMode != BuildMode.Normal)
+			{
+				// BuildManager handles Escape (cancel placement or exit build mode)
+				buildMgr.ExitBuildMode();
+				GetViewport().SetInputAsHandled();
+			}
+			else
+			{
+				DeselectSegment();
+			}
 		}
 	}
 
@@ -103,6 +132,21 @@ public partial class SegmentInteraction : OrbitalRings.Core.SafeNode
 	}
 
 	// -------------------------------------------------------------------------
+	// UI overlap check
+	// -------------------------------------------------------------------------
+
+	/// <summary>
+	/// Safety fallback to check if the mouse is over a UI element.
+	/// The primary guard is MouseFilter.Stop on BuildPanel which prevents _Input
+	/// from firing for clicks on the UI. This method is a secondary check.
+	/// </summary>
+	private bool IsMouseOverUi()
+	{
+		var focused = GetViewport().GuiGetFocusOwner();
+		return focused != null;
+	}
+
+	// -------------------------------------------------------------------------
 	// Polar math hover detection
 	// -------------------------------------------------------------------------
 
@@ -110,11 +154,21 @@ public partial class SegmentInteraction : OrbitalRings.Core.SafeNode
 	/// Casts a ray from camera through the cached mouse position, intersects
 	/// with the ring plane, and converts to polar coordinates to identify
 	/// which segment (if any) the mouse is over.
+	///
+	/// In Placing mode, delegates hover to BuildManager for drag-to-resize
+	/// and suppresses normal hover highlighting (ghost preview provides feedback).
+	/// In Demolish mode, delegates hover to BuildManager for refund preview
+	/// while still showing normal hover highlight.
 	/// </summary>
 	private void UpdateHover()
 	{
 		if (_camera == null)
 			return;
+
+		// Check current build mode once for the whole method
+		var buildMgr = OrbitalRings.Build.BuildManager.Instance;
+		bool isPlacingMode = buildMgr != null && buildMgr.CurrentMode == BuildMode.Placing;
+		bool isDemolishMode = buildMgr != null && buildMgr.CurrentMode == BuildMode.Demolish;
 
 		// 1. Cast ray from camera through mouse position
 		Vector3 rayOrigin = _camera.ProjectRayOrigin(_lastMousePos);
@@ -170,22 +224,40 @@ public partial class SegmentInteraction : OrbitalRings.Core.SafeNode
 			// Unhover old segment (restore to Normal unless it's the selected segment)
 			if (_hoveredFlatIndex >= 0 && _hoveredFlatIndex != _selectedFlatIndex)
 			{
-				_ringVisual.SetSegmentState(_hoveredFlatIndex, SegmentVisualState.Normal);
+				// In placing mode, don't restore to Normal if segment is Dimmed (occupied)
+				if (!isPlacingMode)
+				{
+					_ringVisual.SetSegmentState(_hoveredFlatIndex, SegmentVisualState.Normal);
+				}
 			}
 
 			_hoveredFlatIndex = flatIndex;
 
-			// Apply hover visual (but don't downgrade a selected segment to hover)
-			if (flatIndex != _selectedFlatIndex)
+			// In Placing mode, suppress normal hover highlighting
+			// (BuildManager's ghost preview provides visual feedback instead)
+			if (!isPlacingMode)
 			{
-				_ringVisual.SetSegmentState(flatIndex, SegmentVisualState.Hovered);
+				// Apply hover visual (but don't downgrade a selected segment to hover)
+				if (flatIndex != _selectedFlatIndex)
+				{
+					_ringVisual.SetSegmentState(flatIndex, SegmentVisualState.Hovered);
+				}
 			}
 
 			// Emit event
 			GameEvents.Instance?.EmitSegmentHovered(segIndex, isOuter);
 		}
 
-		// 8. Update tooltip with current segment label
+		// 8. Delegate hover to BuildManager for build modes
+		if (buildMgr != null)
+		{
+			if (isPlacingMode || isDemolishMode)
+			{
+				buildMgr.OnSegmentHovered(flatIndex);
+			}
+		}
+
+		// 9. Update tooltip with current segment label
 		string label = _ringVisual.Grid.GetLabel(row, segIndex);
 		_tooltip?.Show(label, _lastMousePos);
 	}
@@ -200,7 +272,13 @@ public partial class SegmentInteraction : OrbitalRings.Core.SafeNode
 		{
 			if (_hoveredFlatIndex != _selectedFlatIndex)
 			{
-				_ringVisual.SetSegmentState(_hoveredFlatIndex, SegmentVisualState.Normal);
+				// Only restore to Normal if not in placing mode (dimmed segments should stay dimmed)
+				var buildMgr = OrbitalRings.Build.BuildManager.Instance;
+				bool isPlacingMode = buildMgr != null && buildMgr.CurrentMode == BuildMode.Placing;
+				if (!isPlacingMode)
+				{
+					_ringVisual.SetSegmentState(_hoveredFlatIndex, SegmentVisualState.Normal);
+				}
 			}
 
 			_hoveredFlatIndex = -1;
