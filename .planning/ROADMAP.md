@@ -135,7 +135,11 @@ Plans:
   2. New citizens arrive passively as happiness grows — the player can observe the population count rising without taking any action beyond building
   3. At least 2 distinct blueprint unlock moments occur during a 20-minute play session at expected build pace, each adding at least 1 new room type to the build panel
   4. Higher station happiness produces a visible (but not dominant) multiplier effect on credit income compared to low happiness
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 07-01-PLAN.md -- Core progression system: HappinessManager Autoload, CitizenManager.SpawnCitizen refactor, BuildPanel unlock filtering
+- [ ] 07-02-PLAN.md -- HUD and feedback: HappinessBar, PopulationDisplay, arrival fanfare, unlock notifications, human verification
 
 ### Phase 8: Polish and Loop Closure
 **Goal**: The full build-wish-grow loop feels cozy and complete — save/load works, ambient audio sets the tone, the HUD is fully wired, and the loop closure moment (wish fulfilled) is emotionally satisfying
@@ -162,9 +166,9 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 4. Room Placement and Build Interaction | 4/4 | Complete | 2026-03-03 |
 | 5. Citizens and Navigation | 3/3 | Complete | 2026-03-03 |
 | 6. Wish System | 3/3 | Complete | 2026-03-03 |
-| 7. Happiness and Progression | 0/TBD | Not started | - |
+| 7. Happiness and Progression | 0/2 | Not started | - |
 | 8. Polish and Loop Closure | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-03-02*
-*Last updated: 2026-03-03 after Phase 6 completion*
+*Last updated: 2026-03-03 after Phase 7 planning*
