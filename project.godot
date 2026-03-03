@@ -21,6 +21,7 @@ GameEvents="*res://Scripts/Autoloads/GameEvents.cs"
 EconomyManager="*res://Scripts/Autoloads/EconomyManager.cs"
 BuildManager="*res://Scripts/Build/BuildManager.cs"
 CitizenManager="*res://Scripts/Citizens/CitizenManager.cs"
+WishBoard="*res://Scripts/Autoloads/WishBoard.cs"
 
 [display]
 
