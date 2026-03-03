@@ -5,7 +5,7 @@ namespace OrbitalRings.Ring;
 /// <summary>
 /// Visual state for segment highlight feedback.
 /// </summary>
-public enum SegmentVisualState { Normal, Hovered, Selected }
+public enum SegmentVisualState { Normal, Hovered, Selected, Dimmed }
 
 /// <summary>
 /// Node3D that owns 24 MeshInstance3D segment children (12 outer, 12 inner)
@@ -22,6 +22,7 @@ public partial class RingVisual : Node3D
     private readonly StandardMaterial3D[] _baseMaterials = new StandardMaterial3D[SegmentGrid.TotalSegments];
     private readonly StandardMaterial3D[] _hoverMaterials = new StandardMaterial3D[SegmentGrid.TotalSegments];
     private readonly StandardMaterial3D[] _selectedMaterials = new StandardMaterial3D[SegmentGrid.TotalSegments];
+    private readonly StandardMaterial3D[] _dimmedMaterials = new StandardMaterial3D[SegmentGrid.TotalSegments];
     private readonly SegmentGrid _grid = new();
 
     /// <summary>Public read access for interaction system.</summary>
@@ -56,14 +57,25 @@ public partial class RingVisual : Node3D
 
                 Color baseColor = RingColors.GetBaseColor(segRow, pos);
 
-                // Create three material instances for each segment
+                // Create four material instances for each segment (base, hover, selected, dimmed)
                 var baseMat = new StandardMaterial3D { AlbedoColor = baseColor };
                 var hoverMat = new StandardMaterial3D { AlbedoColor = RingColors.Brighten(baseColor) };
                 var selectedMat = new StandardMaterial3D { AlbedoColor = RingColors.SelectionHighlight(baseColor) };
+                var dimmedMat = new StandardMaterial3D
+                {
+                    AlbedoColor = new Color(
+                        baseColor.R * 0.5f,
+                        baseColor.G * 0.5f,
+                        baseColor.B * 0.5f,
+                        0.6f
+                    ),
+                    Transparency = BaseMaterial3D.TransparencyEnum.Alpha
+                };
 
                 _baseMaterials[flatIndex] = baseMat;
                 _hoverMaterials[flatIndex] = hoverMat;
                 _selectedMaterials[flatIndex] = selectedMat;
+                _dimmedMaterials[flatIndex] = dimmedMat;
 
                 var meshInstance = new MeshInstance3D
                 {
@@ -118,6 +130,7 @@ public partial class RingVisual : Node3D
             SegmentVisualState.Normal => _baseMaterials[flatIndex],
             SegmentVisualState.Hovered => _hoverMaterials[flatIndex],
             SegmentVisualState.Selected => _selectedMaterials[flatIndex],
+            SegmentVisualState.Dimmed => _dimmedMaterials[flatIndex],
             _ => _baseMaterials[flatIndex]
         };
     }

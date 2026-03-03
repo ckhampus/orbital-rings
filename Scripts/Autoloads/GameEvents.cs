@@ -1,7 +1,14 @@
 using System;
 using Godot;
+using OrbitalRings.Ring;
 
 namespace OrbitalRings.Autoloads;
+
+/// <summary>
+/// Build mode states for the placement/demolish system.
+/// Defined here (not in BuildManager) to avoid circular namespace dependency.
+/// </summary>
+public enum BuildMode { Normal, Placing, Demolish }
 
 /// <summary>
 /// Centralized signal bus for all cross-system communication.
@@ -79,6 +86,48 @@ public partial class GameEvents : Node
 
   public void EmitRoomDemolished(int segmentIndex)
     => RoomDemolished?.Invoke(segmentIndex);
+
+  // ---------------------------------------------------------------------------
+  // Build Mode Events (Phase 4)
+  // ---------------------------------------------------------------------------
+
+  public event Action<BuildMode> BuildModeChanged;
+  public event Action<int, int> PlacementPreviewUpdated;  // (startFlatIndex, segmentCount)
+  public event Action PlacementPreviewCleared;
+
+  public void EmitBuildModeChanged(BuildMode mode)
+      => BuildModeChanged?.Invoke(mode);
+  public void EmitPlacementPreviewUpdated(int startFlatIndex, int segmentCount)
+      => PlacementPreviewUpdated?.Invoke(startFlatIndex, segmentCount);
+  public void EmitPlacementPreviewCleared()
+      => PlacementPreviewCleared?.Invoke();
+
+  // ---------------------------------------------------------------------------
+  // Placement Feedback Events (Phase 4 -- consumed by PlacementFeedback)
+  // ---------------------------------------------------------------------------
+
+  public event Action<MeshInstance3D, Vector3, Color> RoomPlacementConfirmed;
+  public event Action<Vector3, Color> RoomDemolishConfirmed;
+  public event Action<int> PlacementInvalid;
+
+  public void EmitRoomPlacementConfirmed(MeshInstance3D mesh, Vector3 pos, Color color)
+      => RoomPlacementConfirmed?.Invoke(mesh, pos, color);
+  public void EmitRoomDemolishConfirmed(Vector3 pos, Color color)
+      => RoomDemolishConfirmed?.Invoke(pos, color);
+  public void EmitPlacementInvalid(int flatIndex)
+      => PlacementInvalid?.Invoke(flatIndex);
+
+  // ---------------------------------------------------------------------------
+  // Demolish Hover Events (Phase 4 -- consumed by BuildPanel for refund preview)
+  // ---------------------------------------------------------------------------
+
+  public event Action<int, int> DemolishHoverUpdated;  // (flatIndex, refundAmount)
+  public event Action DemolishHoverCleared;
+
+  public void EmitDemolishHoverUpdated(int flatIndex, int refund)
+      => DemolishHoverUpdated?.Invoke(flatIndex, refund);
+  public void EmitDemolishHoverCleared()
+      => DemolishHoverCleared?.Invoke();
 
   // ---------------------------------------------------------------------------
   // Citizen Events (Phase 5)

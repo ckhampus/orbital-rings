@@ -19,6 +19,7 @@ config/icon="res://icon.svg"
 
 GameEvents="*res://Scripts/Autoloads/GameEvents.cs"
 EconomyManager="*res://Scripts/Autoloads/EconomyManager.cs"
+BuildManager="*res://Scripts/Build/BuildManager.cs"
 
 [dotnet]
 
