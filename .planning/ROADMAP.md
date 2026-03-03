@@ -17,7 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: Economy Foundation** - Implement the credit economy, passive income, balance spreadsheet, and EconomyManager Autoload
 - [x] **Phase 4: Room Placement and Build Interaction** - Wire room placement into the ring, all 5 categories with placeholder art, demolish, and satisfying placement feedback
 - [x] **Phase 5: Citizens and Navigation** - Spawn named walking citizens on the ring walkway with a navigation approach proven by prototype
-- [ ] **Phase 6: Wish System** - Citizens express wishes via speech bubbles; wishes linger harmlessly and are visible on click
+- [x] **Phase 6: Wish System** - Citizens express wishes via speech bubbles; wishes linger harmlessly and are visible on click
 - [ ] **Phase 7: Happiness and Progression** - Wish fulfillment raises happiness, happiness drives citizen arrival and blueprint unlocks
 - [ ] **Phase 8: Polish and Loop Closure** - Save/load, ambient audio, full HUD wiring, and integration pass that makes the loop feel cozy and complete
 
@@ -122,9 +122,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 06-01-PLAN.md -- Data layer: 12 WishTemplate .tres resources (4 categories), placeholder icon PNGs, WishBoard Autoload singleton
-- [ ] 06-02-PLAN.md -- Citizen integration: CitizenNode wish generation + badge display + wish-aware visits + fulfillment, CitizenInfoPanel wish text
-- [ ] 06-03-PLAN.md -- Human verification checkpoint for complete wish system
+- [x] 06-01-PLAN.md -- Data layer: 12 WishTemplate .tres resources (4 categories), placeholder icon PNGs, WishBoard Autoload singleton
+- [x] 06-02-PLAN.md -- Citizen integration: CitizenNode wish generation + badge display + wish-aware visits + fulfillment, CitizenInfoPanel wish text
+- [x] 06-03-PLAN.md -- Human verification checkpoint for complete wish system
 
 ### Phase 7: Happiness and Progression
 **Goal**: Station happiness is tracked visibly, fulfilling wishes raises it, happiness gates citizen arrivals and unlocks new room blueprints at observable milestones
@@ -161,10 +161,10 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 3. Economy Foundation | 3/3 | Complete | 2026-03-03 |
 | 4. Room Placement and Build Interaction | 4/4 | Complete | 2026-03-03 |
 | 5. Citizens and Navigation | 3/3 | Complete | 2026-03-03 |
-| 6. Wish System | 0/3 | Planning complete | - |
+| 6. Wish System | 3/3 | Complete | 2026-03-03 |
 | 7. Happiness and Progression | 0/TBD | Not started | - |
 | 8. Polish and Loop Closure | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-03-02*
-*Last updated: 2026-03-03 after Phase 5 completion*
+*Last updated: 2026-03-03 after Phase 6 completion*

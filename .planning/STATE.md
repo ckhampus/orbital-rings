@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in-progress
-last_updated: "2026-03-03T15:53:46Z"
+last_updated: "2026-03-03T16:01:00Z"
 progress:
   total_phases: 6
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 18
-  completed_plans: 17
+  completed_plans: 18
 ---
 
 # Project State
@@ -18,23 +18,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-02)
 
 **Core value:** The wish-driven building loop: citizens express wishes, the player builds rooms to fulfill them, happiness rises, new citizens arrive, new wishes emerge.
-**Current focus:** Phase 6 Plan 02 complete -- Citizen wish integration (generation, badge, visits, fulfillment, info panel). Plan 03 next (happiness/progression).
+**Current focus:** Phase 6 complete -- Wish system verified by human. Phase 7 next (Happiness and Progression).
 
 ## Current Position
 
-Phase: 6 of 8 (Wish System) -- IN PROGRESS
-Plan: 2 of 3 complete in current phase
-Status: Plan 02 complete (citizen wish integration), Plan 03 next (happiness/progression effects)
-Last activity: 2026-03-03 — Completed 06-02 (citizen wish lifecycle and info panel)
+Phase: 6 of 8 (Wish System) -- COMPLETE
+Plan: 3 of 3 complete in current phase
+Status: Phase 6 complete. All wish system success criteria verified by human. Phase 7 next.
+Last activity: 2026-03-03 — Completed 06-03 (wish system human verification)
 
-Progress: [████████████░░] 81%
+Progress: [█████████████░] 86%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 17
-- Average duration: 3.5 min
-- Total execution time: 1.01 hours
+- Total plans completed: 18
+- Average duration: 3.4 min
+- Total execution time: 1.02 hours
 
 **By Phase:**
 
@@ -45,10 +45,10 @@ Progress: [████████████░░] 81%
 | 3 | 3 | 10min | 3.3min |
 | 4 | 4 | 9min | 2.3min |
 | 5 | 3/3 | 6min | 2min |
-| 6 | 2/3 | 5min | 2.5min |
+| 6 | 3/3 | 6min | 2min |
 
 **Recent Trend:**
-- Last 5 plans: 2min, 3min, 1min, 2min, 3min
+- Last 5 plans: 3min, 1min, 2min, 3min, 1min
 - Trend: steady
 
 *Updated after each plan completion*
@@ -120,6 +120,8 @@ Recent decisions affecting current work:
 - [06-02]: effectiveDist multiplier (0.3x) for wish matching -- creates preference not exclusive targeting
 - [06-02]: Badge as child of CitizenNode inherits Visible=false during visits -- no additional hide/show code needed
 - [06-02]: Deterministic text variant via citizen name hash -- same citizen always shows same text for same wish type
+- [06-03]: CitizenInfoPanel uses citizen.CurrentWish directly instead of WishBoard.GetWishForCitizen() -- WishBoard lookup was failing silently, direct property access is simpler and reliable
+- [06-03]: Wish system approved by human verification -- all 6 checks passed (generation, info display, fulfillment, lingering, category variety, badge visibility)
 
 ### Pending Todos
 
@@ -134,5 +136,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Completed 06-02-PLAN.md
-Resume file: .planning/phases/06-wish-system/06-02-SUMMARY.md
+Stopped at: Completed 06-03-PLAN.md (Phase 6 complete)
+Resume file: .planning/phases/06-wish-system/06-03-SUMMARY.md
