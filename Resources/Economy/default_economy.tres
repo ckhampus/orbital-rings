@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="EconomyConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/Data/EconomyConfig.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+BaseStationIncome = 1.0
+PassiveIncomePerCitizen = 2.0
+WorkBonusMultiplier = 1.25
+HappinessMultiplierCap = 1.3
+IncomeTickInterval = 5.5
+BaseRoomCost = 100
+SizeDiscountFactor = 0.92
+DemolishRefundRatio = 0.5
+OuterRowCostMultiplier = 1.1
+HousingCostMultiplier = 0.7
+LifeSupportCostMultiplier = 0.85
+WorkCostMultiplier = 1.0
+ComfortCostMultiplier = 1.15
+UtilityCostMultiplier = 1.3
+StartingCredits = 750
