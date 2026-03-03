@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: unknown
-last_updated: "2026-03-03T14:24:39.082Z"
+status: in-progress
+last_updated: "2026-03-03T15:47:46Z"
 progress:
-  total_phases: 5
+  total_phases: 6
   completed_phases: 5
-  total_plans: 15
-  completed_plans: 15
+  total_plans: 18
+  completed_plans: 16
 ---
 
 # Project State
@@ -18,23 +18,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-02)
 
 **Core value:** The wish-driven building loop: citizens express wishes, the player builds rooms to fulfill them, happiness rises, new citizens arrive, new wishes emerge.
-**Current focus:** Phase 6 context gathered — Wish System decisions captured. Ready for planning.
+**Current focus:** Phase 6 Plan 01 complete -- WishBoard Autoload and 12 wish templates created. Continuing wish system.
 
 ## Current Position
 
-Phase: 6 of 8 (Wish System) -- CONTEXT GATHERED
-Plan: 0 of TBD in current phase
-Status: Phase 6 context gathered, ready for planning
-Last activity: 2026-03-03 — Captured Phase 6 context (wish system decisions)
+Phase: 6 of 8 (Wish System) -- IN PROGRESS
+Plan: 1 of 3 complete in current phase
+Status: Plan 01 complete (wish data layer), Plan 02 next (citizen wish integration)
+Last activity: 2026-03-03 — Completed 06-01 (wish data layer and WishBoard Autoload)
 
-Progress: [██████████░░░░] 71%
+Progress: [███████████░░░] 76%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 15
-- Average duration: 3.6 min
-- Total execution time: 0.93 hours
+- Total plans completed: 16
+- Average duration: 3.5 min
+- Total execution time: 0.96 hours
 
 **By Phase:**
 
@@ -45,9 +45,10 @@ Progress: [██████████░░░░] 71%
 | 3 | 3 | 10min | 3.3min |
 | 4 | 4 | 9min | 2.3min |
 | 5 | 3/3 | 6min | 2min |
+| 6 | 1/3 | 2min | 2min |
 
 **Recent Trend:**
-- Last 5 plans: 3min, 1min, 2min, 3min, 1min
+- Last 5 plans: 1min, 2min, 3min, 1min, 2min
 - Trend: steady
 
 *Updated after each plan completion*
@@ -112,6 +113,9 @@ Recent decisions affecting current work:
 - [05-02]: Transparency mode toggled ON before fading, OFF after -- prevents Z-fighting artifacts
 - [05-02]: Auto-deselect in _Process when selected citizen starts visiting -- prevents glow on invisible citizen
 - [05-03]: Citizen system approved by human verification -- all 5 success criteria passed on first attempt, no changes needed
+- [06-01]: WishNudgeRequested event on WishBoard instead of direct CitizenNode.NudgeVisit() -- decouples Plan 01 from Plan 02 method that does not exist yet
+- [06-01]: DirAccess.Open + loop for template loading -- auto-discovers new .tres templates without code changes
+- [06-01]: BuildManager.GetPlacedRoom scan for initialization -- handles pre-placed rooms at game start without new public API
 
 ### Pending Todos
 
@@ -126,5 +130,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Phase 6 context gathered
-Resume file: .planning/phases/06-wish-system/06-CONTEXT.md
+Stopped at: Completed 06-01-PLAN.md
+Resume file: .planning/phases/06-wish-system/06-01-SUMMARY.md
