@@ -18,7 +18,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-02)
 
 **Core value:** The wish-driven building loop: citizens express wishes, the player builds rooms to fulfill them, happiness rises, new citizens arrive, new wishes emerge.
-**Current focus:** Phase 3 complete — Economy Foundation done. Phase 4 next.
+**Current focus:** Phase 4 context gathered — Room Placement and Build Interaction ready for planning.
 
 ## Current Position
 
@@ -101,5 +101,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Completed 03-03-PLAN.md (Phase 3 complete)
-Resume file: .planning/phases/03-economy-foundation/03-03-SUMMARY.md
+Stopped at: Phase 4 context gathered
+Resume file: .planning/phases/04-room-placement-and-build-interaction/04-CONTEXT.md
