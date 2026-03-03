@@ -525,7 +525,7 @@ public partial class CitizenNode : Node3D
             Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
             PixelSize = BadgePixelSize,
             Shaded = false,
-            AlphaCut = SpriteBase3D.AlphaCutMode.OpaquePrePass,
+            AlphaCut = SpriteBase3D.AlphaCutMode.OpaquePrepass,
             Position = new Vector3(0, BadgeVerticalOffset, 0)
         };
 
