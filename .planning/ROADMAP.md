@@ -18,7 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: Room Placement and Build Interaction** - Wire room placement into the ring, all 5 categories with placeholder art, demolish, and satisfying placement feedback
 - [x] **Phase 5: Citizens and Navigation** - Spawn named walking citizens on the ring walkway with a navigation approach proven by prototype
 - [x] **Phase 6: Wish System** - Citizens express wishes via speech bubbles; wishes linger harmlessly and are visible on click
-- [ ] **Phase 7: Happiness and Progression** - Wish fulfillment raises happiness, happiness drives citizen arrival and blueprint unlocks
+- [x] **Phase 7: Happiness and Progression** - Wish fulfillment raises happiness, happiness drives citizen arrival and blueprint unlocks
 - [ ] **Phase 8: Polish and Loop Closure** - Save/load, ambient audio, full HUD wiring, and integration pass that makes the loop feel cozy and complete
 
 ## Phase Details
@@ -139,7 +139,7 @@ Plans:
 
 Plans:
 - [x] 07-01-PLAN.md -- Core progression system: HappinessManager Autoload, CitizenManager.SpawnCitizen refactor, BuildPanel unlock filtering
-- [ ] 07-02-PLAN.md -- HUD and feedback: HappinessBar, PopulationDisplay, arrival fanfare, unlock notifications, human verification
+- [x] 07-02-PLAN.md -- HUD and feedback: HappinessBar, PopulationDisplay, arrival fanfare, unlock notifications, human verification
 
 ### Phase 8: Polish and Loop Closure
 **Goal**: The full build-wish-grow loop feels cozy and complete — save/load works, ambient audio sets the tone, the HUD is fully wired, and the loop closure moment (wish fulfilled) is emotionally satisfying
@@ -166,9 +166,9 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 4. Room Placement and Build Interaction | 4/4 | Complete | 2026-03-03 |
 | 5. Citizens and Navigation | 3/3 | Complete | 2026-03-03 |
 | 6. Wish System | 3/3 | Complete | 2026-03-03 |
-| 7. Happiness and Progression | 1/2 | In progress | - |
+| 7. Happiness and Progression | 2/2 | Complete | 2026-03-03 |
 | 8. Polish and Loop Closure | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-03-02*
-*Last updated: 2026-03-03 after 07-01 execution*
+*Last updated: 2026-03-03 after 07-02 execution*
