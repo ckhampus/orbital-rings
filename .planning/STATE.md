@@ -18,14 +18,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-02)
 
 **Core value:** The wish-driven building loop: citizens express wishes, the player builds rooms to fulfill them, happiness rises, new citizens arrive, new wishes emerge.
-**Current focus:** Phase 5 complete — Citizens and Navigation verified by human inspection. Ready for Phase 6 (Wish System).
+**Current focus:** Phase 6 context gathered — Wish System decisions captured. Ready for planning.
 
 ## Current Position
 
-Phase: 5 of 8 (Citizens and Navigation) -- COMPLETE
-Plan: 3 of 3 in current phase (05-03 complete -- phase done)
-Status: Phase 5 complete, ready for Phase 6
-Last activity: 2026-03-03 — Completed 05-03-PLAN.md (human verification of citizen system)
+Phase: 6 of 8 (Wish System) -- CONTEXT GATHERED
+Plan: 0 of TBD in current phase
+Status: Phase 6 context gathered, ready for planning
+Last activity: 2026-03-03 — Captured Phase 6 context (wish system decisions)
 
 Progress: [██████████░░░░] 71%
 
@@ -126,5 +126,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Completed 05-03-PLAN.md (human verification -- Phase 5 complete)
-Resume file: .planning/phases/05-citizens-and-navigation/05-03-SUMMARY.md
+Stopped at: Phase 6 context gathered
+Resume file: .planning/phases/06-wish-system/06-CONTEXT.md
