@@ -34,8 +34,8 @@ Requirements for initial release (single playable ring proving the core loop).
 
 - [x] **CTZN-01**: Named citizens with distinct appearances arrive at the station as happiness grows
 - [x] **CTZN-02**: Citizens walk along the walkway visibly
-- [ ] **CTZN-03**: Citizens visit rooms based on spatial attraction (gravitating toward relevant rooms)
-- [ ] **CTZN-04**: Player can click a citizen to see their name and current wish
+- [x] **CTZN-03**: Citizens visit rooms based on spatial attraction (gravitating toward relevant rooms)
+- [x] **CTZN-04**: Player can click a citizen to see their name and current wish
 
 ### Wishes
 
@@ -120,8 +120,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ECON-05 | Phase 3 | Complete |
 | CTZN-01 | Phase 5 | Complete |
 | CTZN-02 | Phase 5 | Complete |
-| CTZN-03 | Phase 5 | Pending |
-| CTZN-04 | Phase 5 | Pending |
+| CTZN-03 | Phase 5 | Complete |
+| CTZN-04 | Phase 5 | Complete |
 | WISH-01 | Phase 6 | Pending |
 | WISH-02 | Phase 6 | Pending |
 | WISH-03 | Phase 6 | Pending |
