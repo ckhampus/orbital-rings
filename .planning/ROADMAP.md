@@ -12,11 +12,11 @@ Orbital Rings is built from the ground up in eight phases, each delivering a coh
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Foundation and Project Architecture** - Establish signal bus, data schema, camera, and architectural patterns before any gameplay code is written
-- [ ] **Phase 2: Ring Geometry and Segment Grid** - Build the polar segment grid, ring mesh, and visual segment differentiation that everything else sits on
-- [ ] **Phase 3: Economy Foundation** - Implement the credit economy, passive income, balance spreadsheet, and EconomyManager Autoload
+- [x] **Phase 1: Foundation and Project Architecture** - Establish signal bus, data schema, camera, and architectural patterns before any gameplay code is written
+- [x] **Phase 2: Ring Geometry and Segment Grid** - Build the polar segment grid, ring mesh, and visual segment differentiation that everything else sits on
+- [x] **Phase 3: Economy Foundation** - Implement the credit economy, passive income, balance spreadsheet, and EconomyManager Autoload
 - [x] **Phase 4: Room Placement and Build Interaction** - Wire room placement into the ring, all 5 categories with placeholder art, demolish, and satisfying placement feedback
-- [ ] **Phase 5: Citizens and Navigation** - Spawn named walking citizens on the ring walkway with a navigation approach proven by prototype
+- [x] **Phase 5: Citizens and Navigation** - Spawn named walking citizens on the ring walkway with a navigation approach proven by prototype
 - [ ] **Phase 6: Wish System** - Citizens express wishes via speech bubbles; wishes linger harmlessly and are visible on click
 - [ ] **Phase 7: Happiness and Progression** - Wish fulfillment raises happiness, happiness drives citizen arrival and blueprint unlocks
 - [ ] **Phase 8: Polish and Loop Closure** - Save/load, ambient audio, full HUD wiring, and integration pass that makes the loop feel cozy and complete
@@ -38,7 +38,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 Plans:
 - [x] 01-01-PLAN.md -- Core architecture: GameEvents Autoload, SafeNode base class, Resource subclasses
 - [x] 01-02-PLAN.md -- Camera system: OrbitalCamera, environment setup, QuickTest scene
-- [ ] 01-03-PLAN.md -- Gap closure: ambient light fix, flat disc geometry, touchpad/keyboard zoom
+- [x] 01-03-PLAN.md -- Gap closure: ambient light fix, flat disc geometry, touchpad/keyboard zoom
 
 ### Phase 2: Ring Geometry and Segment Grid
 **Goal**: The ring is visible, its 24 segments are selectable by mouse click using polar math (not trimesh collision), and inner vs. outer positions are visually readable
@@ -53,8 +53,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 02-01-PLAN.md -- Ring mesh and segment grid: SegmentGrid data model, RingMeshBuilder, RingVisual with 24 colored segments + walkway, replace CSG placeholder
-- [ ] 02-02-PLAN.md -- Segment interaction and tooltip: polar-math hover/click detection, hover/selection visual feedback, screen-space tooltip
+- [x] 02-01-PLAN.md -- Ring mesh and segment grid: SegmentGrid data model, RingMeshBuilder, RingVisual with 24 colored segments + walkway, replace CSG placeholder
+- [x] 02-02-PLAN.md -- Segment interaction and tooltip: polar-math hover/click detection, hover/selection visual feedback, screen-space tooltip
 
 ### Phase 3: Economy Foundation
 **Goal**: The credit economy is live, balanced via a spreadsheet before any numbers are hardcoded, and all rates are editable in Resource files without recompile
@@ -69,9 +69,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 03-01-PLAN.md -- Balance spreadsheet and data layer: economy-balance.md, EconomyConfig updates, RoomDefinition BaseCostOverride, GameEvents economy display events
-- [ ] 03-02-PLAN.md -- EconomyManager Autoload: credit balance, Timer income tick, cost calculation, spend/earn/refund, default_economy.tres
-- [ ] 03-03-PLAN.md -- Credit HUD: rolling counter, income flash, floating spend/refund numbers, hover tooltip
+- [x] 03-01-PLAN.md -- Balance spreadsheet and data layer: economy-balance.md, EconomyConfig updates, RoomDefinition BaseCostOverride, GameEvents economy display events
+- [x] 03-02-PLAN.md -- EconomyManager Autoload: credit balance, Timer income tick, cost calculation, spend/earn/refund, default_economy.tres
+- [x] 03-03-PLAN.md -- Credit HUD: rolling counter, income flash, floating spend/refund numbers, hover tooltip
 
 ### Phase 4: Room Placement and Build Interaction
 **Goal**: The player can place and demolish rooms anywhere on the ring, choose from 5 visually distinct categories, and feel a satisfying snap response every time
@@ -105,9 +105,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 05-01-PLAN.md -- Core citizen system: GameEvents updates, CitizenNames, CitizenAppearance, CitizenNode walking, CitizenManager Autoload with 5 starter citizens
-- [ ] 05-02-PLAN.md -- Citizen behavior and interaction: room visit drift-fade animation, click detection, CitizenInfoPanel popup, emission glow
-- [ ] 05-03-PLAN.md -- Human verification checkpoint for complete citizen system
+- [x] 05-01-PLAN.md -- Core citizen system: GameEvents updates, CitizenNames, CitizenAppearance, CitizenNode walking, CitizenManager Autoload with 5 starter citizens
+- [x] 05-02-PLAN.md -- Citizen behavior and interaction: room visit drift-fade animation, click detection, CitizenInfoPanel popup, emission glow
+- [x] 05-03-PLAN.md -- Human verification checkpoint for complete citizen system
 
 ### Phase 6: Wish System
 **Goal**: Citizens generate wishes expressed as speech bubbles, those wishes remain visible and harmless until fulfilled, and wishes span all four defined categories
@@ -155,11 +155,11 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 2. Ring Geometry and Segment Grid | 2/2 | Complete | 2026-03-02 |
 | 3. Economy Foundation | 3/3 | Complete | 2026-03-03 |
 | 4. Room Placement and Build Interaction | 4/4 | Complete | 2026-03-03 |
-| 5. Citizens and Navigation | 0/3 | Not started | - |
+| 5. Citizens and Navigation | 3/3 | Complete | 2026-03-03 |
 | 6. Wish System | 0/TBD | Not started | - |
 | 7. Happiness and Progression | 0/TBD | Not started | - |
 | 8. Polish and Loop Closure | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-03-02*
-*Last updated: 2026-03-03 after Phase 4 completion*
+*Last updated: 2026-03-03 after Phase 5 completion*
