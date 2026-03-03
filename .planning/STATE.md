@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: unknown
-last_updated: "2026-03-03T12:50:32.806Z"
+status: executing
+last_updated: "2026-03-03T13:47:03Z"
 progress:
-  total_phases: 4
+  total_phases: 8
   completed_phases: 4
-  total_plans: 12
-  completed_plans: 12
+  total_plans: 15
+  completed_plans: 13
 ---
 
 # Project State
@@ -18,23 +18,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-02)
 
 **Core value:** The wish-driven building loop: citizens express wishes, the player builds rooms to fulfill them, happiness rises, new citizens arrive, new wishes emerge.
-**Current focus:** Phase 4 complete — Room Placement and Build Interaction verified. Ready for Phase 5.
+**Current focus:** Phase 5 in progress — Citizens and Navigation. Plan 01 complete (core citizen system), Plans 02-03 remaining.
 
 ## Current Position
 
-Phase: 4 of 8 (Room Placement and Build Interaction) -- COMPLETE
-Plan: 4 of 4 in current phase (04-01, 04-02, 04-03, 04-04 complete)
-Status: Phase 4 complete
-Last activity: 2026-03-03 — Completed 04-04-PLAN.md (human verification of complete build loop)
+Phase: 5 of 8 (Citizens and Navigation)
+Plan: 1 of 3 in current phase (05-01 complete)
+Status: Executing phase 5
+Last activity: 2026-03-03 — Completed 05-01-PLAN.md (core citizen system with walking behavior)
 
-Progress: [██████████] 100%
+Progress: [████████░░░░░░] 57%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 12
-- Average duration: 4.1 min
-- Total execution time: 0.82 hours
+- Total plans completed: 13
+- Average duration: 3.9 min
+- Total execution time: 0.85 hours
 
 **By Phase:**
 
@@ -44,9 +44,10 @@ Progress: [██████████] 100%
 | 2 | 2 | 8min | 4min |
 | 3 | 3 | 10min | 3.3min |
 | 4 | 4 | 9min | 2.3min |
+| 5 | 1/3 | 2min | 2min |
 
 **Recent Trend:**
-- Last 5 plans: 5min, 4min, 1min, 3min, 1min
+- Last 5 plans: 4min, 1min, 3min, 1min, 2min
 - Trend: steady
 
 *Updated after each plan completion*
@@ -101,6 +102,11 @@ Recent decisions affecting current work:
 - [04-03]: PlacementFeedback instantiated as BuildManager child (Autoload) — no .tscn scene dependency
 - [04-03]: GPUParticles3D one-shot uses Restart()+Emitting workaround with Finished event self-cleanup
 - [04-04]: Build loop approved by human verification -- no code changes required before Phase 5
+- [05-01]: CitizenNode extends Node3D (not SafeNode) — SafeNode extends Node, but CitizenNode needs Node3D for Position/Rotation; implements same lifecycle manually
+- [05-01]: Angle-based polar movement instead of NavigationAgent3D — walkway is a 1D circular path, angle += speed * delta
+- [05-01]: Two overlapping CapsuleMesh instances for two-color band effect — primary body + secondary band at midsection
+- [05-01]: Per-instance StandardMaterial3D for every citizen capsule — prevents shared-material contamination (Phase 2 lesson)
+- [05-01]: Curated 8-color warm/pastel palette for cozy citizen aesthetic
 
 ### Pending Todos
 
@@ -109,11 +115,11 @@ None yet.
 ### Blockers/Concerns
 
 - [Phase 2 RESOLVED]: Polar math segment selection implemented via Plane.IntersectsRay + Atan2 in SegmentInteraction.cs. No trimesh collision used. Phantom hit concern eliminated.
-- [Phase 5 flag]: Circular walkway navmesh is non-standard. Hand-authored NavigationMesh vs. custom arc-waypoint system must be prototyped in Phase 5 before committing to NavigationAgent3D stack. Circular geometry bakes poorly with auto-bake.
+- [Phase 5 RESOLVED]: Circular walkway navigation uses angle-based polar coordinates (angle += speed * delta). NavigationAgent3D skipped entirely — walkway is a 1D circular path, not a 2D navigable surface. No navmesh baking needed.
 - [Phase 3 RESOLVED]: Economy balance spreadsheet produced in 03-01. sqrt scaling + 1.3x happiness cap confirmed: 30-cit/5-cit ratio = 3.3x (under 10x threshold). All EconomyConfig defaults match spreadsheet.
 
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Completed 04-04-PLAN.md (Phase 4 complete)
-Resume file: .planning/phases/04-room-placement-and-build-interaction/04-04-SUMMARY.md
+Stopped at: Completed 05-01-PLAN.md (core citizen system)
+Resume file: .planning/phases/05-citizens-and-navigation/05-01-SUMMARY.md
