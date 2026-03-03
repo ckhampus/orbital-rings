@@ -66,7 +66,12 @@ Plans:
   3. An economy balance spreadsheet exists modeling citizen count, income rate, room costs, and happiness multiplier across 5/15/30 citizen milestones
   4. Room costs scale by segment size with diminishing returns (a 3-segment room costs less than 3x a 1-segment room)
   5. All economy parameters (income rate, happiness multiplier cap, cost formulas) live in Inspector-editable Resource files, not C# constants
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 03-01-PLAN.md -- Balance spreadsheet and data layer: economy-balance.md, EconomyConfig updates, RoomDefinition BaseCostOverride, GameEvents economy display events
+- [ ] 03-02-PLAN.md -- EconomyManager Autoload: credit balance, Timer income tick, cost calculation, spend/earn/refund, default_economy.tres
+- [ ] 03-03-PLAN.md -- Credit HUD: rolling counter, income flash, floating spend/refund numbers, hover tooltip
 
 ### Phase 4: Room Placement and Build Interaction
 **Goal**: The player can place and demolish rooms anywhere on the ring, choose from 5 visually distinct categories, and feel a satisfying snap response every time
@@ -137,7 +142,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 |-------|----------------|--------|-----------|
 | 1. Foundation and Project Architecture | 2/3 | Gap closure | - |
 | 2. Ring Geometry and Segment Grid | 0/2 | Planned | - |
-| 3. Economy Foundation | 0/TBD | Not started | - |
+| 3. Economy Foundation | 0/3 | Planned | - |
 | 4. Room Placement and Build Interaction | 0/TBD | Not started | - |
 | 5. Citizens and Navigation | 0/TBD | Not started | - |
 | 6. Wish System | 0/TBD | Not started | - |
