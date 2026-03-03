@@ -240,10 +240,14 @@ public partial class HappinessManager : Node
             if (citizen != null)
             {
                 // Fade-in animation (locked decision: "new citizen capsule fades in on walkway")
-                citizen.Modulate = new Color(1, 1, 1, 0);
+                citizen.SetMeshTransparencyMode(true);
+                citizen.SetMeshAlpha(0f);
                 var fadeTween = citizen.CreateTween();
-                fadeTween.TweenProperty(citizen, "modulate:a", 1.0f, 0.5f)
-                    .SetEase(Tween.EaseType.Out);
+                fadeTween.TweenMethod(
+                    Callable.From((float alpha) => citizen.SetMeshAlpha(alpha)),
+                    0.0f, 1.0f, 0.5f
+                ).SetEase(Tween.EaseType.Out);
+                fadeTween.TweenCallback(Callable.From(() => citizen.SetMeshTransparencyMode(false)));
 
                 // Floating arrival text
                 string name = citizen.Data?.CitizenName ?? "A citizen";

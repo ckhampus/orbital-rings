@@ -635,7 +635,7 @@ public partial class CitizenNode : Node3D
     /// Enables or disables alpha transparency mode on all citizen mesh materials.
     /// Must be called BEFORE fading to avoid Z-fighting artifacts (pitfall #4).
     /// </summary>
-    private void SetMeshTransparencyMode(bool enabled)
+    internal void SetMeshTransparencyMode(bool enabled)
     {
         if (_meshContainer == null) return;
 
@@ -661,7 +661,7 @@ public partial class CitizenNode : Node3D
     /// Sets the alpha channel on all citizen mesh materials (body + band).
     /// </summary>
     /// <param name="alpha">Alpha value from 0 (invisible) to 1 (opaque).</param>
-    private void SetMeshAlpha(float alpha)
+    internal void SetMeshAlpha(float alpha)
     {
         if (_meshContainer == null) return;
 
