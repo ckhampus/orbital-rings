@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-last_updated: "2026-03-03T08:53:52Z"
+last_updated: "2026-03-03T09:11:00Z"
 progress:
   total_phases: 3
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 8
-  completed_plans: 7
+  completed_plans: 8
 ---
 
 # Project State
@@ -18,23 +18,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-02)
 
 **Core value:** The wish-driven building loop: citizens express wishes, the player builds rooms to fulfill them, happiness rises, new citizens arrive, new wishes emerge.
-**Current focus:** Phase 3 in progress — Economy Foundation
+**Current focus:** Phase 3 complete — Economy Foundation done. Phase 4 next.
 
 ## Current Position
 
-Phase: 3 of 8 (Economy Foundation)
-Plan: 2 of 3 in current phase (03-02 complete)
-Status: Executing Phase 3
-Last activity: 2026-03-03 — Completed 03-02-PLAN.md (economy manager)
+Phase: 3 of 8 (Economy Foundation) -- COMPLETE
+Plan: 3 of 3 in current phase (03-03 complete)
+Status: Phase 3 complete, ready for Phase 4
+Last activity: 2026-03-03 — Completed 03-03-PLAN.md (credit HUD)
 
-Progress: [███████░░░] 70%
+Progress: [████████░░] 80%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7
+- Total plans completed: 8
 - Average duration: 5 min
-- Total execution time: 0.57 hours
+- Total execution time: 0.65 hours
 
 **By Phase:**
 
@@ -42,11 +42,11 @@ Progress: [███████░░░] 70%
 |-------|-------|-------|----------|
 | 1 | 3 | 21min | 7min |
 | 2 | 2 | 8min | 4min |
-| 3 | 2 | 5min | 2.5min |
+| 3 | 3 | 10min | 3.3min |
 
 **Recent Trend:**
-- Last 5 plans: 2min, 5min, 3min, 3min, 2min
-- Trend: accelerating
+- Last 5 plans: 5min, 3min, 3min, 2min, 5min
+- Trend: steady
 
 *Updated after each plan completion*
 
@@ -84,6 +84,9 @@ Recent decisions affecting current work:
 - [03-02]: Timer child node for income ticks (not _Process delta) — periodic 5.5s chunks per user decision
 - [03-02]: ResourceLoader fallback chain: Inspector [Export] -> .tres path -> code defaults with GD.PushWarning
 - [03-02]: Public CalculateTickIncome/CalculateRoomCost for testability and HUD display without side effects
+- [03-03]: Explicit Timer.Start() over Autostart=true — Autostart property set before AddChild() is unreliable in Godot 4 C#
+- [03-03]: No sound on income tick — user decision: visual-only feedback (gold flash + floating text)
+- [03-03]: Balance-only display (no income rate) — user decision: income breakdown available via hover tooltip
 
 ### Pending Todos
 
@@ -98,5 +101,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Completed 03-02-PLAN.md
-Resume file: .planning/phases/03-economy-foundation/03-02-SUMMARY.md
+Stopped at: Completed 03-03-PLAN.md (Phase 3 complete)
+Resume file: .planning/phases/03-economy-foundation/03-03-SUMMARY.md
