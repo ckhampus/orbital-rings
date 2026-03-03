@@ -99,9 +99,6 @@ public partial class CitizenManager : SafeNode
         // Spawn 5 starter citizens evenly spaced around the ring
         SpawnStarterCitizens(5);
 
-        // Update EconomyManager with initial citizen count for income calculation
-        EconomyManager.Instance?.SetCitizenCount(_citizens.Count);
-
         // Cache camera reference for click detection ray casting
         _camera = GetViewport().GetCamera3D();
 
@@ -272,42 +269,58 @@ public partial class CitizenManager : SafeNode
     // -------------------------------------------------------------------------
 
     /// <summary>
+    /// Spawns a single citizen at a random (or specified) walkway position.
+    /// Creates random appearance from curated palette, adds to scene tree,
+    /// updates economy, and fires CitizenArrived event.
+    ///
+    /// Called by HappinessManager for dynamic arrivals and by SpawnStarterCitizens
+    /// for initial population.
+    /// </summary>
+    /// <param name="startAngle">
+    /// Optional angle on the walkway ring (radians). If null, uses a random position.
+    /// </param>
+    /// <returns>The spawned CitizenNode (caller can apply fade-in tween).</returns>
+    public CitizenNode SpawnCitizen(float? startAngle = null)
+    {
+        var bodyTypes = System.Enum.GetValues<CitizenData.BodyType>();
+
+        var data = new CitizenData
+        {
+            CitizenName = CitizenNames.GetNextName(),
+            Body = bodyTypes[GD.RandRange(0, bodyTypes.Length - 1)],
+            PrimaryColor = Palette[GD.RandRange(0, Palette.Length - 1)],
+            SecondaryColor = Palette[GD.RandRange(0, Palette.Length - 1)]
+        };
+
+        // Ensure secondary color differs from primary
+        while (data.SecondaryColor == data.PrimaryColor && Palette.Length > 1)
+        {
+            data.SecondaryColor = Palette[GD.RandRange(0, Palette.Length - 1)];
+        }
+
+        var citizen = new CitizenNode();
+        float angle = startAngle ?? GD.Randf() * Mathf.Tau;
+        citizen.Initialize(data, angle, _grid);
+
+        AddChild(citizen);
+        _citizens.Add(citizen);
+
+        EconomyManager.Instance?.SetCitizenCount(_citizens.Count);
+        GameEvents.Instance?.EmitCitizenArrived(data.CitizenName);
+
+        return citizen;
+    }
+
+    /// <summary>
     /// Spawns the initial set of citizens evenly distributed around the walkway ring.
-    /// Each citizen gets random body type, random colors from the curated palette,
-    /// and a sequential name from CitizenNames.
     /// </summary>
     /// <param name="count">Number of starter citizens to spawn.</param>
     private void SpawnStarterCitizens(int count)
     {
-        var bodyTypes = System.Enum.GetValues<CitizenData.BodyType>();
-
         for (int i = 0; i < count; i++)
         {
-            // Create CitizenData with random appearance
-            var data = new CitizenData
-            {
-                CitizenName = CitizenNames.GetNextName(),
-                Body = bodyTypes[GD.RandRange(0, bodyTypes.Length - 1)],
-                PrimaryColor = Palette[GD.RandRange(0, Palette.Length - 1)],
-                SecondaryColor = Palette[GD.RandRange(0, Palette.Length - 1)]
-            };
-
-            // Ensure secondary color differs from primary
-            while (data.SecondaryColor == data.PrimaryColor && Palette.Length > 1)
-            {
-                data.SecondaryColor = Palette[GD.RandRange(0, Palette.Length - 1)];
-            }
-
-            // Create and initialize CitizenNode with grid reference for room visits
-            var citizen = new CitizenNode();
-            float startAngle = (float)i / count * Mathf.Tau;
-            citizen.Initialize(data, startAngle, _grid);
-
-            AddChild(citizen);
-            _citizens.Add(citizen);
-
-            // Emit arrival event
-            GameEvents.Instance?.EmitCitizenArrived(data.CitizenName);
+            float angle = (float)i / count * Mathf.Tau;
+            SpawnCitizen(angle);
         }
     }
 }

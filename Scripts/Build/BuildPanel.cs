@@ -125,6 +125,7 @@ public partial class BuildPanel : PanelContainer
             GameEvents.Instance.DemolishHoverUpdated += OnDemolishHoverUpdated;
             GameEvents.Instance.DemolishHoverCleared += OnDemolishHoverCleared;
             GameEvents.Instance.CreditsChanged += OnCreditsChanged;
+            GameEvents.Instance.BlueprintUnlocked += OnBlueprintUnlocked;
         }
 
         // Default: select first tab (Housing)
@@ -142,6 +143,7 @@ public partial class BuildPanel : PanelContainer
             GameEvents.Instance.DemolishHoverUpdated -= OnDemolishHoverUpdated;
             GameEvents.Instance.DemolishHoverCleared -= OnDemolishHoverCleared;
             GameEvents.Instance.CreditsChanged -= OnCreditsChanged;
+            GameEvents.Instance.BlueprintUnlocked -= OnBlueprintUnlocked;
         }
     }
 
@@ -355,8 +357,14 @@ public partial class BuildPanel : PanelContainer
 
     private void LoadRoomDefinitions()
     {
+        _roomsByCategory.Clear();
+
         foreach (var id in RoomFiles)
         {
+            // Filter: only load unlocked rooms (locked rooms hidden, not greyed -- locked decision)
+            if (HappinessManager.Instance != null && !HappinessManager.Instance.IsRoomUnlocked(id))
+                continue;
+
             var def = ResourceLoader.Load<RoomDefinition>($"res://Resources/Rooms/{id}.tres");
             if (def != null)
             {
@@ -743,6 +751,18 @@ public partial class BuildPanel : PanelContainer
     {
         // Refresh room card cost affordability
         RefreshCardCosts();
+    }
+
+    /// <summary>
+    /// Called when a new room blueprint is unlocked by HappinessManager.
+    /// Re-loads all room definitions (now includes newly unlocked rooms)
+    /// and refreshes the current tab to show new rooms immediately.
+    /// Tab glow effect handled in Plan 02.
+    /// </summary>
+    private void OnBlueprintUnlocked(string roomType)
+    {
+        LoadRoomDefinitions();
+        PopulateRoomCards(Categories[_activeTabIndex]);
     }
 
     // -------------------------------------------------------------------------
