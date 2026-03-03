@@ -100,4 +100,55 @@ public class SegmentGrid
             ? (OuterRowInner, OuterRadius)
             : (InnerRadius, InnerRowOuter);
     }
+
+    // -------------------------------------------------------------------------
+    // Circular Adjacency Helpers (Phase 4)
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Normalizes a position to the valid 0-11 range, handling negative wrap-around.
+    /// E.g., -1 becomes 11, 12 becomes 0.
+    /// </summary>
+    public static int WrapPosition(int position)
+    {
+        return ((position % SegmentsPerRow) + SegmentsPerRow) % SegmentsPerRow;
+    }
+
+    /// <summary>
+    /// Returns true if two clock positions are adjacent, accounting for circular wrap.
+    /// Position 0 is adjacent to position 11.
+    /// </summary>
+    public static bool AreAdjacent(int posA, int posB)
+    {
+        int delta = System.Math.Abs(posA - posB);
+        return delta == 1 || delta == SegmentsPerRow - 1;
+    }
+
+    /// <summary>
+    /// Checks if <paramref name="count"/> consecutive segments starting from
+    /// <paramref name="startPos"/> (wrapping around) are all unoccupied.
+    /// </summary>
+    public bool AreSegmentsFree(SegmentRow row, int startPos, int count)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            int pos = WrapPosition(startPos + i);
+            if (IsOccupied(row, pos))
+                return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Sets occupancy for <paramref name="count"/> consecutive segments starting from
+    /// <paramref name="startPos"/> (wrapping around).
+    /// </summary>
+    public void SetSegmentsOccupied(SegmentRow row, int startPos, int count, bool occupied)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            int pos = WrapPosition(startPos + i);
+            SetOccupied(row, pos, occupied);
+        }
+    }
 }

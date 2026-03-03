@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="RoomDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/Data/RoomDefinition.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+RoomName = "Reading Nook"
+RoomId = "reading_nook"
+Category = 3
+MinSegments = 1
+MaxSegments = 3
+BaseCapacity = 0
+Effectiveness = 1.15
+BaseCostOverride = 0
