@@ -1,5 +1,6 @@
 using Godot;
 using OrbitalRings.Autoloads;
+using OrbitalRings.Build;
 using OrbitalRings.Data;
 using OrbitalRings.Ring;
 
@@ -72,6 +73,34 @@ public partial class CitizenNode : Node3D
     /// </summary>
     private const float VisitProximityThreshold = 1.5f;
 
+    // ---- Wish timing constants ----
+
+    /// <summary>Minimum seconds before first/next wish generation (30s).</summary>
+    private const float WishTimerMin = 30.0f;
+
+    /// <summary>Maximum seconds before first/next wish generation (60s).</summary>
+    private const float WishTimerMax = 60.0f;
+
+    /// <summary>Minimum cooldown seconds after wish fulfillment (30s).</summary>
+    private const float WishCooldownMin = 30.0f;
+
+    /// <summary>Maximum cooldown seconds after wish fulfillment (90s).</summary>
+    private const float WishCooldownMax = 90.0f;
+
+    /// <summary>Visit timer reset delay on room-build nudge (~5-10s range).</summary>
+    private const float NudgeDelay = 7.0f;
+
+    /// <summary>Distance reduction for rooms matching active wish (70% closer in weighting).</summary>
+    private const float WishMatchDistanceMultiplier = 0.3f;
+
+    // ---- Badge display constants ----
+
+    /// <summary>Badge vertical offset above citizen head (capsule top + margin).</summary>
+    private const float BadgeVerticalOffset = 0.45f;
+
+    /// <summary>Badge pixel size (64px * 0.005 = 0.32 world units).</summary>
+    private const float BadgePixelSize = 0.005f;
+
     // -------------------------------------------------------------------------
     // Fields
     // -------------------------------------------------------------------------
@@ -87,6 +116,13 @@ public partial class CitizenNode : Node3D
     private Timer _visitTimer;      // periodic check for nearby occupied rooms
     private SegmentGrid _grid;      // reference to ring occupancy data
 
+    // ---- Wish fields ----
+    private WishTemplate _currentWish;       // Active wish (null = no wish)
+    private Sprite3D _wishBadge;             // Badge icon above citizen head
+    private Timer _wishTimer;                // Wish generation/cooldown timer
+    private Tween _badgeTween;               // Badge pop animation (separate from visit tween)
+    private int _visitTargetSegment = -1;    // Segment index of current visit target (for fulfillment check)
+
     // -------------------------------------------------------------------------
     // Properties
     // -------------------------------------------------------------------------
@@ -100,6 +136,9 @@ public partial class CitizenNode : Node3D
     /// <summary>Whether this citizen is currently visiting a room.</summary>
     public bool IsVisiting => _isVisiting;
 
+    /// <summary>Current active wish template, or null if no wish.</summary>
+    public WishTemplate CurrentWish => _currentWish;
+
     // -------------------------------------------------------------------------
     // Lifecycle (SafeNode pattern for Node3D)
     // -------------------------------------------------------------------------
@@ -109,6 +148,7 @@ public partial class CitizenNode : Node3D
         // Start visit timer now that we're in the scene tree
         // (Timer.Start() requires being inside the tree — can't call in Initialize())
         _visitTimer?.Start();
+        _wishTimer?.Start();
     }
 
     public override void _EnterTree()
@@ -120,19 +160,28 @@ public partial class CitizenNode : Node3D
     {
         UnsubscribeEvents();
         _activeTween?.Kill();
+        _badgeTween?.Kill();
+        _wishBadge?.QueueFree();
     }
 
     /// <summary>
-    /// Override to connect to GameEvents.Instance and other signal sources.
-    /// Called automatically in _EnterTree().
+    /// Connect to signal sources. Called automatically in _EnterTree().
     /// </summary>
-    protected virtual void SubscribeEvents() { }
+    protected virtual void SubscribeEvents()
+    {
+        if (WishBoard.Instance != null)
+            WishBoard.Instance.WishNudgeRequested += OnWishNudgeRequested;
+    }
 
     /// <summary>
-    /// Override to disconnect from all signal sources. Called automatically
-    /// in _ExitTree(). MUST mirror every connection made in SubscribeEvents().
+    /// Disconnect from all signal sources. Called automatically in _ExitTree().
+    /// MUST mirror every connection made in SubscribeEvents().
     /// </summary>
-    protected virtual void UnsubscribeEvents() { }
+    protected virtual void UnsubscribeEvents()
+    {
+        if (WishBoard.Instance != null)
+            WishBoard.Instance.WishNudgeRequested -= OnWishNudgeRequested;
+    }
 
     // -------------------------------------------------------------------------
     // Initialization
@@ -176,6 +225,17 @@ public partial class CitizenNode : Node3D
         _visitTimer.Timeout += OnVisitTimerTimeout;
         AddChild(_visitTimer);
         // Timer.Start() deferred to _Ready() — timer must be in scene tree first
+
+        // Create wish generation timer (one-shot: fires once, then re-armed in handler)
+        _wishTimer = new Timer
+        {
+            Name = "WishTimer",
+            OneShot = true,
+            WaitTime = WishTimerMin + GD.Randf() * (WishTimerMax - WishTimerMin)
+        };
+        _wishTimer.Timeout += OnWishTimerTimeout;
+        AddChild(_wishTimer);
+        // Timer.Start() deferred to _Ready() per established pattern
 
         // Set initial position from angle
         UpdatePositionFromAngle();
@@ -271,9 +331,29 @@ public partial class CitizenNode : Node3D
 
             float segMidAngle = SegmentGrid.GetStartAngle(pos) + SegmentGrid.SegmentArc * 0.5f;
             float angleDist = AngleDistance(myAngle, segMidAngle);
-            if (angleDist < bestAngleDist)
+
+            // Apply wish-aware distance weighting (per CONTEXT.md locked decision)
+            float effectiveDist = angleDist;
+            if (_currentWish != null)
             {
-                bestAngleDist = angleDist;
+                var placedRoom = BuildManager.Instance?.GetPlacedRoom(i);
+                if (placedRoom != null)
+                {
+                    string roomId = placedRoom.Value.Definition.RoomId;
+                    foreach (var fulfillingId in _currentWish.FulfillingRoomIds)
+                    {
+                        if (roomId == fulfillingId)
+                        {
+                            effectiveDist *= WishMatchDistanceMultiplier;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (effectiveDist < bestAngleDist)
+            {
+                bestAngleDist = effectiveDist;
                 bestSegment = i;
                 bestRow = row;
             }
@@ -282,6 +362,7 @@ public partial class CitizenNode : Node3D
         // Only visit if nearest occupied segment is within proximity threshold
         if (bestSegment >= 0 && bestAngleDist < SegmentGrid.SegmentArc * VisitProximityThreshold)
         {
+            _visitTargetSegment = bestSegment;
             StartVisit(bestRow);
         }
 
@@ -357,14 +438,160 @@ public partial class CitizenNode : Node3D
             0.0f, 1.0f, DriftDuration
         );
 
-        // Phase 8: Restore opaque materials and resume walking
+        // Phase 8: Restore opaque materials, check wish fulfillment, and resume walking
         tween.TweenCallback(Callable.From(() =>
         {
             SetMeshAlpha(1.0f);
             SetMeshTransparencyMode(false);
             _isVisiting = false;
             _activeTween = null;
+
+            // Check if visited room matches active wish (wish fulfillment)
+            if (_currentWish != null && _visitTargetSegment >= 0)
+            {
+                var placedRoom = BuildManager.Instance?.GetPlacedRoom(_visitTargetSegment);
+                if (placedRoom != null)
+                {
+                    string roomId = placedRoom.Value.Definition.RoomId;
+                    foreach (var fulfillingId in _currentWish.FulfillingRoomIds)
+                    {
+                        if (roomId == fulfillingId)
+                        {
+                            FulfillWish();
+                            break;
+                        }
+                    }
+                }
+            }
+            _visitTargetSegment = -1;
         }));
+    }
+
+    // -------------------------------------------------------------------------
+    // Wish system
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Fired by _wishTimer. Generates a random wish if citizen has none.
+    /// </summary>
+    private void OnWishTimerTimeout()
+    {
+        // Don't generate a wish if already have one
+        if (_currentWish != null) return;
+
+        // Get a random wish template from WishBoard
+        var template = WishBoard.Instance?.GetRandomTemplate();
+        if (template == null) return;
+
+        _currentWish = template;
+
+        // Create badge Sprite3D
+        CreateWishBadge();
+
+        // Emit event for WishBoard tracking
+        GameEvents.Instance?.EmitWishGenerated(_data.CitizenName, template.WishId);
+    }
+
+    /// <summary>
+    /// Creates the Sprite3D badge above the citizen's head showing the wish category icon.
+    /// Badge inherits citizen visibility (hides during room visits automatically).
+    /// </summary>
+    private void CreateWishBadge()
+    {
+        // Remove old badge if any
+        _wishBadge?.QueueFree();
+
+        // Determine icon texture path based on wish category
+        string iconPath = _currentWish.Category switch
+        {
+            WishTemplate.WishCategory.Social => "res://Resources/Icons/wish_social.png",
+            WishTemplate.WishCategory.Comfort => "res://Resources/Icons/wish_comfort.png",
+            WishTemplate.WishCategory.Curiosity => "res://Resources/Icons/wish_curiosity.png",
+            WishTemplate.WishCategory.Variety => "res://Resources/Icons/wish_variety.png",
+            _ => "res://Resources/Icons/wish_social.png"
+        };
+
+        var texture = ResourceLoader.Load<Texture2D>(iconPath);
+        if (texture == null)
+        {
+            GD.PushWarning($"CitizenNode: Failed to load wish icon at {iconPath}");
+            return;
+        }
+
+        _wishBadge = new Sprite3D
+        {
+            Name = "WishBadge",
+            Texture = texture,
+            Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
+            PixelSize = BadgePixelSize,
+            Shaded = false,
+            AlphaCut = SpriteBase3D.AlphaCutMode.OpaquePrePass,
+            Position = new Vector3(0, BadgeVerticalOffset, 0)
+        };
+
+        AddChild(_wishBadge);
+    }
+
+    /// <summary>
+    /// Fulfills the citizen's active wish: pop animation on badge, emit event,
+    /// clear state, restart wish timer with cooldown interval.
+    /// Called when citizen visits a room matching their active wish.
+    /// </summary>
+    private void FulfillWish()
+    {
+        if (_currentWish == null) return;
+
+        string wishId = _currentWish.WishId;
+
+        // Emit fulfillment event BEFORE clearing state (WishBoard needs to track)
+        GameEvents.Instance?.EmitWishFulfilled(_data.CitizenName, wishId);
+
+        // Pop animation on badge: scale up + fade out, then remove
+        if (_wishBadge != null)
+        {
+            _badgeTween?.Kill();
+            var tween = CreateTween();
+            _badgeTween = tween;
+
+            tween.SetParallel(true);
+            tween.TweenProperty(_wishBadge, "scale", Vector3.One * 1.5f, 0.3f)
+                .SetEase(Tween.EaseType.Out)
+                .SetTrans(Tween.TransitionType.Back);
+            tween.TweenProperty(_wishBadge, "modulate:a", 0.0f, 0.3f)
+                .SetEase(Tween.EaseType.In);
+
+            tween.SetParallel(false);
+            tween.TweenCallback(Callable.From(() =>
+            {
+                _wishBadge?.QueueFree();
+                _wishBadge = null;
+                _badgeTween = null;
+            }));
+        }
+
+        // Clear wish state
+        _currentWish = null;
+
+        // Restart wish timer with cooldown interval (30-90 seconds)
+        _wishTimer.WaitTime = WishCooldownMin + GD.Randf() * (WishCooldownMax - WishCooldownMin);
+        _wishTimer.Start();
+    }
+
+    /// <summary>
+    /// Handles WishNudgeRequested event from WishBoard. Resets visit timer to a
+    /// short delay so the citizen visits a matching room promptly after it's built.
+    /// </summary>
+    private void OnWishNudgeRequested(string citizenName)
+    {
+        // Only respond to nudges for this citizen
+        if (_data.CitizenName != citizenName) return;
+
+        // Don't nudge if currently visiting
+        if (_isVisiting) return;
+
+        // Reset visit timer to short delay for responsive feedback
+        _visitTimer.WaitTime = NudgeDelay;
+        _visitTimer.Start();
     }
 
     // -------------------------------------------------------------------------
