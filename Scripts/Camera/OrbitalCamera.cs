@@ -38,7 +38,11 @@ public partial class OrbitalCamera : Node3D
   [Export] public float IdleTimeout { get; set; } = 5.0f;
 
   [ExportGroup("Tilt")]
-  [Export] public float TiltAngleDeg { get; set; } = 60.0f;
+  [Export] public float TiltAngleDeg { get; set; } = 45.0f;
+  [Export] public float TiltMin { get; set; } = 20.0f;
+  [Export] public float TiltMax { get; set; } = 60.0f;
+  [Export] public float TiltSpeed { get; set; } = 40.0f;
+  [Export] public float TiltSmoothing { get; set; } = 8.0f;
 
   // -------------------------------------------------------------------------
   // Private State
@@ -48,8 +52,11 @@ public partial class OrbitalCamera : Node3D
   private float _orbitVelocity;
   private float _targetZoom;
   private float _currentZoom;
+  private float _targetTiltDeg;
+  private float _currentTiltDeg;
   private float _idleTimer;
   private bool _isDragging;
+  private bool _isTilting;
   private bool _wasOrbiting;
 
   // -------------------------------------------------------------------------
@@ -66,6 +73,10 @@ public partial class OrbitalCamera : Node3D
 	_targetZoom = ZoomMax;
 	_currentZoom = ZoomMax;
 
+	// Initialize tilt from the exported starting angle
+	_targetTiltDeg = TiltAngleDeg;
+	_currentTiltDeg = TiltAngleDeg;
+
 	// Position camera using spherical coordinates and look at origin.
 	// The CameraRig sits at world origin; Camera3D is offset so it
 	// looks down at the pivot from the correct tilt angle and distance.
@@ -81,6 +92,10 @@ public partial class OrbitalCamera : Node3D
 	  {
 		_isDragging = mb.Pressed;
 	  }
+	  else if (mb.ButtonIndex == MouseButton.Middle)
+	  {
+		_isTilting = mb.Pressed;
+	  }
 	  // Scroll wheel zoom
 	  else if (mb.ButtonIndex == MouseButton.WheelUp && mb.Pressed)
 	  {
@@ -93,11 +108,22 @@ public partial class OrbitalCamera : Node3D
 		ResetIdleTimer();
 	  }
 	}
-	// Right-click drag: orbit
-	else if (@event is InputEventMouseMotion mm && _isDragging)
+	// Right-click drag: orbit / Middle-click drag: tilt
+	else if (@event is InputEventMouseMotion mm)
 	{
-	  _orbitVelocity = -mm.Relative.X * OrbitSpeed;
-	  ResetIdleTimer();
+	  if (_isDragging)
+	  {
+		_orbitVelocity = -mm.Relative.X * OrbitSpeed;
+		ResetIdleTimer();
+	  }
+	  if (_isTilting)
+	  {
+		_targetTiltDeg = Mathf.Clamp(
+		  _targetTiltDeg + -mm.Relative.Y * 0.3f,
+		  TiltMin,
+		  TiltMax);
+		ResetIdleTimer();
+	  }
 	}
 	// Touchpad two-finger scroll: zoom
 	else if (@event is InputEventPanGesture pan)
@@ -132,6 +158,18 @@ public partial class OrbitalCamera : Node3D
 	  ResetIdleTimer();
 	}
 
+	// Keyboard tilt input (W/S / Up/Down arrow keys)
+	if (Input.IsActionPressed("tilt_up"))
+	{
+	  _targetTiltDeg = Mathf.Min(_targetTiltDeg + TiltSpeed * dt, TiltMax);
+	  ResetIdleTimer();
+	}
+	if (Input.IsActionPressed("tilt_down"))
+	{
+	  _targetTiltDeg = Mathf.Max(_targetTiltDeg - TiltSpeed * dt, TiltMin);
+	  ResetIdleTimer();
+	}
+
 	// Apply orbit rotation (rotate the pivot Node3D on Y axis)
 	RotateY(_orbitVelocity);
 
@@ -146,6 +184,9 @@ public partial class OrbitalCamera : Node3D
 
 	// Smooth zoom (lerp toward target)
 	_currentZoom = Mathf.Lerp(_currentZoom, _targetZoom, ZoomSmoothing * dt);
+
+	// Smooth tilt (lerp toward target)
+	_currentTiltDeg = Mathf.Lerp(_currentTiltDeg, _targetTiltDeg, TiltSmoothing * dt);
 
 	// Update camera position and orientation to maintain tilt + distance
 	UpdateCameraTransform();
@@ -190,7 +231,7 @@ public partial class OrbitalCamera : Node3D
   /// </summary>
   private void UpdateCameraTransform()
   {
-	float tiltRad = Mathf.DegToRad(TiltAngleDeg);
+	float tiltRad = Mathf.DegToRad(_currentTiltDeg);
 	float height = _currentZoom * Mathf.Sin(tiltRad);
 	float distance = _currentZoom * Mathf.Cos(tiltRad);
 
@@ -252,6 +293,28 @@ public partial class OrbitalCamera : Node3D
 	  var keyKpMinus = new InputEventKey();
 	  keyKpMinus.PhysicalKeycode = Key.KpSubtract;  // Numpad -
 	  InputMap.ActionAddEvent("zoom_out", keyKpMinus);
+	}
+
+	if (!InputMap.HasAction("tilt_up"))
+	{
+	  InputMap.AddAction("tilt_up");
+	  var keyW = new InputEventKey();
+	  keyW.PhysicalKeycode = Key.W;
+	  InputMap.ActionAddEvent("tilt_up", keyW);
+	  var keyUp = new InputEventKey();
+	  keyUp.PhysicalKeycode = Key.Up;
+	  InputMap.ActionAddEvent("tilt_up", keyUp);
+	}
+
+	if (!InputMap.HasAction("tilt_down"))
+	{
+	  InputMap.AddAction("tilt_down");
+	  var keyS = new InputEventKey();
+	  keyS.PhysicalKeycode = Key.S;
+	  InputMap.ActionAddEvent("tilt_down", keyS);
+	  var keyDown = new InputEventKey();
+	  keyDown.PhysicalKeycode = Key.Down;
+	  InputMap.ActionAddEvent("tilt_down", keyDown);
 	}
   }
 }
