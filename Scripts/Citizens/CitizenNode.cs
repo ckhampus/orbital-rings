@@ -104,6 +104,13 @@ public partial class CitizenNode : Node3D
     // Lifecycle (SafeNode pattern for Node3D)
     // -------------------------------------------------------------------------
 
+    public override void _Ready()
+    {
+        // Start visit timer now that we're in the scene tree
+        // (Timer.Start() requires being inside the tree — can't call in Initialize())
+        _visitTimer?.Start();
+    }
+
     public override void _EnterTree()
     {
         SubscribeEvents();
@@ -168,7 +175,7 @@ public partial class CitizenNode : Node3D
         };
         _visitTimer.Timeout += OnVisitTimerTimeout;
         AddChild(_visitTimer);
-        _visitTimer.Start();
+        // Timer.Start() deferred to _Ready() — timer must be in scene tree first
 
         // Set initial position from angle
         UpdatePositionFromAngle();
