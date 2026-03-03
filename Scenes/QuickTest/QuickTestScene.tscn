@@ -4,6 +4,7 @@
 [ext_resource type="Script" uid="uid://dnrhst8pnjsbm" path="res://Scripts/Camera/OrbitalCamera.cs" id="2_cam"]
 [ext_resource type="PackedScene" uid="uid://bswc7inj8s2ht" path="res://Scenes/Ring/Ring.tscn" id="3_ring"]
 [ext_resource type="Script" uid="uid://c61pt15u8658w" path="res://Scripts/UI/SegmentTooltip.cs" id="4_tooltip"]
+[ext_resource type="Script" path="res://Scripts/UI/CreditHUD.cs" id="5_credithud"]
 
 [node name="QuickTestScene" type="Node3D" unique_id=884004654]
 
@@ -23,6 +24,18 @@ script = ExtResource("2_cam")
 TiltAngleDeg = 20.0
 
 [node name="Camera3D" type="Camera3D" parent="CameraRig" unique_id=2034811885]
+
+[node name="HUDLayer" type="CanvasLayer" parent="."]
+layer = 5
+
+[node name="CreditHUD" type="MarginContainer" parent="HUDLayer"]
+script = ExtResource("5_credithud")
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -200.0
+offset_bottom = 50.0
+grow_horizontal = 0
 
 [node name="TooltipLayer" type="CanvasLayer" parent="." unique_id=1571741361]
 layer = 10
