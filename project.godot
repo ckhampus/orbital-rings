@@ -22,6 +22,7 @@ EconomyManager="*res://Scripts/Autoloads/EconomyManager.cs"
 BuildManager="*res://Scripts/Build/BuildManager.cs"
 CitizenManager="*res://Scripts/Citizens/CitizenManager.cs"
 WishBoard="*res://Scripts/Autoloads/WishBoard.cs"
+HappinessManager="*res://Scripts/Autoloads/HappinessManager.cs"
 
 [display]
 
