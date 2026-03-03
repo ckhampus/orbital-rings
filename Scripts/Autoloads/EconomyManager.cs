@@ -57,10 +57,10 @@ public partial class EconomyManager : Node
         // Create Timer as child node for periodic income ticks
         _incomeTimer = new Timer();
         _incomeTimer.WaitTime = Config.IncomeTickInterval;
-        _incomeTimer.Autostart = true;
         _incomeTimer.OneShot = false;
         AddChild(_incomeTimer);
         _incomeTimer.Timeout += OnIncomeTick;
+        _incomeTimer.Start();
 
         // Timer pauses with the scene tree
         ProcessMode = ProcessModeEnum.Pausable;
