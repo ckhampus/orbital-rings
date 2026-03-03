@@ -34,4 +34,12 @@ public partial class RoomDefinition : Resource
   [ExportGroup("Stats")]
   [Export] public int BaseCapacity { get; set; }
   [Export] public float Effectiveness { get; set; } = 1.0f;
+
+  [ExportGroup("Economy")]
+
+  /// <summary>
+  /// Optional per-room cost override. When greater than 0, the cost formula uses
+  /// this value instead of EconomyConfig.BaseRoomCost. Default 0 means "use global BaseRoomCost".
+  /// </summary>
+  [Export] public int BaseCostOverride { get; set; } = 0;
 }

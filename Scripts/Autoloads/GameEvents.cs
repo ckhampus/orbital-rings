@@ -130,6 +130,19 @@ public partial class GameEvents : Node
   public void EmitHappinessChanged(float newHappiness)
     => HappinessChanged?.Invoke(newHappiness);
 
+  /// <param name="amount">Credits earned from this income tick.</param>
+  public event Action<int> IncomeTicked;
+
+  /// <param name="amount">Credits spent (positive number).</param>
+  public event Action<int> CreditsSpent;
+
+  /// <param name="amount">Credits refunded (positive number).</param>
+  public event Action<int> CreditsRefunded;
+
+  public void EmitIncomeTicked(int amount) => IncomeTicked?.Invoke(amount);
+  public void EmitCreditsSpent(int amount) => CreditsSpent?.Invoke(amount);
+  public void EmitCreditsRefunded(int amount) => CreditsRefunded?.Invoke(amount);
+
   // ---------------------------------------------------------------------------
   // Progression Events (Phase 7)
   // ---------------------------------------------------------------------------
