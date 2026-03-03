@@ -119,7 +119,12 @@ Plans:
   3. An unfulfilled wish stays visible on the citizen indefinitely with no negative consequence to credits, happiness, or anything else
   4. Active wishes span at least 3 of the 4 categories (social, comfort, curiosity, variety) across a normal play session of 10+ minutes
   5. WishBoard Autoload tracks all active wishes and can report the current wish list without iterating citizens directly
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 06-01-PLAN.md -- Data layer: 12 WishTemplate .tres resources (4 categories), placeholder icon PNGs, WishBoard Autoload singleton
+- [ ] 06-02-PLAN.md -- Citizen integration: CitizenNode wish generation + badge display + wish-aware visits + fulfillment, CitizenInfoPanel wish text
+- [ ] 06-03-PLAN.md -- Human verification checkpoint for complete wish system
 
 ### Phase 7: Happiness and Progression
 **Goal**: Station happiness is tracked visibly, fulfilling wishes raises it, happiness gates citizen arrivals and unlocks new room blueprints at observable milestones
@@ -156,7 +161,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 3. Economy Foundation | 3/3 | Complete | 2026-03-03 |
 | 4. Room Placement and Build Interaction | 4/4 | Complete | 2026-03-03 |
 | 5. Citizens and Navigation | 3/3 | Complete | 2026-03-03 |
-| 6. Wish System | 0/TBD | Not started | - |
+| 6. Wish System | 0/3 | Planning complete | - |
 | 7. Happiness and Progression | 0/TBD | Not started | - |
 | 8. Polish and Loop Closure | 0/TBD | Not started | - |
 
