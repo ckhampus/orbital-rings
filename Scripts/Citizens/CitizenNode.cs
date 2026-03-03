@@ -363,7 +363,8 @@ public partial class CitizenNode : Node3D
         if (bestSegment >= 0 && bestAngleDist < SegmentGrid.SegmentArc * VisitProximityThreshold)
         {
             _visitTargetSegment = bestSegment;
-            StartVisit(bestRow);
+            var (_, bestPos) = SegmentGrid.FromIndex(bestSegment);
+            StartVisit(bestRow, bestPos);
         }
 
         // Reset timer with new random interval regardless of whether visit started
@@ -372,11 +373,12 @@ public partial class CitizenNode : Node3D
     }
 
     /// <summary>
-    /// Begins the room visit animation sequence: drift to room edge, fade out,
-    /// wait inside, fade in, drift back to walkway.
+    /// Begins the room visit animation sequence: walk angularly to the target segment,
+    /// drift radially to room edge, fade out, wait inside, fade in, drift back to walkway.
     /// </summary>
     /// <param name="targetRow">Which row the target room is in (determines drift direction).</param>
-    private void StartVisit(SegmentRow targetRow)
+    /// <param name="targetPosition">Clock position (0-11) of the target segment.</param>
+    private void StartVisit(SegmentRow targetRow, int targetPosition)
     {
         _isVisiting = true;
 
@@ -386,8 +388,21 @@ public partial class CitizenNode : Node3D
         float targetRadius = targetRow == SegmentRow.Outer ? OuterDriftRadius : InnerDriftRadius;
         float visitDuration = VisitDurationMin + GD.Randf() * (VisitDurationMax - VisitDurationMin);
         float currentRadius = WalkwayRadius;
-        float angle = _currentAngle;
+        float currentAngle = _currentAngle;
+        float targetAngle = SegmentGrid.GetStartAngle(targetPosition) + SegmentGrid.SegmentArc * 0.5f;
         string citizenName = _data.CitizenName;
+
+        // Compute shortest angular distance and direction (handle Tau wraparound)
+        float rawDelta = targetAngle - currentAngle;
+        // Normalize to [-Pi, Pi] for shortest path
+        if (rawDelta > Mathf.Pi) rawDelta -= Mathf.Tau;
+        if (rawDelta < -Mathf.Pi) rawDelta += Mathf.Tau;
+        float shortestDelta = rawDelta;
+
+        // Calculate walk duration based on angular distance / walking speed
+        float walkDuration = Mathf.Abs(shortestDelta) / _speed;
+        // Clamp minimum walk duration to avoid zero-length tweens
+        walkDuration = Mathf.Max(walkDuration, 0.1f);
 
         // Prepare materials for transparency (pitfall #4: set BEFORE fading)
         SetMeshTransparencyMode(true);
@@ -396,9 +411,27 @@ public partial class CitizenNode : Node3D
         var tween = CreateTween();
         _activeTween = tween;
 
+        // Phase 0: Walk angularly along walkway to target segment's mid-angle
+        tween.TweenMethod(
+            Callable.From((float t) =>
+            {
+                float a = currentAngle + shortestDelta * t;
+                if (a < 0) a += Mathf.Tau;
+                if (a >= Mathf.Tau) a -= Mathf.Tau;
+                SetRadialPosition(a, WalkwayRadius, includeBob: true);
+            }),
+            0.0f, 1.0f, walkDuration
+        );
+
+        // Update _currentAngle after walk phase completes
+        tween.TweenCallback(Callable.From(() =>
+        {
+            _currentAngle = targetAngle;
+        }));
+
         // Phase 1: Drift radially from walkway to room edge
         tween.TweenMethod(
-            Callable.From((float t) => SetRadialPosition(angle, Mathf.Lerp(currentRadius, targetRadius, t))),
+            Callable.From((float t) => SetRadialPosition(targetAngle, Mathf.Lerp(currentRadius, targetRadius, t))),
             0.0f, 1.0f, DriftDuration
         );
 
@@ -422,7 +455,7 @@ public partial class CitizenNode : Node3D
         tween.TweenCallback(Callable.From(() =>
         {
             Visible = true;
-            SetRadialPosition(angle, targetRadius);
+            SetRadialPosition(targetAngle, targetRadius);
             GameEvents.Instance?.EmitCitizenExitedRoom(citizenName);
         }));
 
@@ -434,7 +467,7 @@ public partial class CitizenNode : Node3D
 
         // Phase 7: Drift back from room edge to walkway
         tween.TweenMethod(
-            Callable.From((float t) => SetRadialPosition(angle, Mathf.Lerp(targetRadius, currentRadius, t))),
+            Callable.From((float t) => SetRadialPosition(targetAngle, Mathf.Lerp(targetRadius, currentRadius, t))),
             0.0f, 1.0f, DriftDuration
         );
 
