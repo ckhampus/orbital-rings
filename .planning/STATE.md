@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: unknown
-last_updated: "2026-03-02T22:12:19.756Z"
+status: executing
+last_updated: "2026-03-03T08:47:58Z"
 progress:
-  total_phases: 2
+  total_phases: 3
   completed_phases: 2
-  total_plans: 5
-  completed_plans: 5
+  total_plans: 8
+  completed_plans: 6
 ---
 
 # Project State
@@ -18,23 +18,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-02)
 
 **Core value:** The wish-driven building loop: citizens express wishes, the player builds rooms to fulfill them, happiness rises, new citizens arrive, new wishes emerge.
-**Current focus:** Phase 2 complete — Ready for Phase 3
+**Current focus:** Phase 3 in progress — Economy Foundation
 
 ## Current Position
 
-Phase: 2 of 8 (Ring Geometry and Segment Grid) -- COMPLETE
-Plan: 2 of 2 in current phase (all done)
-Status: Phase 2 Complete
-Last activity: 2026-03-02 — Completed 02-02-PLAN.md (segment interaction, hover/select, tooltip)
+Phase: 3 of 8 (Economy Foundation)
+Plan: 1 of 3 in current phase (03-01 complete)
+Status: Executing Phase 3
+Last activity: 2026-03-03 — Completed 03-01-PLAN.md (economy data layer)
 
-Progress: [█████░░░░░] 50%
+Progress: [██████░░░░] 60%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
+- Total plans completed: 6
 - Average duration: 5 min
-- Total execution time: 0.48 hours
+- Total execution time: 0.53 hours
 
 **By Phase:**
 
@@ -42,9 +42,10 @@ Progress: [█████░░░░░] 50%
 |-------|-------|-------|----------|
 | 1 | 3 | 21min | 7min |
 | 2 | 2 | 8min | 4min |
+| 3 | 1 | 3min | 3min |
 
 **Recent Trend:**
-- Last 5 plans: 4min, 15min, 2min, 5min, 3min
+- Last 5 plans: 15min, 2min, 5min, 3min, 3min
 - Trend: accelerating
 
 *Updated after each plan completion*
@@ -76,6 +77,10 @@ Recent decisions affecting current work:
 - [02-02]: Per-frame UpdateHover in _Process for camera-orbit-safe hover recalculation
 - [02-02]: FindChild pattern for tooltip discovery rather than hard-coded scene paths
 - [02-02]: Direct key detection (Key.Escape) for deselect instead of InputMap action registration
+- [03-01]: Spreadsheet-first economy design: economy-balance.md calibrated before any code changes
+- [03-01]: sqrt scaling on citizen income (30-cit/5-cit = 3.3x ratio) prevents runaway feedback loop
+- [03-01]: Happiness multiplier cap 1.3x (not 2.0x) — modest +30% max income bonus
+- [03-01]: Delta events (IncomeTicked/CreditsSpent/CreditsRefunded) separate from CreditsChanged for HUD display vs balance update
 
 ### Pending Todos
 
@@ -85,10 +90,10 @@ None yet.
 
 - [Phase 2 RESOLVED]: Polar math segment selection implemented via Plane.IntersectsRay + Atan2 in SegmentInteraction.cs. No trimesh collision used. Phantom hit concern eliminated.
 - [Phase 5 flag]: Circular walkway navmesh is non-standard. Hand-authored NavigationMesh vs. custom arc-waypoint system must be prototyped in Phase 5 before committing to NavigationAgent3D stack. Circular geometry bakes poorly with auto-bake.
-- [Phase 3 flag]: Economy balance spreadsheet must be produced before credit numbers are written in code. Without diminishing returns on citizen arrival and a happiness multiplier cap, the positive feedback loop goes runaway at ~15-20 minutes.
+- [Phase 3 RESOLVED]: Economy balance spreadsheet produced in 03-01. sqrt scaling + 1.3x happiness cap confirmed: 30-cit/5-cit ratio = 3.3x (under 10x threshold). All EconomyConfig defaults match spreadsheet.
 
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Phase 3 context gathered
-Resume file: .planning/phases/03-economy-foundation/03-CONTEXT.md
+Stopped at: Completed 03-01-PLAN.md
+Resume file: .planning/phases/03-economy-foundation/03-01-SUMMARY.md

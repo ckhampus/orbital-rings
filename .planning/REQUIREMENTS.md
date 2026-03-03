@@ -24,11 +24,11 @@ Requirements for initial release (single playable ring proving the core loop).
 
 ### Economy
 
-- [ ] **ECON-01**: Player starts with enough credits to place a few rooms on an empty ring
-- [ ] **ECON-02**: Each citizen generates a small passive credit income over time
-- [ ] **ECON-03**: Citizens assigned to work rooms generate bonus credits
-- [ ] **ECON-04**: Higher station happiness slightly multiplies credit generation
-- [ ] **ECON-05**: Room costs scale by segment size with diminishing returns for larger rooms
+- [x] **ECON-01**: Player starts with enough credits to place a few rooms on an empty ring
+- [x] **ECON-02**: Each citizen generates a small passive credit income over time
+- [x] **ECON-03**: Citizens assigned to work rooms generate bonus credits
+- [x] **ECON-04**: Higher station happiness slightly multiplies credit generation
+- [x] **ECON-05**: Room costs scale by segment size with diminishing returns for larger rooms
 
 ### Citizens
 
@@ -113,11 +113,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | BLDG-04 | Phase 4 | Pending |
 | BLDG-05 | Phase 4 | Pending |
 | BLDG-06 | Phase 4 | Pending |
-| ECON-01 | Phase 3 | Pending |
-| ECON-02 | Phase 3 | Pending |
-| ECON-03 | Phase 3 | Pending |
-| ECON-04 | Phase 3 | Pending |
-| ECON-05 | Phase 3 | Pending |
+| ECON-01 | Phase 3 | Complete |
+| ECON-02 | Phase 3 | Complete |
+| ECON-03 | Phase 3 | Complete |
+| ECON-04 | Phase 3 | Complete |
+| ECON-05 | Phase 3 | Complete |
 | CTZN-01 | Phase 5 | Pending |
 | CTZN-02 | Phase 5 | Pending |
 | CTZN-03 | Phase 5 | Pending |
