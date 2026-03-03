@@ -39,8 +39,8 @@ Requirements for initial release (single playable ring proving the core loop).
 
 ### Wishes
 
-- [ ] **WISH-01**: Citizens express wishes via speech bubbles (e.g., "I'd love a place to stargaze")
-- [ ] **WISH-02**: Fulfilling a wish grants happiness to that citizen and a small global happiness boost
+- [x] **WISH-01**: Citizens express wishes via speech bubbles (e.g., "I'd love a place to stargaze")
+- [x] **WISH-02**: Fulfilling a wish grants happiness to that citizen and a small global happiness boost
 - [x] **WISH-03**: Unfulfilled wishes linger harmlessly — nothing bad happens
 - [x] **WISH-04**: Wishes span categories: social, comfort, curiosity, variety
 
@@ -122,8 +122,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CTZN-02 | Phase 5 | Complete |
 | CTZN-03 | Phase 5 | Complete |
 | CTZN-04 | Phase 5 | Complete |
-| WISH-01 | Phase 6 | Pending |
-| WISH-02 | Phase 6 | Pending |
+| WISH-01 | Phase 6 | Complete |
+| WISH-02 | Phase 6 | Complete |
 | WISH-03 | Phase 6 | Complete |
 | WISH-04 | Phase 6 | Complete |
 | PROG-01 | Phase 7 | Pending |

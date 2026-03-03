@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in-progress
-last_updated: "2026-03-03T15:47:46Z"
+last_updated: "2026-03-03T15:53:46Z"
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 18
-  completed_plans: 16
+  completed_plans: 17
 ---
 
 # Project State
@@ -18,23 +18,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-02)
 
 **Core value:** The wish-driven building loop: citizens express wishes, the player builds rooms to fulfill them, happiness rises, new citizens arrive, new wishes emerge.
-**Current focus:** Phase 6 Plan 01 complete -- WishBoard Autoload and 12 wish templates created. Continuing wish system.
+**Current focus:** Phase 6 Plan 02 complete -- Citizen wish integration (generation, badge, visits, fulfillment, info panel). Plan 03 next (happiness/progression).
 
 ## Current Position
 
 Phase: 6 of 8 (Wish System) -- IN PROGRESS
-Plan: 1 of 3 complete in current phase
-Status: Plan 01 complete (wish data layer), Plan 02 next (citizen wish integration)
-Last activity: 2026-03-03 — Completed 06-01 (wish data layer and WishBoard Autoload)
+Plan: 2 of 3 complete in current phase
+Status: Plan 02 complete (citizen wish integration), Plan 03 next (happiness/progression effects)
+Last activity: 2026-03-03 — Completed 06-02 (citizen wish lifecycle and info panel)
 
-Progress: [███████████░░░] 76%
+Progress: [████████████░░] 81%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 16
+- Total plans completed: 17
 - Average duration: 3.5 min
-- Total execution time: 0.96 hours
+- Total execution time: 1.01 hours
 
 **By Phase:**
 
@@ -45,10 +45,10 @@ Progress: [███████████░░░] 76%
 | 3 | 3 | 10min | 3.3min |
 | 4 | 4 | 9min | 2.3min |
 | 5 | 3/3 | 6min | 2min |
-| 6 | 1/3 | 2min | 2min |
+| 6 | 2/3 | 5min | 2.5min |
 
 **Recent Trend:**
-- Last 5 plans: 1min, 2min, 3min, 1min, 2min
+- Last 5 plans: 2min, 3min, 1min, 2min, 3min
 - Trend: steady
 
 *Updated after each plan completion*
@@ -116,6 +116,10 @@ Recent decisions affecting current work:
 - [06-01]: WishNudgeRequested event on WishBoard instead of direct CitizenNode.NudgeVisit() -- decouples Plan 01 from Plan 02 method that does not exist yet
 - [06-01]: DirAccess.Open + loop for template loading -- auto-discovers new .tres templates without code changes
 - [06-01]: BuildManager.GetPlacedRoom scan for initialization -- handles pre-placed rooms at game start without new public API
+- [06-02]: Wish fulfillment only on visit completion (Phase 8 callback) -- citizens must physically visit matching rooms, not just exist near them
+- [06-02]: effectiveDist multiplier (0.3x) for wish matching -- creates preference not exclusive targeting
+- [06-02]: Badge as child of CitizenNode inherits Visible=false during visits -- no additional hide/show code needed
+- [06-02]: Deterministic text variant via citizen name hash -- same citizen always shows same text for same wish type
 
 ### Pending Todos
 
@@ -130,5 +134,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Completed 06-01-PLAN.md
-Resume file: .planning/phases/06-wish-system/06-01-SUMMARY.md
+Stopped at: Completed 06-02-PLAN.md
+Resume file: .planning/phases/06-wish-system/06-02-SUMMARY.md
