@@ -1,5 +1,4 @@
 using Godot;
-using OrbitalRings.Autoloads;
 using OrbitalRings.Citizens;
 using OrbitalRings.Data;
 
@@ -87,8 +86,8 @@ public partial class CitizenInfoPanel : PanelContainer
     {
         _nameLabel.Text = citizen.Data.CitizenName;
 
-        // Display wish text from WishBoard (Phase 6 integration)
-        var wish = WishBoard.Instance?.GetWishForCitizen(citizen.Data.CitizenName);
+        // Display wish text from citizen's active wish (direct property access)
+        var wish = citizen.CurrentWish;
         if (wish != null && wish.TextVariants.Length > 0)
         {
             // Pick a consistent text variant based on citizen name hash
