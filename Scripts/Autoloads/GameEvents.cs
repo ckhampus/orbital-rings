@@ -136,32 +136,28 @@ public partial class GameEvents : Node
   /// <param name="citizenName">Display name of the arriving citizen.</param>
   public event Action<string> CitizenArrived;
 
-  /// <param name="citizenName">Display name of the departing citizen.</param>
-  public event Action<string> CitizenDeparted;
-
   /// <param name="citizenName">Display name of the clicked citizen.</param>
   public event Action<string> CitizenClicked;
 
   /// <param name="citizenName">Display name of the citizen entering a room.</param>
-  public event Action<string> CitizenEnteredRoom;
+  /// <param name="flatSegmentIndex">Flat segment index of the room being entered.</param>
+  public event Action<string, int> CitizenEnteredRoom;
 
   /// <param name="citizenName">Display name of the citizen exiting a room.</param>
-  public event Action<string> CitizenExitedRoom;
+  /// <param name="flatSegmentIndex">Flat segment index of the room being exited.</param>
+  public event Action<string, int> CitizenExitedRoom;
 
   public void EmitCitizenArrived(string citizenName)
     => CitizenArrived?.Invoke(citizenName);
 
-  public void EmitCitizenDeparted(string citizenName)
-    => CitizenDeparted?.Invoke(citizenName);
-
   public void EmitCitizenClicked(string citizenName)
     => CitizenClicked?.Invoke(citizenName);
 
-  public void EmitCitizenEnteredRoom(string citizenName)
-    => CitizenEnteredRoom?.Invoke(citizenName);
+  public void EmitCitizenEnteredRoom(string citizenName, int flatSegmentIndex)
+    => CitizenEnteredRoom?.Invoke(citizenName, flatSegmentIndex);
 
-  public void EmitCitizenExitedRoom(string citizenName)
-    => CitizenExitedRoom?.Invoke(citizenName);
+  public void EmitCitizenExitedRoom(string citizenName, int flatSegmentIndex)
+    => CitizenExitedRoom?.Invoke(citizenName, flatSegmentIndex);
 
   // ---------------------------------------------------------------------------
   // Wish Events (Phase 6)

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Godot;
 using OrbitalRings.Data;
 
@@ -41,6 +42,7 @@ public partial class EconomyManager : Node
     private Timer _incomeTimer;
     private int _citizenCount;
     private int _workingCitizenCount;
+    private readonly HashSet<string> _workingCitizens = new();
     private float _currentHappiness;
 
     public override void _Ready()
@@ -75,6 +77,22 @@ public partial class EconomyManager : Node
 
         // Emit initial balance so HUD can display starting credits
         GameEvents.Instance?.EmitCreditsChanged(_credits);
+
+        // Subscribe to citizen room visit events for work bonus tracking
+        if (GameEvents.Instance != null)
+        {
+            GameEvents.Instance.CitizenEnteredRoom += OnCitizenEnteredRoom;
+            GameEvents.Instance.CitizenExitedRoom += OnCitizenExitedRoom;
+        }
+    }
+
+    public override void _ExitTree()
+    {
+        if (GameEvents.Instance != null)
+        {
+            GameEvents.Instance.CitizenEnteredRoom -= OnCitizenEnteredRoom;
+            GameEvents.Instance.CitizenExitedRoom -= OnCitizenExitedRoom;
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -225,6 +243,45 @@ public partial class EconomyManager : Node
     }
 
     // -------------------------------------------------------------------------
+    // Working Citizen Tracking (Phase 9 -- bridges citizen visits to economy)
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Called when a citizen enters a room. If the room is a Work category room,
+    /// tracks the citizen in the working set and updates the count.
+    /// </summary>
+    private void OnCitizenEnteredRoom(string citizenName, int flatSegmentIndex)
+    {
+        if (IsWorkRoom(flatSegmentIndex))
+        {
+            _workingCitizens.Add(citizenName);
+            _workingCitizenCount = _workingCitizens.Count;
+        }
+    }
+
+    /// <summary>
+    /// Called when a citizen exits a room. Removes from working set if present.
+    /// Uses set membership (not room lookup) to handle demolished-room race condition:
+    /// the room may no longer exist, but the citizen was counted as working.
+    /// </summary>
+    private void OnCitizenExitedRoom(string citizenName, int flatSegmentIndex)
+    {
+        if (_workingCitizens.Remove(citizenName))
+        {
+            _workingCitizenCount = _workingCitizens.Count;
+        }
+    }
+
+    /// <summary>
+    /// Checks whether the room at the given flat segment index is a Work category room.
+    /// </summary>
+    private bool IsWorkRoom(int flatSegmentIndex)
+    {
+        var room = Build.BuildManager.Instance?.GetPlacedRoom(flatSegmentIndex);
+        return room?.Definition.Category == RoomDefinition.RoomCategory.Work;
+    }
+
+    // -------------------------------------------------------------------------
     // Phase 5/7 Integration Stubs
     // -------------------------------------------------------------------------
 
@@ -253,6 +310,8 @@ public partial class EconomyManager : Node
     public void RestoreCredits(int credits)
     {
         _credits = credits;
+        _workingCitizens.Clear();
+        _workingCitizenCount = 0;
         GameEvents.Instance?.EmitCreditsChanged(_credits);
     }
 }

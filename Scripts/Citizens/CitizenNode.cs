@@ -477,7 +477,7 @@ public partial class CitizenNode : Node3D
         tween.TweenCallback(Callable.From(() =>
         {
             Visible = false;
-            GameEvents.Instance?.EmitCitizenEnteredRoom(citizenName);
+            GameEvents.Instance?.EmitCitizenEnteredRoom(citizenName, _visitTargetSegment);
         }));
 
         // Phase 4: Wait inside room
@@ -488,7 +488,7 @@ public partial class CitizenNode : Node3D
         {
             Visible = true;
             SetRadialPosition(targetAngle, targetRadius);
-            GameEvents.Instance?.EmitCitizenExitedRoom(citizenName);
+            GameEvents.Instance?.EmitCitizenExitedRoom(citizenName, _visitTargetSegment);
         }));
 
         // Phase 6: Fade in
