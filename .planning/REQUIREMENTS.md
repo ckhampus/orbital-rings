@@ -73,24 +73,24 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| HCORE-01 | — | Pending |
-| HCORE-02 | — | Pending |
-| HCORE-03 | — | Pending |
-| HCORE-04 | — | Pending |
-| HCORE-05 | — | Pending |
-| TIER-01 | — | Pending |
-| TIER-02 | — | Pending |
-| TIER-03 | — | Pending |
-| TIER-04 | — | Pending |
-| HUD-01 | — | Pending |
-| HUD-02 | — | Pending |
-| SAVE-01 | — | Pending |
+| HCORE-01 | Phase 10 | Pending |
+| HCORE-02 | Phase 10 | Pending |
+| HCORE-03 | Phase 10 | Pending |
+| HCORE-04 | Phase 10 | Pending |
+| HCORE-05 | Phase 10 | Pending |
+| TIER-01 | Phase 10 | Pending |
+| TIER-02 | Phase 11 | Pending |
+| TIER-03 | Phase 11 | Pending |
+| TIER-04 | Phase 10 | Pending |
+| HUD-01 | Phase 13 | Pending |
+| HUD-02 | Phase 13 | Pending |
+| SAVE-01 | Phase 12 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 12 total
-- Mapped to phases: 0
-- Unmapped: 12 ⚠️
+- Mapped to phases: 12
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-04*
-*Last updated: 2026-03-04 after initial definition*
+*Last updated: 2026-03-04 after roadmap creation (traceability complete)*
