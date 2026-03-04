@@ -32,6 +32,26 @@ public partial class EconomyConfig : Resource
     /// <summary>Seconds between income ticks.</summary>
     [Export] public float IncomeTickInterval { get; set; } = 5.5f;
 
+    [ExportGroup("Tier Income Multipliers")]
+
+    /// <summary>
+    /// Income multiplier at Quiet tier. Default 1.0 (no bonus).
+    /// Applies to all income: base station + citizen passive + work bonus.
+    /// </summary>
+    [Export] public float IncomeMultQuiet   { get; set; } = 1.0f;
+
+    /// <summary>Income multiplier at Cozy tier. Default 1.1 (10% bonus).</summary>
+    [Export] public float IncomeMultCozy    { get; set; } = 1.1f;
+
+    /// <summary>Income multiplier at Lively tier. Default 1.2 (20% bonus).</summary>
+    [Export] public float IncomeMultLively  { get; set; } = 1.2f;
+
+    /// <summary>Income multiplier at Vibrant tier. Default 1.3 (30% bonus).</summary>
+    [Export] public float IncomeMultVibrant { get; set; } = 1.3f;
+
+    /// <summary>Income multiplier at Radiant tier. Default 1.4 (40% bonus).</summary>
+    [Export] public float IncomeMultRadiant { get; set; } = 1.4f;
+
     [ExportGroup("Costs")]
 
     /// <summary>Base cost anchor for the room cost formula.</summary>
