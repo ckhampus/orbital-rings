@@ -1,7 +1,6 @@
 using System;
 using OrbitalRings.Data;
 using Godot;
-using OrbitalRings.Ring;
 
 namespace OrbitalRings.Autoloads;
 
