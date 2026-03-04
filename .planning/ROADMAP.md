@@ -2,7 +2,7 @@
 
 ## Overview
 
-Orbital Rings is built from the ground up in eight phases, each delivering a coherent capability. The project starts with architectural decisions that are expensive to retrofit (signals, data schema, camera), then builds the ring geometry that is the game's structural foundation, then layers in economy, building interaction, citizens, wishes, happiness, and finally the polish pass that makes the whole loop feel cozy rather than mechanical. No phase introduces a dependency its predecessor has not satisfied. The game is complete when a player can build rooms, watch named citizens arrive and express wishes, fulfill those wishes, and feel the station grow — all without a single punishing moment.
+Orbital Rings is built from the ground up in nine phases, each delivering a coherent capability. The project starts with architectural decisions that are expensive to retrofit (signals, data schema, camera), then builds the ring geometry that is the game's structural foundation, then layers in economy, building interaction, citizens, wishes, happiness, and finally the polish pass that makes the whole loop feel cozy rather than mechanical. No phase introduces a dependency its predecessor has not satisfied. The game is complete when a player can build rooms, watch named citizens arrive and express wishes, fulfill those wishes, and feel the station grow — all without a single punishing moment.
 
 ## Phases
 
@@ -20,6 +20,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 6: Wish System** - Citizens express wishes via speech bubbles; wishes linger harmlessly and are visible on click
 - [x] **Phase 7: Happiness and Progression** - Wish fulfillment raises happiness, happiness drives citizen arrival and blueprint unlocks
 - [x] **Phase 8: Polish and Loop Closure** - Save/load, ambient audio, full HUD wiring, and integration pass that makes the loop feel cozy and complete
+- [ ] **Phase 9: Wire Work Bonus and Tech Debt Cleanup** - Connect citizen room visit events to EconomyManager work bonus, clean up info-level tech debt from milestone audit
 
 ## Phase Details
 
@@ -158,10 +159,24 @@ Plans:
 - [x] 08-02-PLAN.md -- Audio and celebration: ambient space drone, wish fulfillment chime + gold sparkles, mute toggle
 - [x] 08-03-PLAN.md -- Title screen, game scene integration, and human verification of complete loop
 
+### Phase 9: Wire Work Bonus and Tech Debt Cleanup
+**Goal:** The work bonus economy flow is fully wired end-to-end (citizen visits Work room → event fires → subscriber updates count → income tick includes bonus), and info-level tech debt from the milestone audit is resolved
+**Depends on**: Phase 3, Phase 5
+**Requirements**: ECON-03
+**Gap Closure:** Closes gaps from v1.0 milestone audit
+**Success Criteria** (what must be TRUE):
+  1. When a citizen enters a Work category room, `EconomyManager._workingCitizenCount` increases; when they exit, it decreases
+  2. `CalculateTickIncome()` produces visibly higher income when citizens are in Work rooms vs. when they are not
+  3. The HUD income tooltip reflects the work bonus amount in real time
+  4. `GameEvents.CitizenDeparted` dead code is removed
+  5. `WishBoard.SubscribeEvents()` includes a null guard on `GameEvents.Instance` consistent with codebase pattern
+  6. `SafeNode._EnterTree/_ExitTree` call base methods for inheritance safety
+**Plans**: 0 plans (not yet planned)
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -173,7 +188,8 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 | 6. Wish System | 3/3 | Complete | 2026-03-03 |
 | 7. Happiness and Progression | 2/2 | Complete | 2026-03-03 |
 | 8. Polish and Loop Closure | 3/3 | Complete | 2026-03-04 |
+| 9. Wire Work Bonus and Tech Debt Cleanup | 0/0 | Not Started | — |
 
 ---
 *Roadmap created: 2026-03-02*
-*Last updated: 2026-03-04 after Phase 8 completion - all phases complete*
+*Last updated: 2026-03-04 after gap closure phases added from milestone audit*
