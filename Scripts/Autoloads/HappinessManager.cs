@@ -162,7 +162,7 @@ public partial class HappinessManager : Node
         _crossedMilestoneCount = milestoneCount;
         _housingCapacity = housingCapacity;
 
-        EconomyManager.Instance?.SetHappiness(happiness);
+        EconomyManager.Instance?.SetMoodTier(_lastReportedTier);
         // Do NOT call EmitHappinessChanged — HappinessBar will be replaced in Phase 13
     }
 
@@ -234,6 +234,7 @@ public partial class HappinessManager : Node
         {
             _lastReportedTier = newTier;
             GameEvents.Instance?.EmitMoodTierChanged(newTier, previousTier);
+            EconomyManager.Instance?.SetMoodTier(newTier);
         }
     }
 
@@ -258,10 +259,8 @@ public partial class HappinessManager : Node
         {
             _lastReportedTier = newTier;
             GameEvents.Instance?.EmitMoodTierChanged(newTier, previousTier);
+            EconomyManager.Instance?.SetMoodTier(newTier);
         }
-
-        // Compatibility: continue calling SetHappiness with mood float until Phase 11 updates
-        EconomyManager.Instance?.SetHappiness(_moodSystem.Mood);
 
         CheckUnlockMilestones();
     }
