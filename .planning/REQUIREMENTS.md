@@ -17,7 +17,7 @@ Requirements for the Happiness v2 milestone. Each maps to roadmap phases.
 
 ### Mood Tiers
 
-- [ ] **TIER-01**: Five named mood tiers (Quiet/Cozy/Lively/Vibrant/Radiant) with defined mood ranges
+- [x] **TIER-01**: Five named mood tiers (Quiet/Cozy/Lively/Vibrant/Radiant) with defined mood ranges
 - [ ] **TIER-02**: Citizen arrival probability scales by current mood tier
 - [ ] **TIER-03**: Economy income multiplier scales by current mood tier (1.0x to 1.4x)
 - [ ] **TIER-04**: Hysteresis on tier demotion boundaries prevents rapid tier oscillation
@@ -78,7 +78,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HCORE-03 | Phase 10 | Pending |
 | HCORE-04 | Phase 10 | Pending |
 | HCORE-05 | Phase 10 | Pending |
-| TIER-01 | Phase 10 | Pending |
+| TIER-01 | Phase 10 | Complete |
 | TIER-02 | Phase 11 | Pending |
 | TIER-03 | Phase 11 | Pending |
 | TIER-04 | Phase 10 | Pending |

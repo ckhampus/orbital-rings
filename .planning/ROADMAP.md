@@ -105,7 +105,7 @@ Note: Phases 11 and 12 both depend only on Phase 10 and could execute in either 
 | 7. Happiness and Progression | v1.0 | 2/2 | Complete | 2026-03-03 |
 | 8. Polish and Loop Closure | v1.0 | 3/3 | Complete | 2026-03-04 |
 | 9. Wire Work Bonus and Tech Debt Cleanup | v1.0 | 2/2 | Complete | 2026-03-04 |
-| 10. Happiness Core and Mood Tiers | v1.1 | 0/2 | Not started | - |
+| 10. Happiness Core and Mood Tiers | 1/2 | In Progress|  | - |
 | 11. Economy and Arrival Tier Integration | v1.1 | 0/? | Not started | - |
 | 12. Save Format | v1.1 | 0/? | Not started | - |
 | 13. HUD Replacement | v1.1 | 0/? | Not started | - |
