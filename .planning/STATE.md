@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: MVP
-status: milestone_complete
-stopped_at: v1.0 milestone archived
-last_updated: "2026-03-04T14:00:00.000Z"
-last_activity: "2026-03-04 - Completed v1.0 MVP milestone"
+milestone: v1.1
+milestone_name: Happiness v2
+status: defining_requirements
+stopped_at: null
+last_updated: "2026-03-04T15:00:00.000Z"
+last_activity: "2026-03-04 - Milestone v1.1 started"
 progress:
-  total_phases: 9
-  completed_phases: 9
-  total_plans: 25
-  completed_plans: 25
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -21,36 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** The wish-driven building loop: citizens express wishes, the player builds rooms to fulfill them, happiness rises, new citizens arrive, new wishes emerge.
-**Current focus:** v1.0 shipped. Planning next milestone.
+**Current focus:** v1.1 Happiness v2 — replace single happiness with Lifetime Happiness + Station Mood
 
 ## Current Position
 
-Milestone: v1.0 MVP — SHIPPED 2026-03-04
-All 9 phases complete, 25/25 plans executed, 25/25 requirements satisfied.
-Next step: `/gsd:new-milestone` to define v1.1 scope.
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-04 — Milestone v1.1 started
 
-Progress: [██████████] 100%
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
-**Velocity:**
+**Velocity (from v1.0):**
 - Total plans completed: 25
 - Average duration: 3.2 min
 - Total execution time: ~1.3 hours
-
-**By Phase:**
-
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| 1 | 3 | 21min | 7min |
-| 2 | 2 | 8min | 4min |
-| 3 | 3 | 10min | 3.3min |
-| 4 | 4 | 9min | 2.3min |
-| 5 | 3 | 6min | 2min |
-| 6 | 3 | 6min | 2min |
-| 7 | 2 | 8min | 4min |
-| 8 | 3 | 13min | 4.3min |
-| 9 | 2 | 2min | 1min |
 
 ## Accumulated Context
 
@@ -64,7 +51,7 @@ None.
 
 ### Blockers/Concerns
 
-None — all v1.0 blockers resolved.
+None.
 
 ### Quick Tasks Completed
 
@@ -77,5 +64,5 @@ None — all v1.0 blockers resolved.
 ## Session Continuity
 
 Last session: 2026-03-04
-Stopped at: v1.0 milestone archived
-Next: `/gsd:new-milestone`
+Stopped at: Milestone v1.1 started, defining requirements
+Next: Define requirements → create roadmap

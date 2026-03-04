@@ -27,7 +27,13 @@ The wish-driven building loop: citizens express wishes, the player builds rooms 
 
 ### Active
 
-(None yet — define with `/gsd:new-milestone`)
+- [ ] Replace single happiness percentage with Lifetime Happiness (wish counter) + Station Mood (fluctuating float)
+- [ ] Blueprint unlocks keyed to wish counts (4, 12) instead of percentage thresholds
+- [ ] Mood gain on wish fulfillment, gentle decay toward rising baseline
+- [ ] Five mood tiers (Quiet/Cozy/Lively/Vibrant/Radiant) driving citizen arrivals and economy multiplier
+- [ ] HUD shows lifetime wish counter (♥ 47) and mood tier label with tier-colored text
+- [ ] Tier change notification (floating text on mood tier transition)
+- [ ] Save migration from v1 single happiness float to v2 dual values
 
 ### Out of Scope
 
@@ -72,5 +78,15 @@ Full design document at `IDEA.md` covers multi-ring expansion, proc gen interior
 | Procedural audio (no .wav assets) | Zero external asset dependencies | ✓ Good — placement chime + wish celebration chime feel distinct and satisfying |
 | Debounced autosave on state events | Prevents rapid-fire saves during batch operations | ✓ Good — save/load works reliably with 0.5s debounce |
 
+## Current Milestone: v1.1 Happiness v2
+
+**Goal:** Replace the single happiness percentage with a dual-value system (Lifetime Happiness + Station Mood) so the core loop stays alive indefinitely.
+
+**Target features:**
+- Lifetime Happiness wish counter driving blueprint unlocks
+- Station Mood with gain/decay and tier-based arrivals/economy
+- Updated HUD with counter + tier label
+- v1 save migration
+
 ---
-*Last updated: 2026-03-04 after v1.0 milestone*
+*Last updated: 2026-03-04 after v1.1 milestone started*
