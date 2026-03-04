@@ -19,7 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 5: Citizens and Navigation** - Spawn named walking citizens on the ring walkway with a navigation approach proven by prototype
 - [x] **Phase 6: Wish System** - Citizens express wishes via speech bubbles; wishes linger harmlessly and are visible on click
 - [x] **Phase 7: Happiness and Progression** - Wish fulfillment raises happiness, happiness drives citizen arrival and blueprint unlocks
-- [ ] **Phase 8: Polish and Loop Closure** - Save/load, ambient audio, full HUD wiring, and integration pass that makes the loop feel cozy and complete
+- [x] **Phase 8: Polish and Loop Closure** - Save/load, ambient audio, full HUD wiring, and integration pass that makes the loop feel cozy and complete
 
 ## Phase Details
 
@@ -154,9 +154,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 08-01-PLAN.md -- Save/load system: SaveManager Autoload, manager API additions, autosave with debounce, JSON serialization
-- [ ] 08-02-PLAN.md -- Audio and celebration: ambient space drone, wish fulfillment chime + gold sparkles, mute toggle
-- [ ] 08-03-PLAN.md -- Title screen, game scene integration, and human verification of complete loop
+- [x] 08-01-PLAN.md -- Save/load system: SaveManager Autoload, manager API additions, autosave with debounce, JSON serialization
+- [x] 08-02-PLAN.md -- Audio and celebration: ambient space drone, wish fulfillment chime + gold sparkles, mute toggle
+- [x] 08-03-PLAN.md -- Title screen, game scene integration, and human verification of complete loop
 
 ## Progress
 
@@ -172,8 +172,8 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 | 5. Citizens and Navigation | 3/3 | Complete | 2026-03-03 |
 | 6. Wish System | 3/3 | Complete | 2026-03-03 |
 | 7. Happiness and Progression | 2/2 | Complete | 2026-03-03 |
-| 8. Polish and Loop Closure | 0/3 | Not started | - |
+| 8. Polish and Loop Closure | 3/3 | Complete | 2026-03-04 |
 
 ---
 *Roadmap created: 2026-03-02*
-*Last updated: 2026-03-04 after Phase 8 planning*
+*Last updated: 2026-03-04 after Phase 8 completion - all phases complete*
