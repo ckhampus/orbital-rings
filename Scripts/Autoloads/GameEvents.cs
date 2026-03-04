@@ -1,4 +1,5 @@
 using System;
+using OrbitalRings.Data;
 using Godot;
 using OrbitalRings.Ring;
 
@@ -215,4 +216,21 @@ public partial class GameEvents : Node
 
   public void EmitBlueprintUnlocked(string roomType)
     => BlueprintUnlocked?.Invoke(roomType);
+
+  // ---------------------------------------------------------------------------
+  // Happiness v2 Events (Phase 10)
+  // ---------------------------------------------------------------------------
+
+  /// <param name="newTier">The new mood tier after the change.</param>
+  /// <param name="previousTier">The tier before the change.</param>
+  public event Action<MoodTier, MoodTier> MoodTierChanged;
+
+  /// <param name="newCount">Updated lifetime wish count after the fulfilled wish.</param>
+  public event Action<int> WishCountChanged;
+
+  public void EmitMoodTierChanged(MoodTier newTier, MoodTier previousTier)
+      => MoodTierChanged?.Invoke(newTier, previousTier);
+
+  public void EmitWishCountChanged(int newCount)
+      => WishCountChanged?.Invoke(newCount);
 }

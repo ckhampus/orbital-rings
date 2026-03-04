@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="HappinessConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/Data/HappinessConfig.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+DecayRate = 0.003662
+MoodGainPerWish = 0.06
+BaselineScalingFactor = 0.016
+BaselineCap = 0.2
+TierCozyThreshold = 0.1
+TierLivelyThreshold = 0.3
+TierVibrantThreshold = 0.55
+TierRadiantThreshold = 0.8
+HysteresisWidth = 0.05
