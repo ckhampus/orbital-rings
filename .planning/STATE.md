@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: verifying
-stopped_at: Phase 8 context gathered
-last_updated: "2026-03-04T08:38:17.051Z"
-last_activity: "2026-03-03 - Completed 07-02: HUD and Feedback"
+status: executing
+stopped_at: Completed 08-02-PLAN.md
+last_updated: "2026-03-04T09:20:07Z"
+last_activity: "2026-03-04 - Completed 08-02: Ambient Soundscape and Wish Celebration"
 progress:
   total_phases: 8
   completed_phases: 7
-  total_plans: 20
-  completed_plans: 20
-  percent: 95
+  total_plans: 23
+  completed_plans: 22
+  percent: 97
 ---
 
 # Project State
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-02)
 
 **Core value:** The wish-driven building loop: citizens express wishes, the player builds rooms to fulfill them, happiness rises, new citizens arrive, new wishes emerge.
-**Current focus:** Phase 7 complete -- Happiness and progression system verified by human. Phase 8 next (Polish and Loop Closure).
+**Current focus:** Phase 8 in progress -- Ambient soundscape and wish celebration complete. Save/load and title screen remaining.
 
 ## Current Position
 
-Phase: 7 of 8 (Happiness and Progression) -- COMPLETE
-Plan: 2 of 2 complete in current phase
-Status: Phase 7 complete. Happiness bar, population display, arrival fanfare, and unlock notifications all verified.
-Last activity: 2026-03-03 - Completed 07-02: HUD and Feedback
+Phase: 8 of 8 (Polish and Loop Closure)
+Plan: 2 of 3 complete in current phase
+Status: Ambient drone, wish celebration chime + sparkles, and mute toggle implemented.
+Last activity: 2026-03-04 - Completed 08-02: Ambient Soundscape and Wish Celebration
 
-Progress: [██████████████░] 95%
+Progress: [██████████████░] 97%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 21
-- Average duration: 3.4 min
-- Total execution time: 1.2 hours
+- Total plans completed: 22
+- Average duration: 3.3 min
+- Total execution time: 1.25 hours
 
 **By Phase:**
 
@@ -50,9 +50,10 @@ Progress: [██████████████░] 95%
 | 5 | 3/3 | 6min | 2min |
 | 6 | 3/3 | 6min | 2min |
 | 7 | 2/2 | 8min | 4min |
+| 8 | 1/3 | 3min | 3min |
 
 **Recent Trend:**
-- Last 5 plans: 2min, 3min, 1min, 3min, 5min
+- Last 5 plans: 3min, 1min, 3min, 5min, 3min
 - Trend: steady
 
 *Updated after each plan completion*
@@ -134,6 +135,9 @@ Recent decisions affecting current work:
 - [07-02]: Per-tab StyleBoxFlat instances for glow animation -- avoids shared-material contamination (Phase 2 lesson applied)
 - [07-02]: HUD layout order credits | population | happiness bar per locked CONTEXT.md decision
 - [07-02]: Happiness and progression system approved by human verification -- all visual feedback confirmed working
+- [08-02]: G4 (392 Hz) for wish chime -- distinct from placement chime C5 (523 Hz), exponential decay for warmer sustain
+- [08-02]: 60 Hz ambient drone with perfect fifth + octave harmonics, period-aligned buffer for seamless loop
+- [08-02]: Gold sparkle particles (1.0, 0.85, 0.3) with light gravity (-2 Y) for floaty celebratory feel
 
 ### Pending Todos
 
@@ -155,6 +159,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T08:38:17.042Z
-Stopped at: Phase 8 context gathered
-Resume file: .planning/phases/08-polish-and-loop-closure/08-CONTEXT.md
+Last session: 2026-03-04T09:20:07Z
+Stopped at: Completed 08-02-PLAN.md
+Resume file: .planning/phases/08-polish-and-loop-closure/08-02-SUMMARY.md
