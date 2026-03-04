@@ -9,18 +9,18 @@ Requirements for the Happiness v2 milestone. Each maps to roadmap phases.
 
 ### Happiness Core
 
-- [ ] **HCORE-01**: Lifetime happiness increments by 1 on each wish fulfilled (integer, never decreases)
-- [ ] **HCORE-02**: Station mood is a float that rises on wish fulfillment (flat gain, no diminishing returns)
-- [ ] **HCORE-03**: Station mood decays toward a baseline each frame using exponential smoothing
-- [ ] **HCORE-04**: Mood baseline rises with sqrt(lifetime happiness) so mature stations rest above Quiet
-- [ ] **HCORE-05**: Blueprint unlocks trigger at wish count thresholds (4, 12) instead of percentage thresholds
+- [x] **HCORE-01**: Lifetime happiness increments by 1 on each wish fulfilled (integer, never decreases)
+- [x] **HCORE-02**: Station mood is a float that rises on wish fulfillment (flat gain, no diminishing returns)
+- [x] **HCORE-03**: Station mood decays toward a baseline each frame using exponential smoothing
+- [x] **HCORE-04**: Mood baseline rises with sqrt(lifetime happiness) so mature stations rest above Quiet
+- [x] **HCORE-05**: Blueprint unlocks trigger at wish count thresholds (4, 12) instead of percentage thresholds
 
 ### Mood Tiers
 
 - [x] **TIER-01**: Five named mood tiers (Quiet/Cozy/Lively/Vibrant/Radiant) with defined mood ranges
 - [ ] **TIER-02**: Citizen arrival probability scales by current mood tier
 - [ ] **TIER-03**: Economy income multiplier scales by current mood tier (1.0x to 1.4x)
-- [ ] **TIER-04**: Hysteresis on tier demotion boundaries prevents rapid tier oscillation
+- [x] **TIER-04**: Hysteresis on tier demotion boundaries prevents rapid tier oscillation
 
 ### HUD
 
@@ -73,15 +73,15 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| HCORE-01 | Phase 10 | Pending |
-| HCORE-02 | Phase 10 | Pending |
-| HCORE-03 | Phase 10 | Pending |
-| HCORE-04 | Phase 10 | Pending |
-| HCORE-05 | Phase 10 | Pending |
+| HCORE-01 | Phase 10 | Complete |
+| HCORE-02 | Phase 10 | Complete |
+| HCORE-03 | Phase 10 | Complete |
+| HCORE-04 | Phase 10 | Complete |
+| HCORE-05 | Phase 10 | Complete |
 | TIER-01 | Phase 10 | Complete |
 | TIER-02 | Phase 11 | Pending |
 | TIER-03 | Phase 11 | Pending |
-| TIER-04 | Phase 10 | Pending |
+| TIER-04 | Phase 10 | Complete |
 | HUD-01 | Phase 13 | Pending |
 | HUD-02 | Phase 13 | Pending |
 | SAVE-01 | Phase 12 | Pending |
