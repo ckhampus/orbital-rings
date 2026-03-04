@@ -1,43 +1,42 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.0
-milestone_name: milestone
-status: completed
-stopped_at: Completed 09-01-PLAN.md
-last_updated: "2026-03-04T13:13:50.699Z"
-last_activity: "2026-03-04 - Completed 09-01: Wire Work Bonus Economy Flow"
+milestone_name: MVP
+status: milestone_complete
+stopped_at: v1.0 milestone archived
+last_updated: "2026-03-04T14:00:00.000Z"
+last_activity: "2026-03-04 - Completed v1.0 MVP milestone"
 progress:
   total_phases: 9
   completed_phases: 9
   total_plans: 25
   completed_plans: 25
-  percent: 96
+  percent: 100
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-02)
+See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** The wish-driven building loop: citizens express wishes, the player builds rooms to fulfill them, happiness rises, new citizens arrive, new wishes emerge.
-**Current focus:** Phase 9 gap closure -- wiring work bonus and resolving tech debt from v1.0 milestone audit.
+**Current focus:** v1.0 shipped. Planning next milestone.
 
 ## Current Position
 
-Phase: 9 of 9 (Wire Work Bonus and Tech Debt Cleanup)
-Plan: 1 of 2 complete in current phase
-Status: 09-01 complete. Work bonus wired end-to-end, CreditHUD tooltip fixed.
-Last activity: 2026-03-04 - Completed 09-01: Wire Work Bonus Economy Flow
+Milestone: v1.0 MVP — SHIPPED 2026-03-04
+All 9 phases complete, 25/25 plans executed, 25/25 requirements satisfied.
+Next step: `/gsd:new-milestone` to define v1.1 scope.
 
-Progress: [██████████] 96%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 24
+- Total plans completed: 25
 - Average duration: 3.2 min
-- Total execution time: 1.3 hours
+- Total execution time: ~1.3 hours
 
 **By Phase:**
 
@@ -47,119 +46,25 @@ Progress: [██████████] 96%
 | 2 | 2 | 8min | 4min |
 | 3 | 3 | 10min | 3.3min |
 | 4 | 4 | 9min | 2.3min |
-| 5 | 3/3 | 6min | 2min |
-| 6 | 3/3 | 6min | 2min |
-| 7 | 2/2 | 8min | 4min |
-| 8 | 3/3 | 13min | 4.3min |
-| 9 | 1/2 | 2min | 2min |
-
-**Recent Trend:**
-- Last 5 plans: 1min, 3min, 5min, 3min, 5min
-- Trend: steady
-
-*Updated after each plan completion*
+| 5 | 3 | 6min | 2min |
+| 6 | 3 | 6min | 2min |
+| 7 | 2 | 8min | 4min |
+| 8 | 3 | 13min | 4.3min |
+| 9 | 2 | 2min | 1min |
 
 ## Accumulated Context
 
 ### Decisions
 
-Decisions are logged in PROJECT.md Key Decisions table.
-Recent decisions affecting current work:
-
-- [Init]: Flat donut ring (not full torus) — simpler geometry, easier camera/interaction
-- [Init]: Placeholder interiors for v1 — focus on ring mechanics and wish loop first
-- [Init]: Named citizens but no traits/routines — personality without complex AI scheduling
-- [Init]: Single currency (credits) — cozy promise requires no resource stress
-- [Init]: No tutorial — citizens' wishes are the implicit tutorial
-- [01-01]: Pure C# event delegates for signal bus instead of Godot [Signal] — avoids marshalling overhead and IsConnected bugs
-- [01-01]: Arrays initialized to System.Array.Empty<string>() to prevent null serialization pitfall in Godot Resources
-- [01-02]: Spherical coordinate camera positioning with LookAt(origin) instead of flat Z-offset — ensures correct viewing angle at any tilt/zoom
-- [01-02]: _Input instead of _UnhandledInput for camera mouse events — more reliable event delivery
-- [01-02]: Programmatic input action registration in _Ready() — avoids fragile project.godot [input] serialization
-- [01-03]: CSG subtraction for flat disc ring — clean boolean hole, no custom mesh needed
-- [01-03]: Independent TouchpadZoomSpeed export (0.5f) separate from ZoomSpeed (1.5f) for device-specific tuning
-- [01-03]: Keyboard zoom 3x speed multiplier for responsive continuous hold feel
-- [02-01]: Individual StandardMaterial3D instances per segment to avoid shared-material highlight contamination
-- [02-01]: Pre-allocated base/hover/selected material triplets per segment for zero-allocation state swaps
-- [02-01]: Walkway as single full-circle annulus (48 subdivisions) recessed 0.025 units below row surfaces
-- [02-02]: Polar math picking via Plane.IntersectsRay + Atan2 instead of physics collision bodies -- zero trimesh overhead, no phantom hits
-- [02-02]: Per-frame UpdateHover in _Process for camera-orbit-safe hover recalculation
-- [02-02]: FindChild pattern for tooltip discovery rather than hard-coded scene paths
-- [02-02]: Direct key detection (Key.Escape) for deselect instead of InputMap action registration
-- [03-01]: Spreadsheet-first economy design: economy-balance.md calibrated before any code changes
-- [03-01]: sqrt scaling on citizen income (30-cit/5-cit = 3.3x ratio) prevents runaway feedback loop
-- [03-01]: Happiness multiplier cap 1.3x (not 2.0x) — modest +30% max income bonus
-- [03-01]: Delta events (IncomeTicked/CreditsSpent/CreditsRefunded) separate from CreditsChanged for HUD display vs balance update
-- [03-02]: Timer child node for income ticks (not _Process delta) — periodic 5.5s chunks per user decision
-- [03-02]: ResourceLoader fallback chain: Inspector [Export] -> .tres path -> code defaults with GD.PushWarning
-- [03-02]: Public CalculateTickIncome/CalculateRoomCost for testability and HUD display without side effects
-- [03-03]: Explicit Timer.Start() over Autostart=true — Autostart property set before AddChild() is unreliable in Godot 4 C#
-- [03-03]: No sound on income tick — user decision: visual-only feedback (gold flash + floating text)
-- [03-03]: Balance-only display (no income rate) — user decision: income breakdown available via hover tooltip
-- [04-01]: BuildMode enum in GameEvents.cs (not BuildManager) to avoid circular namespace dependency
-- [04-01]: All Phase 4 events frontloaded in GameEvents in Plan 01 to prevent parallel write conflicts between Plans 02/03
-- [04-01]: RoomVisual as static helper class (not Node) since room block meshes are children of RingVisual
-- [04-01]: Per-room independent StandardMaterial3D instances to avoid shared-material contamination pitfall
-- [04-01]: Ghost preview does not modify SegmentGrid occupancy — only confirm action writes occupancy
-- [04-02]: BuildPanel as PanelContainer with programmatic UI (following CreditHUD pattern) rather than scene-based layout
-- [04-02]: Live cost label uses camera.UnprojectPosition for 3D-to-2D tracking of ghost mesh position
-- [04-02]: SegmentInteraction delegates to BuildManager via singleton Instance rather than node path lookup
-- [04-02]: Hover highlighting suppressed during Placing mode (ghost preview provides feedback), preserved during Demolish mode
-- [04-03]: All feedback audio procedurally generated via AudioStreamWav — zero external .wav/.ogg assets needed
-- [04-03]: PlacementFeedback instantiated as BuildManager child (Autoload) — no .tscn scene dependency
-- [04-03]: GPUParticles3D one-shot uses Restart()+Emitting workaround with Finished event self-cleanup
-- [04-04]: Build loop approved by human verification -- no code changes required before Phase 5
-- [05-01]: CitizenNode extends Node3D (not SafeNode) — SafeNode extends Node, but CitizenNode needs Node3D for Position/Rotation; implements same lifecycle manually
-- [05-01]: Angle-based polar movement instead of NavigationAgent3D — walkway is a 1D circular path, angle += speed * delta
-- [05-01]: Two overlapping CapsuleMesh instances for two-color band effect — primary body + secondary band at midsection
-- [05-01]: Per-instance StandardMaterial3D for every citizen capsule — prevents shared-material contamination (Phase 2 lesson)
-- [05-01]: Curated 8-color warm/pastel palette for cozy citizen aesthetic
-- [05-02]: SegmentGrid passed via Initialize() from CitizenManager -- cleaner dependency injection than tree lookup
-- [05-02]: Emission glow (EmissionEnergyMultiplier=2.5) for selected citizen leveraging existing environment bloom
-- [05-02]: Transparency mode toggled ON before fading, OFF after -- prevents Z-fighting artifacts
-- [05-02]: Auto-deselect in _Process when selected citizen starts visiting -- prevents glow on invisible citizen
-- [05-03]: Citizen system approved by human verification -- all 5 success criteria passed on first attempt, no changes needed
-- [06-01]: WishNudgeRequested event on WishBoard instead of direct CitizenNode.NudgeVisit() -- decouples Plan 01 from Plan 02 method that does not exist yet
-- [06-01]: DirAccess.Open + loop for template loading -- auto-discovers new .tres templates without code changes
-- [06-01]: BuildManager.GetPlacedRoom scan for initialization -- handles pre-placed rooms at game start without new public API
-- [06-02]: Wish fulfillment only on visit completion (Phase 8 callback) -- citizens must physically visit matching rooms, not just exist near them
-- [06-02]: effectiveDist multiplier (0.3x) for wish matching -- creates preference not exclusive targeting
-- [06-02]: Badge as child of CitizenNode inherits Visible=false during visits -- no additional hide/show code needed
-- [06-02]: Deterministic text variant via citizen name hash -- same citizen always shows same text for same wish type
-- [06-03]: CitizenInfoPanel uses citizen.CurrentWish directly instead of WishBoard.GetWishForCitizen() -- WishBoard lookup was failing silently, direct property access is simpler and reliable
-- [06-03]: Wish system approved by human verification -- all 6 checks passed (generation, info display, fulfillment, lingering, category variety, badge visibility)
-- [07-01]: HappinessGainBase = 0.08 with diminishing returns formula gain = base / (1 + h) -- calibrated for 25% unlock at ~wish 4, 60% at ~wish 12
-- [07-01]: Housing capacity tracked via RoomPlaced/RoomDemolished event subscriptions with Dictionary<int, int> -- avoids polling BuildManager every 60s
-- [07-01]: Starter capacity constant of 5 ensures initial citizens always have housing without housing rooms
-- [07-01]: BuildPanel locked rooms hidden (not greyed out) -- filters via HappinessManager.IsRoomUnlocked in LoadRoomDefinitions
-- [07-02]: 3D mesh alpha helpers (SetMeshTransparencyMode/SetMeshAlpha) for citizen fade-in -- Node3D has no Modulate property (CanvasItem-only)
-- [07-02]: Per-tab StyleBoxFlat instances for glow animation -- avoids shared-material contamination (Phase 2 lesson applied)
-- [07-02]: HUD layout order credits | population | happiness bar per locked CONTEXT.md decision
-- [07-02]: Happiness and progression system approved by human verification -- all visual feedback confirmed working
-- [08-01]: Plain C# POCOs for SaveData (no Godot types) -- System.Text.Json cannot serialize Godot structs
-- [08-01]: Debounced autosave (0.5s Timer) on all 7 state-change events -- prevents rapid-fire saves during batch operations
-- [08-01]: Frame-delay scene restoration (wait 2 frames after ChangeSceneToFile) for all _Ready to complete
-- [08-01]: Static StateLoaded flags on managers -- checked in _Ready to skip default initialization when loading from save
-- [08-01]: Room definition cache in BuildManager via DirAccess scan -- enables RestorePlacedRoom by roomId
-- [08-02]: G4 (392 Hz) for wish chime -- distinct from placement chime C5 (523 Hz), exponential decay for warmer sustain
-- [08-02]: 60 Hz ambient drone with perfect fifth + octave harmonics, period-aligned buffer for seamless loop
-- [08-02]: Gold sparkle particles (1.0, 0.85, 0.3) with light gravity (-2 Y) for floaty celebratory feel
-- [08-03]: Programmatic UI for title screen -- matches project-wide pattern of code-built UI
-- [08-03]: GameEvents.Instance in _EnterTree instead of _Ready -- earliest-possible singleton availability for autoload ordering
-- [08-03]: Lazy RingVisual discovery in _Process for BuildManager/CitizenManager -- title screen has no ring, hard _Ready lookups fail
-- [08-03]: Confirmation dialog for New Station only when save exists -- prevents accidental data loss without unnecessary friction
-- [09-01]: HashSet<string> for working citizen tracking solves demolished-room race condition -- exit checks set membership, not room existence
-- [09-02]: base._EnterTree() before SubscribeEvents, base._ExitTree() after UnsubscribeEvents -- standard enter-first/exit-last convention for inheritance safety
+All v1.0 decisions logged in PROJECT.md Key Decisions table with outcomes.
 
 ### Pending Todos
 
-None yet.
+None.
 
 ### Blockers/Concerns
 
-- [Phase 2 RESOLVED]: Polar math segment selection implemented via Plane.IntersectsRay + Atan2 in SegmentInteraction.cs. No trimesh collision used. Phantom hit concern eliminated.
-- [Phase 5 RESOLVED]: Circular walkway navigation uses angle-based polar coordinates (angle += speed * delta). NavigationAgent3D skipped entirely — walkway is a 1D circular path, not a 2D navigable surface. No navmesh baking needed.
-- [Phase 3 RESOLVED]: Economy balance spreadsheet produced in 03-01. sqrt scaling + 1.3x happiness cap confirmed: 30-cit/5-cit ratio = 3.3x (under 10x threshold). All EconomyConfig defaults match spreadsheet.
+None — all v1.0 blockers resolved.
 
 ### Quick Tasks Completed
 
@@ -171,6 +76,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T13:08:24Z
-Stopped at: Completed 09-01-PLAN.md
-Resume file: .planning/phases/09-wire-work-bonus-and-tech-debt-cleanup/09-01-SUMMARY.md
+Last session: 2026-03-04
+Stopped at: v1.0 milestone archived
+Next: `/gsd:new-milestone`
