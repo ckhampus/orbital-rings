@@ -80,4 +80,25 @@ public partial class HappinessConfig : Resource
     /// Default 0.05 prevents rapid tier flickering near boundary values.
     /// </summary>
     [Export] public float HysteresisWidth { get; set; } = 0.05f;
+
+    [ExportGroup("Arrival Probability")]
+
+    /// <summary>
+    /// Probability of a citizen arriving per 60s check at Quiet tier.
+    /// Default 0.15 — approximately 7 minute average wait between arrivals.
+    /// Timer interval stays fixed at 60s; only this probability changes with tier.
+    /// </summary>
+    [Export] public float ArrivalProbabilityQuiet   { get; set; } = 0.15f;
+
+    /// <summary>Arrival probability at Cozy tier. Default 0.25 — ~4 min avg wait.</summary>
+    [Export] public float ArrivalProbabilityCozy    { get; set; } = 0.25f;
+
+    /// <summary>Arrival probability at Lively tier. Default 0.40 — ~2.5 min avg wait.</summary>
+    [Export] public float ArrivalProbabilityLively  { get; set; } = 0.40f;
+
+    /// <summary>Arrival probability at Vibrant tier. Default 0.60 — ~1.7 min avg wait.</summary>
+    [Export] public float ArrivalProbabilityVibrant { get; set; } = 0.60f;
+
+    /// <summary>Arrival probability at Radiant tier. Default 0.75 — ~1.3 min avg wait.</summary>
+    [Export] public float ArrivalProbabilityRadiant { get; set; } = 0.75f;
 }
