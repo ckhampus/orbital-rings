@@ -151,12 +151,17 @@ Plans:
   3. The HUD displays credits, happiness, and population count, and all three update in real time as the game state changes
   4. The moment a wish is fulfilled produces a noticeable positive feedback response (sound, particle, or UI flash) that feels like a small reward
   5. After 30 minutes of play, the game feels cozy — no punishment, no stress, visible growth, and a genuine desire to keep building
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 08-01-PLAN.md -- Save/load system: SaveManager Autoload, manager API additions, autosave with debounce, JSON serialization
+- [ ] 08-02-PLAN.md -- Audio and celebration: ambient space drone, wish fulfillment chime + gold sparkles, mute toggle
+- [ ] 08-03-PLAN.md -- Title screen, game scene integration, and human verification of complete loop
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -167,8 +172,8 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 5. Citizens and Navigation | 3/3 | Complete | 2026-03-03 |
 | 6. Wish System | 3/3 | Complete | 2026-03-03 |
 | 7. Happiness and Progression | 2/2 | Complete | 2026-03-03 |
-| 8. Polish and Loop Closure | 0/TBD | Not started | - |
+| 8. Polish and Loop Closure | 0/3 | Not started | - |
 
 ---
 *Roadmap created: 2026-03-02*
-*Last updated: 2026-03-03 after 07-02 execution*
+*Last updated: 2026-03-04 after Phase 8 planning*
