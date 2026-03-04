@@ -2,22 +2,22 @@ using System.Collections.Generic;
 using Godot;
 using OrbitalRings.Citizens;
 using OrbitalRings.Data;
+using OrbitalRings.Happiness;
 using OrbitalRings.UI;
 
 namespace OrbitalRings.Autoloads;
 
 /// <summary>
-/// Core progression engine: tracks station happiness, gates citizen arrivals
-/// behind housing capacity, and unlocks blueprints at milestone thresholds.
+/// Core progression engine: tracks station lifetime wishes, owns MoodSystem for
+/// fluctuating mood state, gates citizen arrivals behind housing capacity, and
+/// unlocks blueprints at wish-count milestones.
 ///
 /// Registered as an Autoload in project.godot (6th, after all other singletons).
 /// Access via HappinessManager.Instance.
 ///
-/// Happiness only goes up (cozy promise). Diminishing returns formula:
-///   gain = HappinessGainBase / (1 + currentHappiness)
-///
-/// Calibration (base=0.08): 25% unlock ~wish 4, 60% unlock ~wish 12,
-/// 100% reached asymptotically around ~50 wishes.
+/// Dual-value system (Phase 10):
+///   _lifetimeHappiness — monotonically increasing integer, one per fulfilled wish
+///   MoodSystem._mood   — fluctuating float (0–1), gains +0.06 per wish, decays each frame
 /// </summary>
 public partial class HappinessManager : Node
 {
@@ -36,18 +36,12 @@ public partial class HappinessManager : Node
     // Constants
     // -------------------------------------------------------------------------
 
-    /// <summary>
-    /// Base happiness gain per wish fulfillment. Divided by (1 + currentHappiness)
-    /// for diminishing returns. Calibrated: 25% at ~wish 4, 60% at ~wish 12.
-    /// </summary>
-    private const float HappinessGainBase = 0.08f;
-
     /// <summary>Interval in seconds between citizen arrival probability checks.</summary>
     private const float ArrivalCheckInterval = 60.0f;
 
     /// <summary>
-    /// At 100% happiness, this is the probability of a new citizen per check.
-    /// P(arrival) = happiness * ArrivalProbabilityScale.
+    /// At 100% mood, this is the probability of a new citizen per check.
+    /// P(arrival) = mood * ArrivalProbabilityScale.
     /// </summary>
     private const float ArrivalProbabilityScale = 0.6f;
 
@@ -62,20 +56,26 @@ public partial class HappinessManager : Node
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Blueprint unlock thresholds: (happiness threshold, room IDs to unlock).
-    /// Locked decisions from CONTEXT.md.
+    /// Blueprint unlock thresholds: (lifetime wish count, room IDs to unlock).
+    /// Fired at exactly 4 and 12 lifetime wishes. Locked decision from CONTEXT.md.
     /// </summary>
-    private static readonly (float threshold, string[] rooms)[] UnlockMilestones =
+    private static readonly (int wishCount, string[] rooms)[] UnlockMilestones =
     {
-        (0.25f, new[] { "sky_loft", "craft_lab" }),
-        (0.60f, new[] { "star_lounge", "comm_relay" }),
+        (4,  new[] { "sky_loft", "craft_lab" }),
+        (12, new[] { "star_lounge", "comm_relay" }),
     };
 
     // -------------------------------------------------------------------------
     // State
     // -------------------------------------------------------------------------
 
-    private float _happiness;
+    private int _lifetimeHappiness;
+    private MoodSystem _moodSystem;
+    private MoodTier _lastReportedTier = MoodTier.Quiet;
+
+    /// <summary>HappinessConfig resource — set via Inspector or loaded from default path in _Ready.</summary>
+    [Export] public HappinessConfig Config { get; set; }
+
     private Timer _arrivalTimer;
     private readonly HashSet<string> _unlockedRooms = new()
     {
@@ -109,8 +109,20 @@ public partial class HappinessManager : Node
     // Public API
     // -------------------------------------------------------------------------
 
-    /// <summary>Current station happiness (0.0 to 1.0).</summary>
-    public float Happiness => _happiness;
+    /// <summary>Total wishes fulfilled across the station's lifetime. Monotonically increasing.</summary>
+    public int LifetimeWishes => _lifetimeHappiness;
+
+    /// <summary>Current station mood (0.0–1.0). Fluctuates with activity and decay.</summary>
+    public float Mood => _moodSystem?.Mood ?? 0f;
+
+    /// <summary>
+    /// Compatibility shim for SaveManager and EconomyManager until Phase 12/11 update them.
+    /// Returns current mood float (same 0-1 range as old happiness).
+    /// </summary>
+    public float Happiness => _moodSystem?.Mood ?? 0f;
+
+    /// <summary>Current mood tier with hysteresis applied.</summary>
+    public MoodTier CurrentTier => _moodSystem?.CurrentTier ?? MoodTier.Quiet;
 
     /// <summary>
     /// Returns whether the given room ID is unlocked for building.
@@ -139,12 +151,15 @@ public partial class HappinessManager : Node
 
     /// <summary>
     /// Restores all happiness/progression state from save data.
-    /// Sets happiness, unlocked rooms, milestone count, housing capacity,
-    /// and syncs with EconomyManager and GameEvents.
+    /// Signature preserved for SaveManager backward compatibility (Phase 12 will expand it).
+    /// happiness float from old save treated as mood — _lifetimeHappiness starts at 0 for old saves.
     /// </summary>
     public void RestoreState(float happiness, HashSet<string> unlockedRooms, int milestoneCount, int housingCapacity)
     {
-        _happiness = happiness;
+        // happiness float from old save → treat as mood for backward compat
+        _lifetimeHappiness = 0;  // old saves have no lifetime counter; start at 0
+        _moodSystem?.RestoreState(happiness, 0f);
+        _lastReportedTier = _moodSystem?.CurrentTier ?? MoodTier.Quiet;
 
         _unlockedRooms.Clear();
         foreach (var roomId in unlockedRooms)
@@ -154,7 +169,7 @@ public partial class HappinessManager : Node
         _housingCapacity = housingCapacity;
 
         EconomyManager.Instance?.SetHappiness(happiness);
-        GameEvents.Instance?.EmitHappinessChanged(happiness);
+        // Do NOT call EmitHappinessChanged — HappinessBar will be replaced in Phase 13
     }
 
     // -------------------------------------------------------------------------
@@ -192,6 +207,16 @@ public partial class HappinessManager : Node
         // Create CanvasLayer for arrival floating text (same layer as HUDLayer)
         _arrivalCanvasLayer = new CanvasLayer { Layer = 5 };
         AddChild(_arrivalCanvasLayer);
+
+        // Load config (same pattern as EconomyManager loading EconomyConfig)
+        if (Config == null)
+            Config = ResourceLoader.Load<HappinessConfig>("res://Resources/Happiness/default_happiness.tres");
+        if (Config == null)
+        {
+            GD.PushWarning("HappinessManager: No HappinessConfig found. Using code defaults.");
+            Config = new HappinessConfig();
+        }
+        _moodSystem = new MoodSystem(Config);
     }
 
     public override void _ExitTree()
@@ -204,30 +229,46 @@ public partial class HappinessManager : Node
         }
     }
 
+    public override void _Process(double delta)
+    {
+        if (_moodSystem == null) return;
+
+        var previousTier = _lastReportedTier;
+        var newTier = _moodSystem.Update((float)delta, _lifetimeHappiness);
+
+        if (newTier != previousTier)
+        {
+            _lastReportedTier = newTier;
+            GameEvents.Instance?.EmitMoodTierChanged(newTier, previousTier);
+        }
+    }
+
     // -------------------------------------------------------------------------
     // Wish fulfillment handler
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Called when any citizen's wish is fulfilled. Increments happiness with
-    /// diminishing returns, updates economy multiplier, and checks unlock milestones.
+    /// Called when any citizen's wish is fulfilled. Increments lifetime wish count,
+    /// applies flat mood gain via MoodSystem, fires tier-change event if tier changed,
+    /// updates economy multiplier, and checks unlock milestones.
     /// </summary>
     private void OnWishFulfilled(string citizenName, string wishType)
     {
-        // Already at max -- wishes still fulfill but happiness stays at 100%
-        if (_happiness >= 1.0f) return;
+        _lifetimeHappiness++;
+        GameEvents.Instance?.EmitWishCountChanged(_lifetimeHappiness);
 
-        // Diminishing returns: early wishes grant more, later wishes grant less
-        float gain = HappinessGainBase / (1.0f + _happiness);
-        _happiness = Mathf.Min(_happiness + gain, 1.0f);
+        var previousTier = _lastReportedTier;
+        var newTier = _moodSystem.OnWishFulfilled();
 
-        // Update economy multiplier (capped at 1.3x internally by EconomyManager)
-        EconomyManager.Instance?.SetHappiness(_happiness);
+        if (newTier != previousTier)
+        {
+            _lastReportedTier = newTier;
+            GameEvents.Instance?.EmitMoodTierChanged(newTier, previousTier);
+        }
 
-        // Fire event for UI (happiness bar, floating text)
-        GameEvents.Instance?.EmitHappinessChanged(_happiness);
+        // Compatibility: continue calling SetHappiness with mood float until Phase 11 updates
+        EconomyManager.Instance?.SetHappiness(_moodSystem.Mood);
 
-        // Check if any unlock thresholds were crossed
         CheckUnlockMilestones();
     }
 
@@ -236,15 +277,15 @@ public partial class HappinessManager : Node
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Checks if happiness has crossed any new unlock thresholds.
+    /// Checks if lifetime wish count has crossed any new unlock thresholds.
     /// Iterates from the last crossed milestone to avoid re-triggering.
     /// </summary>
     private void CheckUnlockMilestones()
     {
         while (_crossedMilestoneCount < UnlockMilestones.Length)
         {
-            var (threshold, rooms) = UnlockMilestones[_crossedMilestoneCount];
-            if (_happiness < threshold) break;
+            var (wishCount, rooms) = UnlockMilestones[_crossedMilestoneCount];
+            if (_lifetimeHappiness < wishCount) break;
 
             // Milestone crossed -- unlock rooms
             foreach (var roomId in rooms)
@@ -262,19 +303,19 @@ public partial class HappinessManager : Node
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Periodic check (~60s): roll a probability based on happiness.
+    /// Periodic check (~60s): roll a probability based on current mood.
     /// If successful and population is below housing capacity, spawn a citizen
     /// with fade-in animation and floating arrival text.
     /// </summary>
     private void OnArrivalCheck()
     {
-        if (_happiness <= 0f) return;
+        if (Mood <= 0f) return;
 
         int currentPop = CitizenManager.Instance?.CitizenCount ?? 0;
         if (currentPop >= _housingCapacity) return;
 
-        // P(arrival) = happiness * scale (at 100% happiness, 60% chance)
-        float chance = _happiness * ArrivalProbabilityScale;
+        // P(arrival) = mood * scale (at 100% mood, 60% chance)
+        float chance = Mood * ArrivalProbabilityScale;
         if (GD.Randf() < chance)
         {
             var citizen = CitizenManager.Instance?.SpawnCitizen();
