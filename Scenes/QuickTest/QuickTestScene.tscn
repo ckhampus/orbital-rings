@@ -8,6 +8,9 @@
 [ext_resource type="Script" path="res://Scripts/Build/BuildPanel.cs" id="6_buildpanel"]
 [ext_resource type="Script" path="res://Scripts/UI/HappinessBar.cs" id="7_happinessbar"]
 [ext_resource type="Script" path="res://Scripts/UI/PopulationDisplay.cs" id="8_populationdisplay"]
+[ext_resource type="Script" path="res://Scripts/Audio/AmbientDrone.cs" id="9_ambientdrone"]
+[ext_resource type="Script" path="res://Scripts/Audio/WishCelebration.cs" id="10_wishcelebration"]
+[ext_resource type="Script" path="res://Scripts/UI/MuteToggle.cs" id="11_mutetoggle"]
 
 [node name="QuickTestScene" type="Node3D" unique_id=884004654]
 
@@ -75,3 +78,12 @@ layer = 10
 
 [node name="SegmentTooltip" type="PanelContainer" parent="TooltipLayer" unique_id=1285651752]
 script = ExtResource("4_tooltip")
+
+[node name="AmbientDrone" type="Node" parent="."]
+script = ExtResource("9_ambientdrone")
+
+[node name="WishCelebration" type="Node" parent="."]
+script = ExtResource("10_wishcelebration")
+
+[node name="MuteToggle" type="Button" parent="HUDLayer"]
+script = ExtResource("11_mutetoggle")
