@@ -1,5 +1,6 @@
 using Godot;
 using OrbitalRings.Autoloads;
+using OrbitalRings.Citizens;
 
 namespace OrbitalRings.UI;
 
@@ -271,7 +272,7 @@ public partial class CreditHUD : MarginContainer
         var (baseIncome, citizenIncome, workBonus, happinessMult, total) =
             EconomyManager.Instance.GetIncomeBreakdown();
 
-        int citizenCount = 0;
+        int citizenCount = CitizenManager.Instance?.CitizenCount ?? 0;
         // Show breakdown text
         string breakdownText =
             $"Income per tick:\n" +
