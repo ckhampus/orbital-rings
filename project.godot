@@ -23,6 +23,7 @@ BuildManager="*res://Scripts/Build/BuildManager.cs"
 CitizenManager="*res://Scripts/Citizens/CitizenManager.cs"
 WishBoard="*res://Scripts/Autoloads/WishBoard.cs"
 HappinessManager="*res://Scripts/Autoloads/HappinessManager.cs"
+SaveManager="*res://Scripts/Autoloads/SaveManager.cs"
 
 [display]
 
