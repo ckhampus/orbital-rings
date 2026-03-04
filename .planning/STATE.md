@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Happiness v2
 status: planning
-stopped_at: Completed 11-02-PLAN.md
-last_updated: "2026-03-04T20:54:48.575Z"
+stopped_at: Completed 11-03-PLAN.md
+last_updated: "2026-03-04T20:57:32.101Z"
 last_activity: 2026-03-04 — Roadmap created for v1.1 (4 phases, 12 requirements)
 progress:
   total_phases: 4
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 5
-  completed_plans: 4
+  completed_plans: 5
   percent: 0
 ---
 
@@ -54,6 +54,8 @@ All v1.0 decisions logged in PROJECT.md Key Decisions table with outcomes.
 - [Phase 11-01]: SetHappiness(float) removed in Plan 01 (not 03) because _currentHappiness no longer exists; HappinessMultiplierCap retained until Plan 03 cleanup
 - [Phase 11-02]: Quiet tier always yields 0.15 arrival probability — Mood <= 0f guard removed; arrival path no longer depends on mood float
 - [Phase 11-02]: Timer interval stays fixed at 60s; only probability changes with tier (locked decision from CONTEXT.md)
+- [Phase 11-03]: SetMoodTier called only inside tier-change blocks in all three HappinessManager paths (_Process, OnWishFulfilled, RestoreState) — no redundant EconomyManager notifications
+- [Phase 11-03]: RestoreState passes _lastReportedTier (set from _moodSystem.CurrentTier on previous line) rather than raw happiness float — correct tier-space value for save/load
 
 ### Pending Todos
 
@@ -74,9 +76,10 @@ None.
 | Phase 10-happiness-core-and-mood-tiers P02 | 2 | 2 tasks | 2 files |
 | Phase 11-economy-and-arrival-tier-integration P01 | 2 | 2 tasks | 3 files |
 | Phase 11-economy-and-arrival-tier-integration P02 | 2 | 2 tasks | 3 files |
+| Phase 11-economy-and-arrival-tier-integration P03 | 81 | 1 tasks | 1 files |
 
 ## Session Continuity
 
-Last session: 2026-03-04T20:54:48.572Z
-Stopped at: Completed 11-02-PLAN.md
+Last session: 2026-03-04T20:57:32.097Z
+Stopped at: Completed 11-03-PLAN.md
 Next: Plan Phase 10 (Happiness Core and Mood Tiers)
