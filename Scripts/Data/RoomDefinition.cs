@@ -10,36 +10,36 @@ namespace OrbitalRings.Data;
 [GlobalClass]
 public partial class RoomDefinition : Resource
 {
-  /// <summary>
-  /// The five functional categories for rooms on the station.
-  /// </summary>
-  public enum RoomCategory
-  {
-    Housing,
-    LifeSupport,
-    Work,
-    Comfort,
-    Utility
-  }
+    /// <summary>
+    /// The five functional categories for rooms on the station.
+    /// </summary>
+    public enum RoomCategory
+    {
+        Housing,
+        LifeSupport,
+        Work,
+        Comfort,
+        Utility
+    }
 
-  [ExportGroup("Identity")]
-  [Export] public string RoomName { get; set; } = "";
-  [Export] public string RoomId { get; set; } = "";
+    [ExportGroup("Identity")]
+    [Export] public string RoomName { get; set; } = "";
+    [Export] public string RoomId { get; set; } = "";
 
-  [ExportGroup("Placement")]
-  [Export] public RoomCategory Category { get; set; }
-  [Export(PropertyHint.Range, "1,3")] public int MinSegments { get; set; } = 1;
-  [Export(PropertyHint.Range, "1,3")] public int MaxSegments { get; set; } = 1;
+    [ExportGroup("Placement")]
+    [Export] public RoomCategory Category { get; set; }
+    [Export(PropertyHint.Range, "1,3")] public int MinSegments { get; set; } = 1;
+    [Export(PropertyHint.Range, "1,3")] public int MaxSegments { get; set; } = 1;
 
-  [ExportGroup("Stats")]
-  [Export] public int BaseCapacity { get; set; }
-  [Export] public float Effectiveness { get; set; } = 1.0f;
+    [ExportGroup("Stats")]
+    [Export] public int BaseCapacity { get; set; }
+    [Export] public float Effectiveness { get; set; } = 1.0f;
 
-  [ExportGroup("Economy")]
+    [ExportGroup("Economy")]
 
-  /// <summary>
-  /// Optional per-room cost override. When greater than 0, the cost formula uses
-  /// this value instead of EconomyConfig.BaseRoomCost. Default 0 means "use global BaseRoomCost".
-  /// </summary>
-  [Export] public int BaseCostOverride { get; set; } = 0;
+    /// <summary>
+    /// Optional per-room cost override. When greater than 0, the cost formula uses
+    /// this value instead of EconomyConfig.BaseRoomCost. Default 0 means "use global BaseRoomCost".
+    /// </summary>
+    [Export] public int BaseCostOverride { get; set; } = 0;
 }

@@ -101,26 +101,26 @@ public class MoodSystem
     {
         if (mood >= _config.TierRadiantThreshold) return MoodTier.Radiant;
         if (mood >= _config.TierVibrantThreshold) return MoodTier.Vibrant;
-        if (mood >= _config.TierLivelyThreshold)  return MoodTier.Lively;
-        if (mood >= _config.TierCozyThreshold)    return MoodTier.Cozy;
+        if (mood >= _config.TierLivelyThreshold) return MoodTier.Lively;
+        if (mood >= _config.TierCozyThreshold) return MoodTier.Cozy;
         return MoodTier.Quiet;
     }
 
     private float PromoteThreshold(MoodTier tier) => tier switch
     {
-        MoodTier.Quiet   => _config.TierCozyThreshold,
-        MoodTier.Cozy    => _config.TierLivelyThreshold,
-        MoodTier.Lively  => _config.TierVibrantThreshold,
+        MoodTier.Quiet => _config.TierCozyThreshold,
+        MoodTier.Cozy => _config.TierLivelyThreshold,
+        MoodTier.Lively => _config.TierVibrantThreshold,
         MoodTier.Vibrant => _config.TierRadiantThreshold,
-        _                => float.MaxValue   // Radiant cannot promote
+        _ => float.MaxValue   // Radiant cannot promote
     };
 
     private float DemoteThreshold(MoodTier tier) => tier switch
     {
-        MoodTier.Cozy    => _config.TierCozyThreshold    - _config.HysteresisWidth,
-        MoodTier.Lively  => _config.TierLivelyThreshold  - _config.HysteresisWidth,
+        MoodTier.Cozy => _config.TierCozyThreshold - _config.HysteresisWidth,
+        MoodTier.Lively => _config.TierLivelyThreshold - _config.HysteresisWidth,
         MoodTier.Vibrant => _config.TierVibrantThreshold - _config.HysteresisWidth,
         MoodTier.Radiant => _config.TierRadiantThreshold - _config.HysteresisWidth,
-        _                => float.MinValue   // Quiet cannot demote
+        _ => float.MinValue   // Quiet cannot demote
     };
 }

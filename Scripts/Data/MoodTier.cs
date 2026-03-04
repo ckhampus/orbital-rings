@@ -6,9 +6,9 @@ namespace OrbitalRings.Data;
 /// </summary>
 public enum MoodTier
 {
-    Quiet   = 0,
-    Cozy    = 1,
-    Lively  = 2,
+    Quiet = 0,
+    Cozy = 1,
+    Lively = 2,
     Vibrant = 3,
     Radiant = 4,
 }

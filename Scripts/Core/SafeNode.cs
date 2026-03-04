@@ -26,28 +26,28 @@ namespace OrbitalRings.Core;
 /// </summary>
 public partial class SafeNode : Node
 {
-  public override void _EnterTree()
-  {
-    base._EnterTree();
-    SubscribeEvents();
-  }
+    public override void _EnterTree()
+    {
+        base._EnterTree();
+        SubscribeEvents();
+    }
 
-  public override void _ExitTree()
-  {
-    UnsubscribeEvents();
-    base._ExitTree();
-  }
+    public override void _ExitTree()
+    {
+        UnsubscribeEvents();
+        base._ExitTree();
+    }
 
-  /// <summary>
-  /// Override to connect to GameEvents.Instance and other signal sources.
-  /// Called automatically in _EnterTree(). GameEvents.Instance is guaranteed
-  /// available because Autoloads initialize before scene nodes.
-  /// </summary>
-  protected virtual void SubscribeEvents() { }
+    /// <summary>
+    /// Override to connect to GameEvents.Instance and other signal sources.
+    /// Called automatically in _EnterTree(). GameEvents.Instance is guaranteed
+    /// available because Autoloads initialize before scene nodes.
+    /// </summary>
+    protected virtual void SubscribeEvents() { }
 
-  /// <summary>
-  /// Override to disconnect from all signal sources. Called automatically
-  /// in _ExitTree(). MUST mirror every connection made in SubscribeEvents().
-  /// </summary>
-  protected virtual void UnsubscribeEvents() { }
+    /// <summary>
+    /// Override to disconnect from all signal sources. Called automatically
+    /// in _ExitTree(). MUST mirror every connection made in SubscribeEvents().
+    /// </summary>
+    protected virtual void UnsubscribeEvents() { }
 }

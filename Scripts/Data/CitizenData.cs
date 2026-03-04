@@ -9,22 +9,22 @@ namespace OrbitalRings.Data;
 [GlobalClass]
 public partial class CitizenData : Resource
 {
-  /// <summary>
-  /// Visual body type variations for citizen models.
-  /// </summary>
-  public enum BodyType
-  {
-	Tall,
-	Short,
-	Round
-  }
+    /// <summary>
+    /// Visual body type variations for citizen models.
+    /// </summary>
+    public enum BodyType
+    {
+        Tall,
+        Short,
+        Round
+    }
 
-  [ExportGroup("Identity")]
-  [Export] public string CitizenName { get; set; } = "";
+    [ExportGroup("Identity")]
+    [Export] public string CitizenName { get; set; } = "";
 
-  [ExportGroup("Appearance")]
-  [Export] public BodyType Body { get; set; }
-  [Export] public Color PrimaryColor { get; set; } = Colors.White;
-  [Export] public Color SecondaryColor { get; set; } = Colors.Gray;
-  [Export] public string Accessory { get; set; } = "";
+    [ExportGroup("Appearance")]
+    [Export] public BodyType Body { get; set; }
+    [Export] public Color PrimaryColor { get; set; } = Colors.White;
+    [Export] public Color SecondaryColor { get; set; } = Colors.Gray;
+    [Export] public string Accessory { get; set; } = "";
 }

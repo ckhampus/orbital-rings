@@ -51,14 +51,14 @@ public partial class CitizenManager : SafeNode
     private static readonly Color[] Palette =
     {
         new Color(0.95f, 0.6f, 0.5f),   // salmon
-        new Color(0.6f, 0.85f, 0.7f),   // mint
-        new Color(0.55f, 0.65f, 0.95f), // periwinkle
-        new Color(0.95f, 0.85f, 0.5f),  // buttercup
-        new Color(0.85f, 0.55f, 0.85f), // lavender
-        new Color(0.5f, 0.85f, 0.85f),  // teal
-        new Color(0.95f, 0.7f, 0.4f),   // peach
-        new Color(0.7f, 0.9f, 0.55f),   // lime
-    };
+		new Color(0.6f, 0.85f, 0.7f),   // mint
+		new Color(0.55f, 0.65f, 0.95f), // periwinkle
+		new Color(0.95f, 0.85f, 0.5f),  // buttercup
+		new Color(0.85f, 0.55f, 0.85f), // lavender
+		new Color(0.5f, 0.85f, 0.85f),  // teal
+		new Color(0.95f, 0.7f, 0.4f),   // peach
+		new Color(0.7f, 0.9f, 0.55f),   // lime
+	};
 
     // -------------------------------------------------------------------------
     // Ring reference (for SegmentGrid access)
