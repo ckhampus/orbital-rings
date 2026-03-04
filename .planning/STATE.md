@@ -50,7 +50,7 @@ Progress: [██████████████░] 97%
 | 5 | 3/3 | 6min | 2min |
 | 6 | 3/3 | 6min | 2min |
 | 7 | 2/2 | 8min | 4min |
-| 8 | 1/3 | 3min | 3min |
+| 8 | 2/3 | 8min | 4min |
 
 **Recent Trend:**
 - Last 5 plans: 3min, 1min, 3min, 5min, 3min
@@ -135,6 +135,11 @@ Recent decisions affecting current work:
 - [07-02]: Per-tab StyleBoxFlat instances for glow animation -- avoids shared-material contamination (Phase 2 lesson applied)
 - [07-02]: HUD layout order credits | population | happiness bar per locked CONTEXT.md decision
 - [07-02]: Happiness and progression system approved by human verification -- all visual feedback confirmed working
+- [08-01]: Plain C# POCOs for SaveData (no Godot types) -- System.Text.Json cannot serialize Godot structs
+- [08-01]: Debounced autosave (0.5s Timer) on all 7 state-change events -- prevents rapid-fire saves during batch operations
+- [08-01]: Frame-delay scene restoration (wait 2 frames after ChangeSceneToFile) for all _Ready to complete
+- [08-01]: Static StateLoaded flags on managers -- checked in _Ready to skip default initialization when loading from save
+- [08-01]: Room definition cache in BuildManager via DirAccess scan -- enables RestorePlacedRoom by roomId
 - [08-02]: G4 (392 Hz) for wish chime -- distinct from placement chime C5 (523 Hz), exponential decay for warmer sustain
 - [08-02]: 60 Hz ambient drone with perfect fifth + octave harmonics, period-aligned buffer for seamless loop
 - [08-02]: Gold sparkle particles (1.0, 0.85, 0.3) with light gravity (-2 Y) for floaty celebratory feel
@@ -159,6 +164,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T09:20:07Z
-Stopped at: Completed 08-02-PLAN.md
-Resume file: .planning/phases/08-polish-and-loop-closure/08-02-SUMMARY.md
+Last session: 2026-03-04T09:21:26Z
+Stopped at: Completed 08-01-PLAN.md and 08-02-PLAN.md
+Resume file: .planning/phases/08-polish-and-loop-closure/08-01-SUMMARY.md
