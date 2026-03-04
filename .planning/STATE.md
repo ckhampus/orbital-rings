@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Happiness v2
 status: planning
-stopped_at: Phase 11 context gathered
-last_updated: "2026-03-04T20:30:41.546Z"
+stopped_at: Completed 11-01-PLAN.md
+last_updated: "2026-03-04T20:51:03.313Z"
 last_activity: 2026-03-04 — Roadmap created for v1.1 (4 phases, 12 requirements)
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  total_plans: 5
+  completed_plans: 3
   percent: 0
 ---
 
@@ -50,6 +50,8 @@ All v1.0 decisions logged in PROJECT.md Key Decisions table with outcomes.
 - [Phase 10-02]: MathF.Clamp unavailable in Godot build env; Math.Clamp used for float clamping in MoodSystem
 - [Phase 10-02]: HappinessChanged not emitted in new OnWishFulfilled; HappinessBar replaced in Phase 13 (intentional transition)
 - [Phase 10-02]: Old saves: happiness float maps to initial mood with _lifetimeHappiness=0; milestone guards preserve unlock state
+- [Phase 11-01]: Economy domain now operates in tier-space (discrete MoodTier enum) not float-space; _currentTierMultiplier default 1.0f (Quiet) is safe startup state
+- [Phase 11-01]: SetHappiness(float) removed in Plan 01 (not 03) because _currentHappiness no longer exists; HappinessMultiplierCap retained until Plan 03 cleanup
 
 ### Pending Todos
 
@@ -68,9 +70,10 @@ None.
 | 3 | Camera tilt adjustment (W/S keys + middle-mouse, 20-60 deg) | 2026-03-03 | efa59ad | [3-i-want-to-be-able-adjust-the-tilt-of-the](./quick/3-i-want-to-be-able-adjust-the-tilt-of-the/) |
 | Phase 10-happiness-core-and-mood-tiers P01 | 2 | 2 tasks | 4 files |
 | Phase 10-happiness-core-and-mood-tiers P02 | 2 | 2 tasks | 2 files |
+| Phase 11-economy-and-arrival-tier-integration P01 | 2 | 2 tasks | 3 files |
 
 ## Session Continuity
 
-Last session: 2026-03-04T20:30:41.542Z
-Stopped at: Phase 11 context gathered
+Last session: 2026-03-04T20:51:03.310Z
+Stopped at: Completed 11-01-PLAN.md
 Next: Plan Phase 10 (Happiness Core and Mood Tiers)
