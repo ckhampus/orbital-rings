@@ -89,12 +89,8 @@ public partial class BuildManager : Node
     {
         Instance = this;
 
-        // Find the Ring node's RingVisual in the scene tree
+        // Try to find RingVisual (may not exist yet if title screen is main scene)
         _ringVisual = GetTree().Root.FindChild("Ring", true, false) as RingVisual;
-        if (_ringVisual == null)
-        {
-            GD.PushWarning("BuildManager: RingVisual not found in scene tree. Build features disabled until Ring is present.");
-        }
 
         // Cache all RoomDefinition resources for save/load restoration
         LoadRoomDefinitions();
@@ -103,6 +99,15 @@ public partial class BuildManager : Node
         var feedback = new PlacementFeedback();
         feedback.Name = "PlacementFeedback";
         AddChild(feedback);
+    }
+
+    public override void _Process(double delta)
+    {
+        // Lazy discovery: find RingVisual when game scene loads after title screen
+        if (_ringVisual == null)
+        {
+            _ringVisual = GetTree().Root.FindChild("Ring", true, false) as RingVisual;
+        }
     }
 
     public override void _Input(InputEvent @event)

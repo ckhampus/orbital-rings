@@ -144,6 +144,14 @@ public partial class CitizenManager : SafeNode
 
     public override void _Process(double delta)
     {
+        // Lazy discovery: find RingVisual grid when game scene loads after title screen
+        if (_grid == null)
+        {
+            var ringVisual = GetTree().Root.FindChild("Ring", true, false) as RingVisual;
+            if (ringVisual != null)
+                _grid = ringVisual.Grid;
+        }
+
         // If selected citizen starts visiting (invisible), auto-deselect
         // to prevent glow on invisible citizen
         if (_selectedCitizen != null && _selectedCitizen.IsVisiting)

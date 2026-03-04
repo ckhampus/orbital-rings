@@ -29,7 +29,7 @@ public partial class GameEvents : Node
   /// </summary>
   public static GameEvents Instance { get; private set; }
 
-  public override void _Ready()
+  public override void _EnterTree()
   {
     Instance = this;
   }
