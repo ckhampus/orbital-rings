@@ -40,12 +40,6 @@ public partial class HappinessManager : Node
     private const float ArrivalCheckInterval = 60.0f;
 
     /// <summary>
-    /// At 100% mood, this is the probability of a new citizen per check.
-    /// P(arrival) = mood * ArrivalProbabilityScale.
-    /// </summary>
-    private const float ArrivalProbabilityScale = 0.6f;
-
-    /// <summary>
     /// Minimum housing capacity accounting for the 5 starter citizens
     /// who bypass the housing check at game start.
     /// </summary>
@@ -303,19 +297,17 @@ public partial class HappinessManager : Node
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Periodic check (~60s): roll a probability based on current mood.
+    /// Periodic check (~60s): roll a probability based on the current mood tier.
     /// If successful and population is below housing capacity, spawn a citizen
     /// with fade-in animation and floating arrival text.
+    /// Quiet tier always gives 0.15 probability — no early-return guard needed.
     /// </summary>
     private void OnArrivalCheck()
     {
-        if (Mood <= 0f) return;
-
         int currentPop = CitizenManager.Instance?.CitizenCount ?? 0;
         if (currentPop >= _housingCapacity) return;
 
-        // P(arrival) = mood * scale (at 100% mood, 60% chance)
-        float chance = Mood * ArrivalProbabilityScale;
+        float chance = ArrivalProbabilityForTier(_lastReportedTier);
         if (GD.Randf() < chance)
         {
             var citizen = CitizenManager.Instance?.SpawnCitizen();
@@ -337,6 +329,21 @@ public partial class HappinessManager : Node
             }
         }
     }
+
+    /// <summary>
+    /// Maps the current mood tier to the configured arrival probability.
+    /// Probability is used once per 60s timer tick — only the value changes with tier,
+    /// not the timer interval (locked decision from CONTEXT.md).
+    /// </summary>
+    private float ArrivalProbabilityForTier(MoodTier tier) => tier switch
+    {
+        MoodTier.Quiet   => Config.ArrivalProbabilityQuiet,
+        MoodTier.Cozy    => Config.ArrivalProbabilityCozy,
+        MoodTier.Lively  => Config.ArrivalProbabilityLively,
+        MoodTier.Vibrant => Config.ArrivalProbabilityVibrant,
+        MoodTier.Radiant => Config.ArrivalProbabilityRadiant,
+        _                => Config.ArrivalProbabilityQuiet,
+    };
 
     /// <summary>
     /// Spawns a floating "Name has arrived!" text at screen center using
