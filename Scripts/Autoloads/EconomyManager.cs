@@ -43,7 +43,7 @@ public partial class EconomyManager : Node
     private int _citizenCount;
     private int _workingCitizenCount;
     private readonly HashSet<string> _workingCitizens = new();
-    private float _currentHappiness;
+    private float _currentTierMultiplier = 1.0f;  // default Quiet tier — set by SetMoodTier()
 
     public override void _Ready()
     {
@@ -127,7 +127,7 @@ public partial class EconomyManager : Node
         float baseIncome = Config.BaseStationIncome;
         float citizenIncome = Config.PassiveIncomePerCitizen * MathF.Sqrt(_citizenCount);
         float workBonus = _workingCitizenCount * Config.WorkBonusMultiplier;
-        float happinessMult = 1.0f + (_currentHappiness * (Config.HappinessMultiplierCap - 1.0f));
+        float happinessMult = _currentTierMultiplier;
         return Mathf.RoundToInt((baseIncome + citizenIncome + workBonus) * happinessMult);
     }
 
@@ -237,7 +237,7 @@ public partial class EconomyManager : Node
         float baseIncome = Config.BaseStationIncome;
         float citizenIncome = Config.PassiveIncomePerCitizen * MathF.Sqrt(_citizenCount);
         float workBonus = _workingCitizenCount * Config.WorkBonusMultiplier;
-        float happinessMult = 1.0f + (_currentHappiness * (Config.HappinessMultiplierCap - 1.0f));
+        float happinessMult = _currentTierMultiplier;
         int total = Mathf.RoundToInt((baseIncome + citizenIncome + workBonus) * happinessMult);
         return (baseIncome, citizenIncome, workBonus, happinessMult, total);
     }
@@ -296,9 +296,24 @@ public partial class EconomyManager : Node
     public void SetWorkingCitizenCount(int count) { _workingCitizenCount = Mathf.Max(0, count); }
 
     /// <summary>
-    /// Set the current station happiness (0.0 to 1.0). Called by HappinessManager (Phase 7).
+    /// Set the income multiplier from the current mood tier. Called by HappinessManager
+    /// on every tier transition (both _Process decay path and OnWishFulfilled path).
+    /// Replaces SetHappiness() — economy domain now operates in tier-space, not float-space.
     /// </summary>
-    public void SetHappiness(float happiness) { _currentHappiness = Mathf.Clamp(happiness, 0f, 1f); }
+    public void SetMoodTier(MoodTier tier)
+    {
+        _currentTierMultiplier = IncomeMultiplierForTier(tier);
+    }
+
+    private float IncomeMultiplierForTier(MoodTier tier) => tier switch
+    {
+        MoodTier.Quiet   => Config.IncomeMultQuiet,
+        MoodTier.Cozy    => Config.IncomeMultCozy,
+        MoodTier.Lively  => Config.IncomeMultLively,
+        MoodTier.Vibrant => Config.IncomeMultVibrant,
+        MoodTier.Radiant => Config.IncomeMultRadiant,
+        _                => Config.IncomeMultQuiet,
+    };
 
     // -------------------------------------------------------------------------
     // Save/Load API
