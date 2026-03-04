@@ -43,11 +43,11 @@
   3. The game recognizes five distinct mood tiers (Quiet/Cozy/Lively/Vibrant/Radiant) based on current mood value
   4. Mood tier does not oscillate rapidly when mood hovers near a tier boundary (hysteresis prevents chatter)
   5. Blueprint unlocks trigger at wish counts 4 and 12 instead of the old percentage thresholds
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 10-01: TBD
-- [ ] 10-02: TBD
+- [ ] 10-01-PLAN.md — Contracts layer: MoodTier enum, HappinessConfig resource, default .tres, GameEvents v2 events
+- [ ] 10-02-PLAN.md — Core logic: MoodSystem POCO, HappinessManager refactor with dual-value state and _Process wiring
 
 ### Phase 11: Economy and Arrival Tier Integration
 **Goal**: The station's mood tier visibly affects gameplay by governing how quickly new citizens arrive and how much income rooms generate
@@ -105,11 +105,11 @@ Note: Phases 11 and 12 both depend only on Phase 10 and could execute in either 
 | 7. Happiness and Progression | v1.0 | 2/2 | Complete | 2026-03-03 |
 | 8. Polish and Loop Closure | v1.0 | 3/3 | Complete | 2026-03-04 |
 | 9. Wire Work Bonus and Tech Debt Cleanup | v1.0 | 2/2 | Complete | 2026-03-04 |
-| 10. Happiness Core and Mood Tiers | v1.1 | 0/? | Not started | - |
+| 10. Happiness Core and Mood Tiers | v1.1 | 0/2 | Not started | - |
 | 11. Economy and Arrival Tier Integration | v1.1 | 0/? | Not started | - |
 | 12. Save Format | v1.1 | 0/? | Not started | - |
 | 13. HUD Replacement | v1.1 | 0/? | Not started | - |
 
 ---
 *Roadmap created: 2026-03-02*
-*Last updated: 2026-03-04 after v1.1 roadmap creation*
+*Last updated: 2026-03-04 after Phase 10 planned (2 plans)*
