@@ -28,12 +28,14 @@ public partial class SafeNode : Node
 {
   public override void _EnterTree()
   {
+    base._EnterTree();
     SubscribeEvents();
   }
 
   public override void _ExitTree()
   {
     UnsubscribeEvents();
+    base._ExitTree();
   }
 
   /// <summary>

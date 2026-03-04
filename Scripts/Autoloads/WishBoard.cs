@@ -172,6 +172,7 @@ public partial class WishBoard : SafeNode
 
     protected override void SubscribeEvents()
     {
+        if (GameEvents.Instance == null) return;
         GameEvents.Instance.WishGenerated += OnWishGenerated;
         GameEvents.Instance.WishFulfilled += OnWishFulfilled;
         GameEvents.Instance.RoomPlaced += OnRoomPlaced;
@@ -180,6 +181,7 @@ public partial class WishBoard : SafeNode
 
     protected override void UnsubscribeEvents()
     {
+        if (GameEvents.Instance == null) return;
         GameEvents.Instance.WishGenerated -= OnWishGenerated;
         GameEvents.Instance.WishFulfilled -= OnWishFulfilled;
         GameEvents.Instance.RoomPlaced -= OnRoomPlaced;
