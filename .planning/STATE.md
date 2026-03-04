@@ -3,15 +3,16 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 09-02-PLAN.md
-last_updated: "2026-03-04T13:08:00Z"
-last_activity: "2026-03-04 - Completed 09-02: Tech Debt Cleanup (SafeNode base calls, WishBoard null guards)"
+stopped_at: Completed 09-01-PLAN.md
+last_updated: "2026-03-04T13:08:24Z"
+last_activity: "2026-03-04 - Completed 09-01: Wire Work Bonus Economy Flow"
 progress:
   total_phases: 9
   completed_phases: 8
   total_plans: 25
   completed_plans: 24
   percent: 96
+# Note: 09-01 complete, 09-02 pending
 ---
 
 # Project State
@@ -26,9 +27,9 @@ See: .planning/PROJECT.md (updated 2026-03-02)
 ## Current Position
 
 Phase: 9 of 9 (Wire Work Bonus and Tech Debt Cleanup)
-Plan: 2 of 2 complete in current phase
-Status: 09-02 complete. SafeNode base calls and WishBoard null guards applied.
-Last activity: 2026-03-04 - Completed 09-02: Tech Debt Cleanup
+Plan: 1 of 2 complete in current phase
+Status: 09-01 complete. Work bonus wired end-to-end, CreditHUD tooltip fixed.
+Last activity: 2026-03-04 - Completed 09-01: Wire Work Bonus Economy Flow
 
 Progress: [██████████] 96%
 
@@ -51,7 +52,7 @@ Progress: [██████████] 96%
 | 6 | 3/3 | 6min | 2min |
 | 7 | 2/2 | 8min | 4min |
 | 8 | 3/3 | 13min | 4.3min |
-| 9 | 1/2 | 1min | 1min |
+| 9 | 1/2 | 2min | 2min |
 
 **Recent Trend:**
 - Last 5 plans: 1min, 3min, 5min, 3min, 5min
@@ -148,6 +149,7 @@ Recent decisions affecting current work:
 - [08-03]: GameEvents.Instance in _EnterTree instead of _Ready -- earliest-possible singleton availability for autoload ordering
 - [08-03]: Lazy RingVisual discovery in _Process for BuildManager/CitizenManager -- title screen has no ring, hard _Ready lookups fail
 - [08-03]: Confirmation dialog for New Station only when save exists -- prevents accidental data loss without unnecessary friction
+- [09-01]: HashSet<string> for working citizen tracking solves demolished-room race condition -- exit checks set membership, not room existence
 - [09-02]: base._EnterTree() before SubscribeEvents, base._ExitTree() after UnsubscribeEvents -- standard enter-first/exit-last convention for inheritance safety
 
 ### Pending Todos
@@ -170,6 +172,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T13:08:00Z
-Stopped at: Completed 09-02-PLAN.md
-Resume file: .planning/phases/09-wire-work-bonus-and-tech-debt-cleanup/09-02-SUMMARY.md
+Last session: 2026-03-04T13:08:24Z
+Stopped at: Completed 09-01-PLAN.md
+Resume file: .planning/phases/09-wire-work-bonus-and-tech-debt-cleanup/09-01-SUMMARY.md

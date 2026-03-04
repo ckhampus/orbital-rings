@@ -174,7 +174,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 09-01-PLAN.md -- Wire work bonus end-to-end: enhance event signatures, EconomyManager subscriber, CreditHUD tooltip fix, remove dead code
+- [x] 09-01-PLAN.md -- Wire work bonus end-to-end: enhance event signatures, EconomyManager subscriber, CreditHUD tooltip fix, remove dead code
 - [ ] 09-02-PLAN.md -- Tech debt cleanup: SafeNode base calls, WishBoard null guards
 
 ## Progress
@@ -192,7 +192,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9
 | 6. Wish System | 3/3 | Complete | 2026-03-03 |
 | 7. Happiness and Progression | 2/2 | Complete | 2026-03-03 |
 | 8. Polish and Loop Closure | 3/3 | Complete | 2026-03-04 |
-| 9. Wire Work Bonus and Tech Debt Cleanup | 0/2 | Not Started | — |
+| 9. Wire Work Bonus and Tech Debt Cleanup | 1/2 | In Progress | — |
 
 ---
 *Roadmap created: 2026-03-02*
