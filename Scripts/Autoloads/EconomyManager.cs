@@ -23,6 +23,12 @@ public partial class EconomyManager : Node
     public static EconomyManager Instance { get; private set; }
 
     /// <summary>
+    /// When true, _Ready() skips setting credits to StartingCredits. Set by SaveManager
+    /// before scene transition so loaded state is not overwritten by default initialization.
+    /// </summary>
+    public static bool StateLoaded { get; set; }
+
+    /// <summary>
     /// Economy configuration loaded from .tres resource. All income rates, cost formulas,
     /// and multipliers are defined here for Inspector tuning.
     /// </summary>
@@ -52,7 +58,9 @@ public partial class EconomyManager : Node
             Config = new EconomyConfig();
         }
 
-        _credits = Config.StartingCredits;
+        // Only set starting credits on fresh game (not when loading from save)
+        if (!StateLoaded)
+            _credits = Config.StartingCredits;
 
         // Create Timer as child node for periodic income ticks
         _incomeTimer = new Timer();
@@ -234,4 +242,17 @@ public partial class EconomyManager : Node
     /// Set the current station happiness (0.0 to 1.0). Called by HappinessManager (Phase 7).
     /// </summary>
     public void SetHappiness(float happiness) { _currentHappiness = Mathf.Clamp(happiness, 0f, 1f); }
+
+    // -------------------------------------------------------------------------
+    // Save/Load API
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Restores the credit balance from save data and notifies UI.
+    /// </summary>
+    public void RestoreCredits(int credits)
+    {
+        _credits = credits;
+        GameEvents.Instance?.EmitCreditsChanged(_credits);
+    }
 }

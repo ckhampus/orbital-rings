@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 using OrbitalRings.Autoloads;
 using OrbitalRings.Data;
@@ -59,6 +60,12 @@ public partial class BuildManager : Node
     private readonly Dictionary<int, PlacedRoom> _placedRooms = new();
 
     // -------------------------------------------------------------------------
+    // Room definition cache (for RestorePlacedRoom lookups)
+    // -------------------------------------------------------------------------
+
+    private readonly Dictionary<string, RoomDefinition> _roomDefinitions = new();
+
+    // -------------------------------------------------------------------------
     // References
     // -------------------------------------------------------------------------
 
@@ -88,6 +95,9 @@ public partial class BuildManager : Node
         {
             GD.PushWarning("BuildManager: RingVisual not found in scene tree. Build features disabled until Ring is present.");
         }
+
+        // Cache all RoomDefinition resources for save/load restoration
+        LoadRoomDefinitions();
 
         // Instantiate PlacementFeedback as a child of BuildManager (Autoload)
         var feedback = new PlacementFeedback();
@@ -268,6 +278,112 @@ public partial class BuildManager : Node
     public Vector3 GetGhostWorldPosition()
     {
         return _ghostMesh?.GlobalPosition ?? Vector3.Zero;
+    }
+
+    // -------------------------------------------------------------------------
+    // Save/Load API
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Returns serializable data for all placed rooms (for save).
+    /// Row encoded as int: 0=Outer, 1=Inner.
+    /// </summary>
+    public List<(string RoomId, int Row, int StartPos, int SegmentCount, int Cost)> GetAllPlacedRooms()
+    {
+        var result = new List<(string, int, int, int, int)>();
+        foreach (var (_, room) in _placedRooms)
+        {
+            int rowInt = room.Row == SegmentRow.Outer ? 0 : 1;
+            result.Add((room.Definition.RoomId, rowInt, room.StartPos, room.SegmentCount, room.Cost));
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Restores a placed room from save data. Loads the RoomDefinition by ID,
+    /// creates the permanent mesh, marks segments occupied, and tracks the room.
+    /// </summary>
+    public void RestorePlacedRoom(string roomId, int row, int startPos, int segmentCount, int cost)
+    {
+        if (_ringVisual == null)
+        {
+            GD.PushWarning($"BuildManager: Cannot restore room '{roomId}' -- RingVisual not available.");
+            return;
+        }
+
+        if (!_roomDefinitions.TryGetValue(roomId, out var definition))
+        {
+            GD.PushWarning($"BuildManager: Unknown room ID '{roomId}' during restore. Skipping.");
+            return;
+        }
+
+        SegmentRow segRow = row == 0 ? SegmentRow.Outer : SegmentRow.Inner;
+
+        // Mark segments occupied
+        _ringVisual.Grid.SetSegmentsOccupied(segRow, startPos, segmentCount, true);
+
+        // Create permanent room mesh
+        var roomMesh = RoomVisual.CreateRoomBlock(segRow, startPos, segmentCount, definition, isGhost: false);
+        _ringVisual.AddChild(roomMesh);
+
+        // Track placed room
+        int anchorIndex = SegmentGrid.ToIndex(segRow, startPos);
+        _placedRooms[anchorIndex] = new PlacedRoom(definition, segRow, startPos, segmentCount, cost, roomMesh);
+    }
+
+    /// <summary>
+    /// Removes all placed rooms, frees meshes, clears occupancy, and resets tracking.
+    /// Used before loading saved state or starting a new station.
+    /// </summary>
+    public void ClearAllRooms()
+    {
+        foreach (var (_, room) in _placedRooms)
+        {
+            if (IsInstanceValid(room.Mesh))
+                room.Mesh.QueueFree();
+        }
+        _placedRooms.Clear();
+
+        // Reset all segment occupancy
+        if (_ringVisual != null)
+        {
+            for (int i = 0; i < SegmentGrid.TotalSegments; i++)
+            {
+                var (r, p) = SegmentGrid.FromIndex(i);
+                _ringVisual.Grid.SetOccupied(r, p, false);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Loads all RoomDefinition .tres resources from res://Resources/Rooms/
+    /// into _roomDefinitions cache. Same DirAccess pattern as WishBoard.LoadTemplates.
+    /// </summary>
+    private void LoadRoomDefinitions()
+    {
+        using var dir = DirAccess.Open("res://Resources/Rooms/");
+        if (dir == null)
+        {
+            GD.PushWarning("BuildManager: Could not open Resources/Rooms/ directory.");
+            return;
+        }
+
+        dir.ListDirBegin();
+        string fileName = dir.GetNext();
+        while (!string.IsNullOrEmpty(fileName))
+        {
+            if (fileName.EndsWith(".tres"))
+            {
+                string path = $"res://Resources/Rooms/{fileName}";
+                var definition = ResourceLoader.Load<RoomDefinition>(path);
+                if (definition != null && !string.IsNullOrEmpty(definition.RoomId))
+                {
+                    _roomDefinitions[definition.RoomId] = definition;
+                }
+            }
+            fileName = dir.GetNext();
+        }
+        dir.ListDirEnd();
     }
 
     // -------------------------------------------------------------------------

@@ -139,6 +139,38 @@ public partial class CitizenNode : Node3D
     /// <summary>Current active wish template, or null if no wish.</summary>
     public WishTemplate CurrentWish => _currentWish;
 
+    /// <summary>Current walking direction: +1.0 (CCW) or -1.0 (CW).</summary>
+    public float Direction => _direction;
+
+    // -------------------------------------------------------------------------
+    // Save/Load helpers (internal -- used by CitizenManager.SpawnCitizenFromSave)
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Sets the walking direction. Used during save restoration to match
+    /// the citizen's exact state from the previous session.
+    /// </summary>
+    internal void SetDirection(float dir) => _direction = dir;
+
+    /// <summary>
+    /// Restores a citizen's active wish from save data. Looks up the template
+    /// from WishBoard, sets internal state, creates the badge, and notifies
+    /// WishBoard for tracking.
+    /// </summary>
+    internal void SetWishFromSave(string wishId)
+    {
+        var template = WishBoard.Instance?.GetTemplateById(wishId);
+        if (template == null)
+        {
+            GD.PushWarning($"CitizenNode: Cannot restore wish '{wishId}' -- template not found.");
+            return;
+        }
+
+        _currentWish = template;
+        CreateWishBadge();
+        GameEvents.Instance?.EmitWishGenerated(_data.CitizenName, wishId);
+    }
+
     // -------------------------------------------------------------------------
     // Lifecycle (SafeNode pattern for Node3D)
     // -------------------------------------------------------------------------

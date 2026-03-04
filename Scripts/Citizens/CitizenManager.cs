@@ -29,6 +29,12 @@ public partial class CitizenManager : SafeNode
     /// </summary>
     public static CitizenManager Instance { get; private set; }
 
+    /// <summary>
+    /// When true, _Ready() skips SpawnStarterCitizens. Set by SaveManager before
+    /// scene transition so loaded state is not overwritten by default initialization.
+    /// </summary>
+    public static bool StateLoaded { get; set; }
+
     /// <summary>All active citizen nodes managed by this system.</summary>
     private readonly List<CitizenNode> _citizens = new();
 
@@ -97,7 +103,9 @@ public partial class CitizenManager : SafeNode
         }
 
         // Spawn 5 starter citizens evenly spaced around the ring
-        SpawnStarterCitizens(5);
+        // (skipped when loading from save -- SaveManager sets StateLoaded before scene transition)
+        if (!StateLoaded)
+            SpawnStarterCitizens(5);
 
         // Cache camera reference for click detection ray casting
         _camera = GetViewport().GetCamera3D();
@@ -322,5 +330,60 @@ public partial class CitizenManager : SafeNode
             float angle = (float)i / count * Mathf.Tau;
             SpawnCitizen(angle);
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // Save/Load API
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Removes all active citizens, frees their nodes, clears the list,
+    /// and resets the economy citizen count. Used before loading saved state.
+    /// </summary>
+    public void ClearCitizens()
+    {
+        foreach (var citizen in _citizens)
+        {
+            if (IsInstanceValid(citizen))
+                citizen.QueueFree();
+        }
+        _citizens.Clear();
+        EconomyManager.Instance?.SetCitizenCount(0);
+    }
+
+    /// <summary>
+    /// Spawns a citizen with exact saved state. Does NOT emit CitizenArrived
+    /// (they already arrived in the original session).
+    /// </summary>
+    public CitizenNode SpawnCitizenFromSave(
+        string name, int bodyType,
+        float primaryR, float primaryG, float primaryB,
+        float secondaryR, float secondaryG, float secondaryB,
+        float angle, float direction, string wishId)
+    {
+        var data = new CitizenData
+        {
+            CitizenName = name,
+            Body = (CitizenData.BodyType)bodyType,
+            PrimaryColor = new Color(primaryR, primaryG, primaryB),
+            SecondaryColor = new Color(secondaryR, secondaryG, secondaryB)
+        };
+
+        var citizen = new CitizenNode();
+        citizen.Initialize(data, angle, _grid);
+        citizen.SetDirection(direction);
+
+        AddChild(citizen);
+        _citizens.Add(citizen);
+
+        EconomyManager.Instance?.SetCitizenCount(_citizens.Count);
+
+        // Restore active wish if citizen had one
+        if (!string.IsNullOrEmpty(wishId))
+        {
+            citizen.SetWishFromSave(wishId);
+        }
+
+        return citizen;
     }
 }

@@ -26,6 +26,12 @@ public partial class HappinessManager : Node
     /// </summary>
     public static HappinessManager Instance { get; private set; }
 
+    /// <summary>
+    /// When true, _Ready() skips InitializeHousingCapacity. Set by SaveManager before
+    /// scene transition so loaded state is not overwritten by default initialization.
+    /// </summary>
+    public static bool StateLoaded { get; set; }
+
     // -------------------------------------------------------------------------
     // Constants
     // -------------------------------------------------------------------------
@@ -119,6 +125,39 @@ public partial class HappinessManager : Node
     public int CalculateHousingCapacity() => _housingCapacity;
 
     // -------------------------------------------------------------------------
+    // Save/Load API
+    // -------------------------------------------------------------------------
+
+    /// <summary>Returns a copy of the currently unlocked room IDs (for save).</summary>
+    public HashSet<string> GetUnlockedRoomIds() => new(_unlockedRooms);
+
+    /// <summary>Returns the number of milestones crossed (for save).</summary>
+    public int GetCrossedMilestoneCount() => _crossedMilestoneCount;
+
+    /// <summary>Returns the current housing capacity (for save).</summary>
+    public int GetHousingCapacity() => _housingCapacity;
+
+    /// <summary>
+    /// Restores all happiness/progression state from save data.
+    /// Sets happiness, unlocked rooms, milestone count, housing capacity,
+    /// and syncs with EconomyManager and GameEvents.
+    /// </summary>
+    public void RestoreState(float happiness, HashSet<string> unlockedRooms, int milestoneCount, int housingCapacity)
+    {
+        _happiness = happiness;
+
+        _unlockedRooms.Clear();
+        foreach (var roomId in unlockedRooms)
+            _unlockedRooms.Add(roomId);
+
+        _crossedMilestoneCount = milestoneCount;
+        _housingCapacity = housingCapacity;
+
+        EconomyManager.Instance?.SetHappiness(happiness);
+        GameEvents.Instance?.EmitHappinessChanged(happiness);
+    }
+
+    // -------------------------------------------------------------------------
     // Lifecycle
     // -------------------------------------------------------------------------
 
@@ -146,7 +185,9 @@ public partial class HappinessManager : Node
         ProcessMode = ProcessModeEnum.Pausable;
 
         // Scan for any pre-placed housing rooms at startup
-        InitializeHousingCapacity();
+        // (skipped when loading from save -- SaveManager restores state directly)
+        if (!StateLoaded)
+            InitializeHousingCapacity();
 
         // Create CanvasLayer for arrival floating text (same layer as HUDLayer)
         _arrivalCanvasLayer = new CanvasLayer { Layer = 5 };

@@ -338,4 +338,49 @@ public partial class WishBoard : SafeNode
         int index = (int)(GD.Randi() % (uint)templates.Count);
         return templates[index];
     }
+
+    // -------------------------------------------------------------------------
+    // Save/Load API
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Returns a copy of the placed room type counts (for save).
+    /// </summary>
+    public Dictionary<string, int> GetPlacedRoomTypeCounts()
+    {
+        return new Dictionary<string, int>(_placedRoomTypes);
+    }
+
+    /// <summary>
+    /// Restores active wishes from save data. Clears current tracking,
+    /// then re-populates from the citizenName -> wishId mapping.
+    /// </summary>
+    public void RestoreActiveWishes(Dictionary<string, string> citizenWishes)
+    {
+        _activeWishes.Clear();
+        foreach (var (citizenName, wishId) in citizenWishes)
+        {
+            var template = GetTemplateById(wishId);
+            if (template != null)
+            {
+                _activeWishes[citizenName] = template;
+            }
+            else
+            {
+                GD.PushWarning($"WishBoard: Unknown wish ID '{wishId}' for citizen '{citizenName}' during restore.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Restores placed room type counts from save data. Replaces current tracking.
+    /// </summary>
+    public void RestorePlacedRoomTypes(Dictionary<string, int> roomTypes)
+    {
+        _placedRoomTypes.Clear();
+        foreach (var (roomId, count) in roomTypes)
+        {
+            _placedRoomTypes[roomId] = count;
+        }
+    }
 }
