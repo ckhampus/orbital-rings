@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Happiness v2
 status: planning
-stopped_at: Completed 11-01-PLAN.md
-last_updated: "2026-03-04T20:51:03.313Z"
+stopped_at: Completed 11-02-PLAN.md
+last_updated: "2026-03-04T20:54:48.575Z"
 last_activity: 2026-03-04 — Roadmap created for v1.1 (4 phases, 12 requirements)
 progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 5
-  completed_plans: 3
+  completed_plans: 4
   percent: 0
 ---
 
@@ -52,6 +52,8 @@ All v1.0 decisions logged in PROJECT.md Key Decisions table with outcomes.
 - [Phase 10-02]: Old saves: happiness float maps to initial mood with _lifetimeHappiness=0; milestone guards preserve unlock state
 - [Phase 11-01]: Economy domain now operates in tier-space (discrete MoodTier enum) not float-space; _currentTierMultiplier default 1.0f (Quiet) is safe startup state
 - [Phase 11-01]: SetHappiness(float) removed in Plan 01 (not 03) because _currentHappiness no longer exists; HappinessMultiplierCap retained until Plan 03 cleanup
+- [Phase 11-02]: Quiet tier always yields 0.15 arrival probability — Mood <= 0f guard removed; arrival path no longer depends on mood float
+- [Phase 11-02]: Timer interval stays fixed at 60s; only probability changes with tier (locked decision from CONTEXT.md)
 
 ### Pending Todos
 
@@ -71,9 +73,10 @@ None.
 | Phase 10-happiness-core-and-mood-tiers P01 | 2 | 2 tasks | 4 files |
 | Phase 10-happiness-core-and-mood-tiers P02 | 2 | 2 tasks | 2 files |
 | Phase 11-economy-and-arrival-tier-integration P01 | 2 | 2 tasks | 3 files |
+| Phase 11-economy-and-arrival-tier-integration P02 | 2 | 2 tasks | 3 files |
 
 ## Session Continuity
 
-Last session: 2026-03-04T20:51:03.310Z
-Stopped at: Completed 11-01-PLAN.md
+Last session: 2026-03-04T20:54:48.572Z
+Stopped at: Completed 11-02-PLAN.md
 Next: Plan Phase 10 (Happiness Core and Mood Tiers)
