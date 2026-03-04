@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: verifying
-stopped_at: All phases complete - v1.0 milestone achieved
-last_updated: "2026-03-04T12:19:26.459Z"
-last_activity: "2026-03-04 - Completed 08-03: Title Screen and Game Scene Integration"
+status: executing
+stopped_at: Completed 09-02-PLAN.md
+last_updated: "2026-03-04T13:08:00Z"
+last_activity: "2026-03-04 - Completed 09-02: Tech Debt Cleanup (SafeNode base calls, WishBoard null guards)"
 progress:
-  total_phases: 8
+  total_phases: 9
   completed_phases: 8
-  total_plans: 23
-  completed_plans: 23
-  percent: 100
+  total_plans: 25
+  completed_plans: 24
+  percent: 96
 ---
 
 # Project State
@@ -21,22 +21,22 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-02)
 
 **Core value:** The wish-driven building loop: citizens express wishes, the player builds rooms to fulfill them, happiness rises, new citizens arrive, new wishes emerge.
-**Current focus:** All phases complete. v1.0 milestone achieved. The full build-wish-grow loop is cozy and complete.
+**Current focus:** Phase 9 gap closure -- wiring work bonus and resolving tech debt from v1.0 milestone audit.
 
 ## Current Position
 
-Phase: 8 of 8 (Polish and Loop Closure)
-Plan: 3 of 3 complete in current phase
-Status: All plans complete. Title screen, save/load, audio, and game loop verified by human.
-Last activity: 2026-03-04 - Completed 08-03: Title Screen and Game Scene Integration
+Phase: 9 of 9 (Wire Work Bonus and Tech Debt Cleanup)
+Plan: 2 of 2 complete in current phase
+Status: 09-02 complete. SafeNode base calls and WishBoard null guards applied.
+Last activity: 2026-03-04 - Completed 09-02: Tech Debt Cleanup
 
-Progress: [██████████] 100%
+Progress: [██████████] 96%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 23
-- Average duration: 3.3 min
+- Total plans completed: 24
+- Average duration: 3.2 min
 - Total execution time: 1.3 hours
 
 **By Phase:**
@@ -51,6 +51,7 @@ Progress: [██████████] 100%
 | 6 | 3/3 | 6min | 2min |
 | 7 | 2/2 | 8min | 4min |
 | 8 | 3/3 | 13min | 4.3min |
+| 9 | 1/2 | 1min | 1min |
 
 **Recent Trend:**
 - Last 5 plans: 1min, 3min, 5min, 3min, 5min
@@ -147,6 +148,7 @@ Recent decisions affecting current work:
 - [08-03]: GameEvents.Instance in _EnterTree instead of _Ready -- earliest-possible singleton availability for autoload ordering
 - [08-03]: Lazy RingVisual discovery in _Process for BuildManager/CitizenManager -- title screen has no ring, hard _Ready lookups fail
 - [08-03]: Confirmation dialog for New Station only when save exists -- prevents accidental data loss without unnecessary friction
+- [09-02]: base._EnterTree() before SubscribeEvents, base._ExitTree() after UnsubscribeEvents -- standard enter-first/exit-last convention for inheritance safety
 
 ### Pending Todos
 
@@ -168,6 +170,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T12:14:07Z
-Stopped at: All phases complete - v1.0 milestone achieved
-Resume file: .planning/phases/08-polish-and-loop-closure/08-03-SUMMARY.md
+Last session: 2026-03-04T13:08:00Z
+Stopped at: Completed 09-02-PLAN.md
+Resume file: .planning/phases/09-wire-work-bonus-and-tech-debt-cleanup/09-02-SUMMARY.md
