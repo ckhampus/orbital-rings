@@ -310,6 +310,15 @@ public partial class WishBoard : SafeNode
     }
 
     /// <summary>
+    /// Returns the wish template with the given ID, or null if not found.
+    /// Used by CitizenNode.SetWishFromSave() to restore active wishes from save data.
+    /// </summary>
+    public WishTemplate GetTemplateById(string wishId)
+    {
+        return _allTemplates.FirstOrDefault(t => t.WishId == wishId);
+    }
+
+    /// <summary>
     /// Returns a random wish template from all loaded templates.
     /// </summary>
     public WishTemplate GetRandomTemplate()
