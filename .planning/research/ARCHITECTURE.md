@@ -1,542 +1,565 @@
 # Architecture Research
 
-**Domain:** Godot 4 C# cozy builder game with citizen AI
-**Researched:** 2026-03-02
-**Confidence:** MEDIUM-HIGH (Godot 4 patterns well-documented; ring-specific geometry is novel application of standard patterns)
+**Domain:** Godot 4 C# cozy builder game — Happiness v2 integration into existing singleton architecture
+**Researched:** 2026-03-04
+**Confidence:** HIGH (analysis is based on direct reading of the existing codebase; no speculative API research required)
 
 ---
 
 ## Standard Architecture
 
-### System Overview
+### System Overview — Current (v1.0)
 
 ```
-┌────────────────────────────────────────────────────────────────────┐
-│                        AUTOLOADS (Singletons)                       │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐              │
-│  │  GameEvents  │  │  EconomyMgr  │  │ HappinessMgr │              │
-│  │ (event bus)  │  │ (credits $)  │  │  (score/flow)│              │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘              │
-│         │                 │                  │                      │
-├─────────┼─────────────────┼──────────────────┼──────────────────────┤
-│                        GAME WORLD SCENE                             │
-│  ┌──────────────────────────────────────────────────────────────┐   │
-│  │  GameWorld (Node3D)                                          │   │
-│  │  ├── Ring (Node3D)                                           │   │
-│  │  │   ├── RingGeometry (MeshInstance3D — flat donut)          │   │
-│  │  │   ├── SegmentGrid (Node3D — 24 placement slots)           │   │
-│  │  │   │   ├── Segment[0..11] outer (RoomSlot)                 │   │
-│  │  │   │   └── Segment[0..11] inner (RoomSlot)                 │   │
-│  │  │   ├── Walkway (Node3D — circular corridor)                │   │
-│  │  │   │   └── NavigationRegion3D (baked navmesh)              │   │
-│  │  │   └── RoomContainer (Node3D — instanced rooms)            │   │
-│  │  │       └── Room[...] (instanced Room scenes)               │   │
-│  │  ├── CitizenContainer (Node3D — instanced citizens)          │   │
-│  │  │   └── Citizen[...] (instanced Citizen scenes)             │   │
-│  │  └── WishBoard (Node3D — active wish display)                │   │
-│  └──────────────────────────────────────────────────────────────┘   │
-├──────────────────────────────────────────────────────────────────────┤
-│                            UI LAYER                                  │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐              │
-│  │  HUD         │  │  BuildPanel  │  │  WishTracker │              │
-│  │  (credits,   │  │  (room type  │  │  (active     │              │
-│  │   happiness) │  │   selector)  │  │   wishes UI) │              │
-│  └──────────────┘  └──────────────┘  └──────────────┘              │
-├──────────────────────────────────────────────────────────────────────┤
-│                       CAMERA (CameraRig)                             │
-│  ┌──────────────────────────────────────────────────────────────┐   │
-│  │  CameraRig (Node3D — pivot at ring center)                   │   │
-│  │  └── SpringArm3D (collision-safe arm at fixed tilt)          │   │
-│  │      └── Camera3D                                            │   │
-│  └──────────────────────────────────────────────────────────────┘   │
-└──────────────────────────────────────────────────────────────────────┘
+                          GameEvents (signal bus)
+                               |
+        ┌──────────────────────┼──────────────────────┐
+        |                      |                      |
+  WishFulfilled          HappinessChanged        BlueprintUnlocked
+        |                      |                      |
+        v                      v                      v
+ HappinessManager  ──SetHappiness──>  EconomyManager   BuildPanel/HUD
+  float _happiness              float _currentHappiness
+  % thresholds                  multiplier formula
+        |
+  OnArrivalCheck
+        |
+  CitizenManager.SpawnCitizen
+        |
+  HappinessBar (UI)
+   reads HappinessManager.Happiness on init
+   subscribes to HappinessChanged (float)
+```
+
+### System Overview — Target (v2)
+
+```
+                          GameEvents (signal bus)
+                               |
+        ┌──────────────────────┼──────────────────────────────────────┐
+        |                      |                          |           |
+  WishFulfilled    LifetimeHappinessChanged    MoodChanged    MoodTierChanged
+        |                      |                  |              |
+        v                      v                  v              v
+ HappinessManager     HappinessCounter (HUD)   EconomyManager  MoodDisplay (HUD)
+  int _lifetime                                  float _currentMood  FloatingText
+  float _mood                 (replaces HappinessChanged event)
+  float _baseline
+  MoodTier _tier
+  Timer _moodDecayTimer
+        |
+  OnArrivalCheck (tier-based)
+        |
+  CitizenManager.SpawnCitizen
 ```
 
 ### Component Responsibilities
 
-| Component | Responsibility | Typical Implementation |
-|-----------|----------------|------------------------|
-| `GameEvents` | Global signal bus — decouples systems | Autoload Node; emits signals; no state |
-| `EconomyManager` | Credits balance, income ticks, cost validation | Autoload Node; `float Credits`; timer for passive income |
-| `HappinessManager` | Station-wide happiness score, milestone tracking, citizen arrival trigger | Autoload Node; aggregates per-citizen happiness |
-| `Ring` | Owns segment state: which are occupied, what room is in each | Node3D; holds `RingData` resource; 24-slot array |
-| `SegmentGrid` | Visual and spatial representation of 24 placement slots; raycasts for click → slot | Child of Ring; maps world positions to slot indices |
-| `RoomSlot` | A single placeable slot — knows segment index, inner/outer, occupancy | Node3D; lightweight; stores reference to placed Room |
-| `Room` | Visual + data for a placed room; emits happiness/income events | Instanced scene: MeshInstance3D + CollisionShape3D + RoomLogic script |
-| `Walkway` | The circular corridor — navmesh surface citizens walk on | Node3D wrapping NavigationRegion3D with baked circular navmesh |
-| `Citizen` | Named NPC with state machine: Idle → Walking → Visiting → Wishing | Instanced scene: CharacterBody3D + NavigationAgent3D + CitizenLogic |
-| `WishBoard` | Tracks and surfaces active wishes; provides targets for player | Autoload or singleton node; list of `WishData` resources |
-| `BuildPanel` | UI for selecting room type and size before placement | Control node; communicates to Ring via GameEvents |
-| `CameraRig` | Orbiting camera anchored at ring center; fixed tilt, horizontal orbit, zoom | Node3D pivot + SpringArm3D + Camera3D |
+| Component | Responsibility v1 | Responsibility v2 | Change |
+|-----------|-------------------|-------------------|--------|
+| `HappinessManager` | Owns `float _happiness` (0–1), wish-gain with diminishing returns, % unlock milestones, arrival probability | Owns `int _lifetimeHappiness` + `float _mood` + `float _baseline`, mood gain/decay, tier computation, wish-count unlock milestones, tier-based arrival probability | **Replace — full refactor** |
+| `GameEvents` | `event Action<float> HappinessChanged` | Add `event Action<int> LifetimeHappinessChanged`, `event Action<float, MoodTier> MoodChanged`, `event Action<MoodTier, MoodTier> MoodTierChanged`; keep or remove old event | **Extend** |
+| `EconomyManager` | `float _currentHappiness` drives `1 + (happiness × 0.3)` multiplier | `MoodTier _currentTier` drives lookup table multiplier | **Swap input type** |
+| `CitizenManager` | Called by `HappinessManager.OnArrivalCheck` — no direct change | No direct change — arrival is still driven by `HappinessManager.OnArrivalCheck` | **No change** |
+| `HappinessBar` (UI) | Subscribes to `HappinessChanged(float)`, displays bar + percentage | **Replace** with two widgets: counter `♥ 47` + tier label | **Replace** |
+| `SaveManager` / `SaveData` | `float Happiness`, `int CrossedMilestoneCount` | `int LifetimeHappiness`, `float Mood`, `int CrossedMilestoneCount`; version bump + migration | **Extend + migrate** |
+| `WishBoard` / `WishFulfilled` | No change — still emits `WishFulfilled(citizenName, wishType)` | No change | **No change** |
+| `BuildManager` | No change | No change | **No change** |
 
 ---
 
 ## Recommended Project Structure
 
+No new files are required. All changes are to existing files:
+
 ```
-res://
-├── autoloads/
-│   ├── GameEvents.cs          # Signal bus (all cross-system signals defined here)
-│   ├── EconomyManager.cs      # Credits state + income ticks
-│   ├── HappinessManager.cs    # Station happiness + milestones
-│   └── WishBoard.cs           # Active wish list management
-├── scenes/
-│   ├── game_world/
-│   │   ├── GameWorld.tscn     # Root game scene
-│   │   └── GameWorld.cs
-│   ├── ring/
-│   │   ├── Ring.tscn
-│   │   ├── Ring.cs            # Segment state, room placement logic
-│   │   ├── RoomSlot.tscn
-│   │   ├── RoomSlot.cs
-│   │   ├── Walkway.tscn       # NavigationRegion3D + navmesh
-│   │   └── Walkway.cs
-│   ├── rooms/
-│   │   ├── Room.tscn          # Base room scene (inherited/instanced)
-│   │   ├── Room.cs            # Base room logic
-│   │   ├── RoomHousing.tscn
-│   │   ├── RoomCafe.tscn
-│   │   └── ...                # One tscn per room type
-│   ├── citizens/
-│   │   ├── Citizen.tscn       # CharacterBody3D + NavigationAgent3D
-│   │   └── Citizen.cs         # State machine: Idle/Walking/Visiting/Wishing
-│   ├── camera/
-│   │   ├── CameraRig.tscn
-│   │   └── CameraRig.cs       # Orbit input, zoom, fixed tilt
-│   └── ui/
-│       ├── HUD.tscn
-│       ├── BuildPanel.tscn
-│       └── WishTracker.tscn
-├── resources/
-│   ├── RoomDefinition.cs      # [GlobalClass] Resource: name, cost, size, category
-│   ├── WishData.cs            # [GlobalClass] Resource: citizen ref, wish type, target room
-│   ├── CitizenData.cs         # [GlobalClass] Resource: name, happiness, active wishes
-│   └── RingData.cs            # [GlobalClass] Resource: 24-slot occupancy array
-├── data/
-│   ├── rooms/
-│   │   ├── room_housing_quarters.tres
-│   │   ├── room_comfort_cafe.tres
-│   │   └── ...                # One .tres per room type (RoomDefinition data)
-│   └── wishes/
-│       └── wish_catalog.tres  # WishCatalog resource with all possible wish types
-└── tests/                     # GUT or similar test scenes
+Scripts/
+├── Autoloads/
+│   ├── GameEvents.cs          # EXTEND: add 3 new events, keep or deprecate HappinessChanged
+│   ├── HappinessManager.cs    # REPLACE: refactor to dual-value system
+│   ├── EconomyManager.cs      # MODIFY: swap happiness float input for MoodTier
+│   └── SaveManager.cs         # MODIFY: SaveData version bump, new fields, migration logic
+├── UI/
+│   └── HappinessBar.cs        # REPLACE: rebuild as HappinessCounter + MoodDisplay
+└── Data/
+    └── (optional) MoodTier.cs # NEW enum if not inlined in HappinessManager
 ```
 
-### Structure Rationale
-
-- **autoloads/:** Only truly global systems live here — economy, happiness, event bus, wish board. Kept small. Godot official docs recommend autoloads only for "broad-scoped tasks that manage their own data."
-- **scenes/:** Each gameplay concept is its own scene. Ring, rooms, citizens, camera are all independently loadable and testable.
-- **resources/:** C# classes extending `Resource` with `[GlobalClass]` — the Godot equivalent of Unity ScriptableObjects. These are data containers, not logic.
-- **data/:** Actual `.tres` files (resource instances) containing room definitions, wish catalogs. Editor-editable without code changes.
+The `MoodTier` enum is small enough to live in `HappinessManager.cs`. Extract to `Data/MoodTier.cs` only if `EconomyManager.cs` needs to reference it directly (to avoid circular dependency — both are in the `OrbitalRings.Autoloads` namespace so the enum can be `public` in the same namespace).
 
 ---
 
 ## Architectural Patterns
 
-### Pattern 1: Event Bus (GameEvents Autoload)
+### Pattern 1: Enum-keyed lookup table for tier effects
 
-**What:** A single autoload node (`GameEvents.cs`) that declares all cross-system signals. Systems emit signals on `GameEvents`; other systems subscribe to it. No direct references between distant systems.
+**What:** Define `MoodTier` as an enum (Quiet, Cozy, Lively, Vibrant, Radiant). Store tier thresholds, arrival scales, and economy multipliers in a static readonly array indexed by tier cast to int. Computing the active tier is a linear scan of the threshold array.
 
-**When to use:** Whenever two systems need to communicate but should not hold direct references to each other. Examples: citizen fulfills wish → happiness changes; room placed → economy charged; happiness threshold crossed → new citizen spawns.
+**When to use:** Any time a float maps to one of N named states with associated data. Lookup tables are easier to tune than nested conditionals and make the spec values visible in code.
 
-**Trade-offs:** Simple and idiomatic in Godot. Risk of "signal spaghetti" if every tiny event goes through it — use only for cross-system boundaries, not intra-scene communication.
-
-**Example:**
-```csharp
-// GameEvents.cs (Autoload)
-public partial class GameEvents : Node
-{
-    public static GameEvents Instance { get; private set; }
-
-    [Signal] public delegate void WishFulfilledEventHandler(CitizenData citizen, WishData wish);
-    [Signal] public delegate void RoomPlacedEventHandler(int segmentIndex, bool isOuter, RoomDefinition def);
-    [Signal] public delegate void CreditsChangedEventHandler(float newTotal);
-    [Signal] public delegate void HappinessChangedEventHandler(float newScore);
-    [Signal] public delegate void NewCitizenArrivedEventHandler(CitizenData citizen);
-
-    public override void _Ready() => Instance = this;
-}
-
-// EconomyManager.cs subscribes:
-GameEvents.Instance.RoomPlaced += OnRoomPlaced;
-
-// Ring.cs emits after placing:
-GameEvents.Instance.EmitSignal(GameEvents.SignalName.RoomPlaced, segmentIndex, isOuter, def);
-```
-
-### Pattern 2: Custom Resource as Data Definition (RoomDefinition, WishData)
-
-**What:** Game data (room types, wish templates, citizen stats) is defined as C# classes extending `Resource` with `[GlobalClass]` and `[Export]` attributes. Instances are saved as `.tres` files and loaded at runtime.
-
-**When to use:** Any data that needs to be editor-configurable, asset-referenceable, and shared between multiple systems without duplication. This is Godot's equivalent of Unity ScriptableObjects.
-
-**Trade-offs:** Clean separation of data from logic. The resource file is the single source of truth. Editor integration is excellent. Does not support `_Ready()` — no setup logic in Resource classes.
+**Trade-offs:** Tightly couples the data to the enum ordinal. Acceptable here because the tier ordering is fixed by design.
 
 **Example:**
 ```csharp
-// RoomDefinition.cs
-[GlobalClass]
-public partial class RoomDefinition : Resource
+public enum MoodTier { Quiet, Cozy, Lively, Vibrant, Radiant }
+
+private static readonly (float minMood, float arrivalScale, float economyMult)[] TierData =
 {
-    [Export] public string RoomName { get; set; } = "";
-    [Export] public RoomCategory Category { get; set; }
-    [Export] public float BaseCost { get; set; }
-    [Export] public int MinSize { get; set; } = 1;
-    [Export] public int MaxSize { get; set; } = 3;
-    [Export] public float HappinessPerVisit { get; set; }
-    [Export] public PackedScene RoomScene { get; set; }
+    (0f,    0.0f, 1.0f),   // Quiet
+    (2.0f,  0.2f, 1.1f),   // Cozy
+    (5.0f,  0.4f, 1.2f),   // Lively
+    (10.0f, 0.6f, 1.3f),   // Vibrant
+    (18.0f, 0.8f, 1.4f),   // Radiant
+};
+
+private static MoodTier ComputeTier(float mood)
+{
+    // Walk backwards so we return the highest tier whose threshold mood meets
+    for (int i = TierData.Length - 1; i >= 0; i--)
+        if (mood >= TierData[i].minMood) return (MoodTier)i;
+    return MoodTier.Quiet;
 }
 ```
 
-### Pattern 3: Citizen State Machine (FSM on Node)
+### Pattern 2: _Process-based mood decay (not a Timer)
 
-**What:** Each `Citizen` node runs a simple finite state machine with states: `Idle`, `WalkingToRoom`, `VisitingRoom`, `WalkingHome`, `Wishing`. State transitions trigger via signals or direct method calls on the citizen.
+**What:** Run mood decay each frame inside `_Process(double delta)` in `HappinessManager`. The formula `mood += (baseline - mood) * DecayRate * delta` is framerate-independent and requires no Timer node.
 
-**When to use:** Any NPC whose behavior changes based on discrete conditions. Keeps NPC logic readable and testable. Avoids boolean flag soup.
+**When to use:** Smooth, continuous decay that must feel organic. The 60s arrival timer is a discrete check and fits a Timer; mood decay is continuous and fits `_Process`.
 
-**Trade-offs:** Straightforward for 4–5 states. If citizen personality and daily routines are added later (deferred per PROJECT.md), consider upgrading to a behavior tree. For the first milestone, FSM is sufficient and simpler.
+**Trade-offs:** `HappinessManager._Process` fires every frame (at render rate, not physics rate). The calculation is O(1), so the cost is negligible. ProcessMode is already set to `Pausable` which is correct — mood should not decay while the game is paused.
 
 **Example:**
 ```csharp
-// Citizen.cs
-public partial class Citizen : CharacterBody3D
+public override void _Process(double delta)
 {
-    private enum CitizenState { Idle, WalkingToRoom, VisitingRoom, WalkingHome, Wishing }
-    private CitizenState _state = CitizenState.Idle;
+    float f = (float)delta;
+    float baseline = BaselineFactor * Mathf.Sqrt(_lifetimeHappiness);
+    _mood += (baseline - _mood) * DecayRate * f;
+    _mood = Mathf.Max(_mood, 0f);
 
-    [Export] public CitizenData Data { get; set; }
-    private NavigationAgent3D _agent;
-
-    private void TransitionTo(CitizenState newState)
+    MoodTier newTier = ComputeTier(_mood);
+    if (newTier != _currentTier)
     {
-        _state = newState;
-        // state entry logic
+        var oldTier = _currentTier;
+        _currentTier = newTier;
+        GameEvents.Instance?.EmitMoodTierChanged(oldTier, newTier);
     }
+
+    // Emit mood change every frame for EconomyManager to read
+    // (or only on change -- see integration note below)
+    GameEvents.Instance?.EmitMoodChanged(_mood, _currentTier);
 }
 ```
 
-### Pattern 4: Ring as Authoritative State Owner
+**Integration note:** Emitting `MoodChanged` every frame is wasteful. Emit only when `_mood` changes by more than a small epsilon, or only when tier changes. `EconomyManager` needs the multiplier — it only cares about `MoodTier`, not the raw float. Emit `MoodTierChanged` on tier change and let EconomyManager subscribe to that instead. Store `_currentTier` on `HappinessManager` so consumers can poll it without events.
 
-**What:** The `Ring` node (or its `RingData` resource) is the single source of truth for segment occupancy. All room placement, removal, and validation goes through `Ring`. No other system directly mutates segment state.
+### Pattern 3: Additive events — preserve HappinessChanged for SaveManager compatibility
 
-**When to use:** Always, for the ring. The ring layout is the core game state. Centralizing mutations prevents bugs where the UI, economy, and room nodes disagree about what's placed where.
+**What:** Keep `HappinessChanged(float)` in `GameEvents` for the `SaveManager` debounce subscription. `SaveManager` subscribes to state-change events to trigger autosave — it does not care about the payload, only that something changed. Replacing `HappinessChanged` with a rename would require removing and re-adding SaveManager's subscription.
 
-**Trade-offs:** Ring becomes a coordination point. Acceptable — it has clear boundaries. If multi-ring expansion lands later, `Ring` stays scoped; a new `Station` node manages the collection of rings.
+**When to use:** When changing an existing event would require updating all subscribers simultaneously (risky mid-milestone). Instead, add new events for new consumers and keep the old event for existing subscribers that just need a "something changed" signal.
 
-**Example:**
-```csharp
-// Ring.cs
-public partial class Ring : Node3D
-{
-    private RoomDefinition[] _outerSlots = new RoomDefinition[12];
-    private RoomDefinition[] _innerSlots = new RoomDefinition[12];
-
-    public bool CanPlace(int segmentIndex, bool isOuter, int size)
-    {
-        // Check slots [segmentIndex .. segmentIndex+size-1] are empty
-    }
-
-    public void PlaceRoom(int segmentIndex, bool isOuter, int size, RoomDefinition def)
-    {
-        // Validate, fill slots, spawn Room scene, emit GameEvents.RoomPlaced
-    }
-
-    public void DemolishRoom(int segmentIndex, bool isOuter)
-    {
-        // Clear slots, remove Room node, emit GameEvents.RoomDemolished
-    }
-}
-```
+**Trade-offs:** Two events for related data can cause confusion. The cleaner approach is to remove `HappinessChanged(float)` entirely and have SaveManager subscribe to `LifetimeHappinessChanged` and `MoodTierChanged` instead. This is a one-line change in SaveManager and is preferred — do the clean version.
 
 ---
 
 ## Data Flow
 
-### Room Placement Flow
+### Wish Fulfillment Flow (v2)
 
 ```
-Player clicks segment in world
+WishBoard.OnRoomPlaced detects wish fulfilled
     ↓
-SegmentGrid.cs (raycast → segment index)
+GameEvents.EmitWishFulfilled(citizenName, wishType)
     ↓
-Ring.CanPlace(index, isOuter, selectedSize)
-    ↓ [valid]
-EconomyManager.TrySpend(def.BaseCost * sizeMultiplier)
-    ↓ [sufficient credits]
-Ring.PlaceRoom(index, isOuter, size, def)
-    ↓
-GameEvents.EmitSignal(RoomPlaced)
-    ↓                          ↓
-EconomyManager              WishBoard
-(credits deducted)     (check if wish fulfilled)
-                             ↓ [wish matched]
-                       GameEvents.EmitSignal(WishFulfilled, citizen, wish)
-                             ↓
-                       HappinessManager
-                       (increase happiness, check milestones)
+HappinessManager.OnWishFulfilled(citizenName, wishType)
+    ├── _lifetimeHappiness += 1
+    ├── _mood += MoodGainPerWish (3.0)
+    ├── _mood clamped (no explicit cap — naturally bounded by decay rate)
+    ├── GameEvents.EmitLifetimeHappinessChanged(_lifetimeHappiness)
+    │       ↓
+    │   HUD counter "♥ N" ticks up with pulse animation
+    └── CheckUnlockMilestones()  [now keyed to _lifetimeHappiness int thresholds]
+            ↓ (if milestone crossed)
+        GameEvents.EmitBlueprintUnlocked(roomId)
 ```
 
-### Citizen Tick Flow (per frame / physics process)
+### Mood Decay Flow (v2 — per frame)
 
 ```
-Citizen._PhysicsProcess(delta)
+HappinessManager._Process(delta)
+    ├── baseline = BaselineFactor * sqrt(_lifetimeHappiness)
+    ├── _mood += (baseline - _mood) * DecayRate * delta
+    ├── _mood = Max(_mood, 0)
+    └── newTier = ComputeTier(_mood)
+            ↓ (if tier changed)
+        GameEvents.EmitMoodTierChanged(oldTier, newTier)
+            ↓
+            ├── EconomyManager.OnMoodTierChanged(newTier) → stores _currentTier
+            └── HUD MoodDisplay.OnMoodTierChanged(oldTier, newTier)
+                    └── update label text + color + spawn floating text
+```
+
+### Arrival Check Flow (v2 — unchanged structure, changed probability)
+
+```
+HappinessManager._arrivalTimer.Timeout (every 60s)
     ↓
-CitizenFSM: current state
-    │
-    ├── Idle: wait timer → pick target room from WishBoard or random comfort room
-    │         → TransitionTo(WalkingToRoom)
-    │
-    ├── WalkingToRoom: NavigationAgent3D.GetNextPathPosition()
-    │                  → move CharacterBody3D toward target
-    │                  → on arrival: TransitionTo(VisitingRoom)
-    │
-    ├── VisitingRoom: wait timer → Room.OnCitizenVisit(this)
-    │                → HappinessManager.AddCitizenHappiness(citizenData, amount)
-    │                → TransitionTo(Wishing or WalkingHome)
-    │
-    └── Wishing: WishBoard.AddWish(citizenData, wishType)
-                 → emit speech bubble signal on Citizen
-                 → TransitionTo(Idle)
-```
-
-### Happiness / Economy Passive Flow
-
-```
-EconomyManager._Process(delta)
-    ↓ (every income tick, e.g. 5 seconds)
-income = baseCitizenIncome * citizenCount * happinessMultiplier
+int currentPop = CitizenManager.Instance.CitizenCount
+if currentPop >= _housingCapacity: return
     ↓
-EconomyManager.Credits += income
+float arrivalScale = TierData[(int)_currentTier].arrivalScale
+if _currentTier == MoodTier.Quiet: return  // 0.0 arrival scale = no arrivals
     ↓
-GameEvents.EmitSignal(CreditsChanged, Credits)
-    ↓
-HUD.UpdateCreditsDisplay()
-
-HappinessManager watches:
-    CitizenData.Happiness per citizen → aggregates → StationHappiness
-    StationHappiness crosses milestone threshold
-        → GameEvents.EmitSignal(HappinessMilestone, threshold)
-        → Spawn new citizen OR unlock new RoomDefinition
+float chance = arrivalScale * ArrivalProbabilityBase
+if GD.Randf() < chance:
+    CitizenManager.Instance.SpawnCitizen()
+    SpawnArrivalText(...)
 ```
 
-### State Management Summary
+Note: `ArrivalProbabilityBase` replaces `ArrivalProbabilityScale`. At Quiet tier, arrival scale is 0.0, so the early return replaces the old `if (_happiness <= 0f) return` guard.
+
+### Economy Multiplier Flow (v2)
 
 ```
-Permanent game state lives in:
-  EconomyManager.Credits (Autoload, in-memory, serialized on save)
-  HappinessManager.StationHappiness (Autoload, derived from citizens)
-  Ring._outerSlots / _innerSlots (Ring node, serialized on save)
-  CitizenData resources (one per citizen, serialized on save)
+v1: EconomyManager._currentHappiness = happiness (float)
+    multiplier = 1 + (happiness * (HappinessMultiplierCap - 1.0f))
 
-Transient state lives in:
-  Citizen FSM states (re-derived on load from CitizenData)
-  NavigationAgent3D paths (re-computed on demand)
-  UI panel visibility (never saved)
+v2: EconomyManager._currentTier = tier (MoodTier enum)
+    multiplier = TierData[(int)_currentTier].economyMult (lookup, not formula)
+
+SetHappiness(float) → replace with SetMoodTier(MoodTier)
+```
+
+The `SetHappiness` method on EconomyManager is called only from HappinessManager (in `OnWishFulfilled` and `RestoreState`). Replacing it with `SetMoodTier(MoodTier tier)` is a contained change. `GetIncomeBreakdown()` currently returns `happinessMult` as a float — it can continue to do so (just read from the tier lookup table).
+
+---
+
+## Events: New, Modified, Removed
+
+### Remove
+
+| Event | Reason |
+|-------|--------|
+| `HappinessChanged(float)` | Replaced by `LifetimeHappinessChanged` + `MoodChanged`. SaveManager subscription moves to new events. HappinessBar is replaced entirely. |
+
+### Add
+
+| Event | Signature | Who Emits | Who Subscribes |
+|-------|-----------|-----------|----------------|
+| `LifetimeHappinessChanged` | `Action<int> newCount` | `HappinessManager.OnWishFulfilled` | `HUD counter widget`, `SaveManager` |
+| `MoodChanged` | `Action<float> newMood` | `HappinessManager._Process` (on significant change only) | `SaveManager` (debounce trigger only) |
+| `MoodTierChanged` | `Action<MoodTier, MoodTier> oldTier, newTier` | `HappinessManager._Process` | `EconomyManager`, `HUD mood display widget` |
+
+### Keep Unchanged
+
+| Event | Reason |
+|-------|--------|
+| `WishFulfilled(string, string)` | Still the trigger; HappinessManager subscribes as before |
+| `BlueprintUnlocked(string)` | Still emitted by HappinessManager when milestones pass; BuildPanel subscribes as before |
+| All other events | Unaffected by this milestone |
+
+---
+
+## SaveManager: Serialization Changes
+
+### SaveData POCO — changes required
+
+```csharp
+// v1 fields to remove/replace:
+public float Happiness { get; set; }           // REMOVE
+
+// v2 fields to add:
+public int LifetimeHappiness { get; set; }     // ADD
+public float Mood { get; set; }                // ADD
+
+// Unchanged:
+public int Version { get; set; } = 1;          // BUMP to 2
+public int CrossedMilestoneCount { get; set; } // KEEP (semantics unchanged — still milestone index)
+public int HousingCapacity { get; set; }       // KEEP
+public List<string> UnlockedRooms { get; set; } // KEEP
+// ... all other fields unchanged
+```
+
+### CollectGameState — changes required
+
+```csharp
+// Replace:
+Happiness = HappinessManager.Instance?.Happiness ?? 0f,
+
+// With:
+LifetimeHappiness = HappinessManager.Instance?.LifetimeHappiness ?? 0,
+Mood = HappinessManager.Instance?.Mood ?? 0f,
+```
+
+### ApplyState — changes required
+
+```csharp
+// Replace call to RestoreState:
+HappinessManager.Instance?.RestoreState(
+    data.Happiness,
+    new HashSet<string>(data.UnlockedRooms),
+    data.CrossedMilestoneCount,
+    data.HousingCapacity);
+
+// With:
+HappinessManager.Instance?.RestoreState(
+    data.LifetimeHappiness,
+    data.Mood,
+    new HashSet<string>(data.UnlockedRooms),
+    data.CrossedMilestoneCount,
+    data.HousingCapacity);
+```
+
+### HappinessManager.RestoreState — signature change
+
+```csharp
+// v1:
+public void RestoreState(float happiness, HashSet<string> unlockedRooms,
+    int milestoneCount, int housingCapacity)
+
+// v2:
+public void RestoreState(int lifetimeHappiness, float mood,
+    HashSet<string> unlockedRooms, int milestoneCount, int housingCapacity)
+```
+
+Inside `RestoreState`, after setting state, call `EconomyManager.Instance?.SetMoodTier(ComputeTier(mood))` (replaces `SetHappiness`) and emit `LifetimeHappinessChanged` + `MoodTierChanged` to sync UI.
+
+### SaveManager event subscriptions — changes required
+
+`SaveManager._onHappinessChanged` subscribes to the old `HappinessChanged` event. Replace with subscriptions to `LifetimeHappinessChanged` and `MoodChanged` (both just call `OnAnyStateChanged()` — the payload is irrelevant to SaveManager).
+
+```csharp
+// Remove:
+private Action<float> _onHappinessChanged;
+GameEvents.Instance.HappinessChanged += _onHappinessChanged;
+GameEvents.Instance.HappinessChanged -= _onHappinessChanged;
+
+// Add:
+private Action<int> _onLifetimeHappinessChanged;
+private Action<float> _onMoodChanged;
+_onLifetimeHappinessChanged = _ => OnAnyStateChanged();
+_onMoodChanged = _ => OnAnyStateChanged();
+GameEvents.Instance.LifetimeHappinessChanged += _onLifetimeHappinessChanged;
+GameEvents.Instance.MoodChanged += _onMoodChanged;
+// (and unsubscribe in _ExitTree / UnsubscribeEvents)
+```
+
+### v1 Save Migration
+
+Migration runs inside `SaveManager.Load()` (or a dedicated `MigrateV1ToV2(SaveData)` helper called from `Load()`). The `Version` field gates which path is taken.
+
+```csharp
+public SaveData Load()
+{
+    // ... read and deserialize as before ...
+    if (data.Version == 1)
+        data = MigrateV1ToV2(data);
+    return data;
+}
+
+private static SaveData MigrateV1ToV2(SaveData v1)
+{
+    // Invert the diminishing-returns formula to estimate wish count
+    // v1 formula: gain = 0.08 / (1 + happiness); sum of gains ≈ happiness
+    // Approximation from design spec: wishes ≈ (happiness / HappinessGainBase) * (1 + happiness)
+    const float HappinessGainBase = 0.08f;
+    float h = v1.Happiness;
+    int estimatedWishes = Mathf.RoundToInt((h / HappinessGainBase) * (1f + h));
+
+    float baseline = Mathf.Sqrt(estimatedWishes); // BaselineFactor = 1.0
+    float initialMood = baseline;                  // Start at baseline, not above it
+
+    v1.LifetimeHappiness = estimatedWishes;
+    v1.Mood = initialMood;
+    v1.Version = 2;
+    return v1;  // v1 fields (Happiness) remain in the object but are ignored by v2 logic
+}
+```
+
+The old `Happiness` field is left in `SaveData` as a nullable or simply ignored — `System.Text.Json` will silently skip unrecognized fields on the v2 class if `Happiness` is removed from the POCO (or include it as an ignored migration-only field).
+
+**Cleaner approach:** Keep `Happiness` in `SaveData` as a migration-only property with `[JsonIgnore]` after migration is complete, or simply remove it and rely on `JsonSerializer`'s default behavior of ignoring unknown fields during deserialization of a v1 save file into the v2 class (where `LifetimeHappiness` and `Mood` default to 0, then migration fills them in).
+
+Recommended: add `[System.Text.Json.Serialization.JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]` to nothing — just remove `Happiness` from the POCO. On v1 save load, `LifetimeHappiness` and `Mood` will be 0; `Version` will be 1; the migration branch runs. The old `Happiness` key in the JSON is ignored by the deserializer.
+
+---
+
+## EconomyManager: Integration Change
+
+### What changes
+
+`_currentHappiness` (float) becomes `_currentTier` (MoodTier). The `SetHappiness(float)` method is replaced by `SetMoodTier(MoodTier)`. Income calculation reads from the tier lookup table instead of a formula.
+
+```csharp
+// Remove:
+private float _currentHappiness;
+public void SetHappiness(float happiness) { _currentHappiness = Mathf.Clamp(happiness, 0f, 1f); }
+
+// Add:
+private MoodTier _currentTier = MoodTier.Quiet;
+public void SetMoodTier(MoodTier tier) { _currentTier = tier; }
+
+// Replace income formula:
+// v1: float happinessMult = 1.0f + (_currentHappiness * (Config.HappinessMultiplierCap - 1.0f));
+// v2: float happinessMult = HappinessManager.TierData[(int)_currentTier].economyMult;
+//     (or expose a static helper on HappinessManager: HappinessManager.GetEconomyMultiplier(_currentTier))
+```
+
+EconomyManager does not need to subscribe to any event. HappinessManager calls `EconomyManager.Instance?.SetMoodTier(newTier)` directly when the tier changes (same pattern as the existing `SetHappiness` direct call from `RestoreState` and `OnWishFulfilled`). Alternatively, EconomyManager subscribes to `MoodTierChanged` — either works; the direct call is simpler and matches the existing pattern.
+
+### GetIncomeBreakdown — update for HUD
+
+`GetIncomeBreakdown()` returns `happinessMult` as a float. After the change it returns the tier multiplier value. No signature change required — the return type is still `float`.
+
+---
+
+## HUD: Component Replacement
+
+### HappinessBar.cs — full replacement
+
+`HappinessBar.cs` is a `MarginContainer` that builds a fill bar and subscribes to `HappinessChanged(float)`. The entire widget is obsolete. Replace it with two separate widgets, or one combined widget:
+
+**Option A — Two widgets (recommended for clean separation):**
+- `HappinessCounter.cs` — subscribes to `LifetimeHappinessChanged(int)`, displays `♥ 47` with pulse on increment
+- `MoodDisplay.cs` — subscribes to `MoodTierChanged`, displays tier name with tier color, spawns floating text on tier change
+
+**Option B — One widget:**
+- `HappinessHUD.cs` — handles both events in one class
+
+Option A matches the existing pattern (CreditHUD, PopulationDisplay are separate widgets). Use Option A.
+
+Both widgets initialize from `HappinessManager.Instance` in `_Ready()` the same way `HappinessBar` reads `HappinessManager.Instance.Happiness` today.
+
+```csharp
+// HappinessCounter._Ready() initialization:
+int initial = HappinessManager.Instance?.LifetimeHappiness ?? 0;
+UpdateCounter(initial);
+
+// MoodDisplay._Ready() initialization:
+MoodTier initial = HappinessManager.Instance?.CurrentTier ?? MoodTier.Quiet;
+UpdateDisplay(initial);
 ```
 
 ---
 
-## Component Boundaries
+## Suggested Build Order
 
-| Boundary | Communication Method | Notes |
-|----------|---------------------|-------|
-| Ring ↔ EconomyManager | `GameEvents.RoomPlaced` signal | Ring does not call EconomyManager directly |
-| Ring ↔ HappinessManager | `GameEvents.WishFulfilled` signal | Decoupled; happiness responds to events |
-| Citizen ↔ WishBoard | Direct call: `WishBoard.Instance.AddWish()` | Acceptable direct ref — WishBoard is an Autoload |
-| Citizen ↔ Room | Direct call: `room.OnCitizenVisit(this)` | Room is the target; citizen has reference when navigating to it |
-| BuildPanel (UI) ↔ Ring | `GameEvents.PlacementRequested` signal | UI never directly calls Ring; events decouple UI from game logic |
-| HappinessManager ↔ Citizen | Citizen emits `HappinessChanged` on CitizenData; HappinessMgr watches all citizens | Observer pattern on per-citizen data |
-| CameraRig ↔ everything | None — camera reads only input; nothing reads from camera | Intentionally isolated |
-
----
-
-## Godot Scene Tree Recommendations
-
-### Root Scene Structure
-
-The main scene (`GameWorld.tscn`) should be kept shallow. Use composition via instanced sub-scenes rather than deep node trees inline.
+Dependencies determine order. The HappinessManager refactor is the source of truth — all consumers update after it.
 
 ```
-GameWorld (Node3D)
-├── Ring (instance of Ring.tscn)
-├── CitizenContainer (Node3D — parent for all citizen instances)
-├── CameraRig (instance of CameraRig.tscn)
-└── UI (CanvasLayer)
-    ├── HUD (instance of HUD.tscn)
-    ├── BuildPanel (instance of BuildPanel.tscn)
-    └── WishTracker (instance of WishTracker.tscn)
+Step 1 — HappinessManager refactor (no consumers yet, but defines the contract)
+  - Add MoodTier enum
+  - Replace float _happiness with int _lifetimeHappiness + float _mood
+  - Add _Process decay loop
+  - Replace % milestone thresholds with wish-count thresholds
+  - Replace arrival probability formula with tier lookup
+  - Update RestoreState signature
+  - Compile guard: keep SetHappiness stub returning no-op until EconomyManager is updated
+    (prevents compile errors while Step 2 is incomplete)
+
+Step 2 — GameEvents event changes (depends on: MoodTier enum from Step 1)
+  - Add LifetimeHappinessChanged(int)
+  - Add MoodChanged(float)
+  - Add MoodTierChanged(MoodTier, MoodTier)
+  - Remove HappinessChanged(float) — or keep as no-op until all subscribers are updated
+    Recommended: remove immediately and let the compiler surface every subscriber.
+    There are exactly 3 subscribers: HappinessBar, SaveManager, and HappinessManager emits it.
+    All are updated in this milestone.
+
+Step 3 — EconomyManager consumer update (depends on: Step 1 MoodTier, Step 2 events)
+  - Replace _currentHappiness with _currentTier
+  - Replace SetHappiness with SetMoodTier
+  - Update CalculateTickIncome to use tier lookup
+  - Update GetIncomeBreakdown to return tier multiplier
+
+Step 4 — SaveManager / SaveData migration (depends on: Step 1 new API)
+  - Bump SaveData.Version to 2
+  - Add LifetimeHappiness and Mood fields
+  - Remove (or ignore) Happiness field
+  - Update CollectGameState to read new fields
+  - Update ApplyState to pass new fields
+  - Add MigrateV1ToV2 logic
+  - Update event subscriptions (HappinessChanged → LifetimeHappinessChanged + MoodChanged)
+
+Step 5 — HUD replacement (depends on: Step 2 events, Step 1 public API)
+  - Delete or gut HappinessBar.cs
+  - Create HappinessCounter.cs (subscribes to LifetimeHappinessChanged)
+  - Create MoodDisplay.cs (subscribes to MoodTierChanged, spawns tier-change floating text)
+  - Wire both into the existing HUD scene (QuickTestScene.tscn) in place of HappinessBar
+
+Step 6 — Integration smoke test
+  - Fresh game: mood starts Quiet, rises to Cozy after first wish, decays back toward baseline
+  - Blueprint unlock fires at wish 4 and wish 12
+  - Economy multiplier changes at each tier boundary
+  - HUD counter increments on each wish, tier label updates
+  - Save/load: both values persist and restore correctly
+  - v1 migration: load an old save.json — LifetimeHappiness and Mood are estimated,
+    session continues without errors
 ```
 
-**Why CanvasLayer for UI:** All UI nodes under a `CanvasLayer` render on top of 3D content and are unaffected by the 3D camera. This is the correct Godot pattern for game HUDs.
+**Why this order:**
 
-### Ring Scene Internal Structure
+Steps 1 and 2 are done together or sequentially because Step 2 depends on the `MoodTier` enum that lives in Step 1. Steps 3, 4, and 5 have no dependencies on each other after Step 2 is complete — they can be done in any order, but Step 3 (EconomyManager) is the smallest change and validates the new API first. Step 4 (SaveManager) is the riskiest change (data migration) and benefits from doing last among consumers so the API it calls is stable.
 
-The Ring scene handles geometry, slots, and rooms. The walkway navmesh is a child of Ring so it can be baked relative to the ring's transform.
-
-```
-Ring (Node3D — Ring.cs)
-├── RingGeometry (MeshInstance3D — TorusMesh or procedural flat donut)
-│   └── StaticBody3D + CollisionShape3D (click detection on ring surface)
-├── Walkway (Node3D — Walkway.cs)
-│   └── NavigationRegion3D
-│       └── NavigationMesh (baked circular corridor)
-├── SegmentGrid (Node3D — SegmentGrid.cs)
-│   ├── OuterSlot_0 (RoomSlot.tscn) ... OuterSlot_11
-│   └── InnerSlot_0 (RoomSlot.tscn) ... InnerSlot_11
-└── RoomContainer (Node3D — parent for dynamically spawned rooms)
-```
-
-**RoomSlot positioning:** Slots are positioned procedurally at `_Ready()` using trig: `angle = (segmentIndex / 12.0f) * 2 * Mathf.Pi`. Each slot knows its world position for both room spawning and citizen navigation targets.
-
-### Citizen Scene Structure
-
-```
-Citizen (CharacterBody3D — Citizen.cs)
-├── MeshInstance3D (citizen visual)
-├── CollisionShape3D (physics capsule)
-├── NavigationAgent3D (pathfinding)
-└── SpeechBubble (Node3D — parented above head)
-    └── BillboardSprite3D or SubViewport label
-```
-
-**NavigationAgent3D usage:** `GetNextPathPosition()` called each physics frame; citizen moves toward it. When `IsNavigationFinished()` returns true, state transitions. Navigation target is set to the `RoomSlot.GlobalPosition` of the destination room.
-
-### Camera Scene Structure
-
-```
-CameraRig (Node3D — CameraRig.cs, positioned at ring center 0,0,0)
-└── SpringArm3D (length = zoom distance, fixed tilt via local rotation)
-    └── Camera3D
-```
-
-**Fixed tilt:** The `SpringArm3D` rotation x-axis is set at scene creation to 30–45 degrees and never modified by input. Input only rotates the parent `CameraRig` around the Y axis (horizontal orbit) and adjusts `SpringArm3D.SpringLength` (zoom). This preserves the "diorama" feel.
-
----
-
-## Scaling Considerations
-
-This is a single-player PC game; "scaling" means complexity growth as features are added, not server load.
-
-| Scale | Architecture Adjustments |
-|-------|--------------------------|
-| 1 ring, 5-10 citizens (first milestone) | Current architecture — no changes needed |
-| 3-5 rings, 20-30 citizens | Add `Station` node wrapping array of `Ring`; HappinessManager aggregates across rings; navmesh spans connected rings |
-| Full game with personalities, events | Citizen FSM upgrades to behavior tree (BehaviourToolkit asset or Chickensoft); `WishBoard` gains priority/weight system; `EventSystem` Autoload handles random events |
-
-### Scaling Priorities
-
-1. **First bottleneck — navmesh rebaking:** When rooms are placed or demolished, NavigationRegion3D must rebake. For the circular walkway, rooms don't block the walkway, so rebaking is rarely needed. Citizens navigate the walkway perimeter; rooms are visited by simply walking to their slot position. If rooms do affect navigation, use `NavigationServer3D.BakeFromSourceGeometryDataAsync()` to rebake off-thread.
-2. **Second bottleneck — citizen _PhysicsProcess count:** 20-30 citizens each running `_PhysicsProcess` is fine. If citizens scale to 50+, consider an ECS-style update manager that batches citizen ticks rather than each citizen self-updating.
+The HUD (Step 5) is last because it is purely a consumer with no downstream impact — a broken HUD does not break the game loop, making it the safest place for any iteration.
 
 ---
 
 ## Anti-Patterns
 
-### Anti-Pattern 1: Everything in One Scene Inline
+### Anti-Pattern 1: Emitting MoodChanged every frame from _Process
 
-**What people do:** Build the entire Ring, all slots, all rooms, and all citizens as one massive `.tscn` file.
-**Why it's wrong:** Impossible to work on in teams, slow to load in editor, can't test Ring in isolation, merge conflicts on every change.
-**Do this instead:** Each logical concept is its own scene (`Ring.tscn`, `Room.tscn`, `Citizen.tscn`). The game world composes them via `PackedScene.Instantiate()`.
+**What people do:** Call `GameEvents.Instance?.EmitMoodChanged(_mood, _currentTier)` every frame inside `_Process`.
+**Why it's wrong:** SaveManager subscribes to state-change events to trigger its debounce timer. If `MoodChanged` fires every frame, the autosave debounce restarts every frame and the game never saves at all.
+**Do this instead:** `MoodChanged` is emitted only on tier change (`MoodTierChanged`), or when mood changes by more than an epsilon (e.g., 0.1 units). SaveManager subscribes to `MoodTierChanged` and `LifetimeHappinessChanged` only — these fire infrequently and are the correct autosave triggers.
 
-### Anti-Pattern 2: Bypassing GameEvents for Cross-System Calls
+### Anti-Pattern 2: Storing mood tier on EconomyManager directly
 
-**What people do:** `EconomyManager.Instance.Spend(cost)` called directly from inside `Ring.PlaceRoom()`.
-**Why it's wrong:** Ring now has a hard dependency on EconomyManager. Testing Ring requires EconomyManager to exist. Adding a new system that cares about room placement requires modifying Ring.
-**Do this instead:** Ring emits `GameEvents.RoomPlaced`; EconomyManager and WishBoard both subscribe. Ring has zero knowledge of downstream consumers.
+**What people do:** EconomyManager subscribes to `MoodTierChanged` and caches the tier internally.
+**Why it's wrong:** Not wrong per se, but creates a second copy of truth. If HappinessManager is the single owner of tier state, calling `EconomyManager.SetMoodTier()` directly from HappinessManager (same as the existing `SetHappiness` pattern) is simpler and avoids the EconomyManager subscription and unsubscription boilerplate.
+**Do this instead:** Follow the existing pattern. HappinessManager calls `EconomyManager.Instance?.SetMoodTier(newTier)` directly when the tier changes inside `_Process`. EconomyManager does not subscribe to any events.
 
-### Anti-Pattern 3: Storing Game State in Node Properties Without a Resource
+### Anti-Pattern 3: v1 save migration inside SaveData POCO constructor
 
-**What people do:** `Ring._slots` is a C# array on the Ring node — fine at runtime, but lost on scene reload and can't be saved.
-**Why it's wrong:** Save/load requires serializing the array manually. Editor inspection is limited. Data is coupled to the node's lifecycle.
-**Do this instead:** Wrap ring state in a `RingData` Resource. Ring node holds a reference to it. Serializing `RingData` to `.tres` gives a complete save file for the ring layout.
+**What people do:** Add migration logic to `SaveData`'s constructor or a property getter to auto-convert old fields.
+**Why it's wrong:** SaveData is a plain C# serialization POCO. Logic in POCOs makes them hard to test and violates the single-responsibility principle.
+**Do this instead:** Migration is a static method on SaveManager: `private static SaveData MigrateV1ToV2(SaveData v1)`. It is pure (no side effects), takes old data, returns new data. Called from `Load()` before the data is consumed.
 
-### Anti-Pattern 4: Baking a Full NavigationMesh Over the Entire Ring Geometry
+### Anti-Pattern 4: Removing the CrossedMilestoneCount semantics
 
-**What people do:** Drop a `NavigationRegion3D` covering the full ring mesh and bake it. Rooms end up as obstacles.
-**Why it's wrong:** Room placement and removal triggers expensive rebakes. The walkway is a fixed circular corridor — citizens don't navigate through rooms, they walk to room door positions on the walkway.
-**Do this instead:** The NavigationMesh covers only the walkway (the circular corridor surface). Citizens navigate to the closest walkway point adjacent to a room slot, not into the room itself. Room visits are simulated (animation, timer) not physically navigated. This makes the navmesh static and eliminates rebaking entirely.
-
-### Anti-Pattern 5: Overloading Autoloads
-
-**What people do:** Put game logic, UI state, and data all in one `GameManager` autoload.
-**Why it's wrong:** Becomes a god object. Untestable. Every system depends on it. Changes break unrelated systems.
-**Do this instead:** Three narrow autoloads with clear scopes: `GameEvents` (signals only, no state), `EconomyManager` (credits only), `HappinessManager` (happiness only). UI state lives in UI nodes. Ring state lives in Ring. Autoloads hold only data with system-wide scope.
+**What people do:** Since milestones are now keyed to wish counts rather than percentages, assume `CrossedMilestoneCount` needs to change and redesign it.
+**Why it's wrong:** `CrossedMilestoneCount` is an index into the `UnlockMilestones` array, not a percentage. The semantics are "how many milestone entries have been processed," which is equally valid for wish-count thresholds. The field name, type, and SaveData serialization are all unchanged.
+**Do this instead:** Keep `CrossedMilestoneCount` as-is. Only change the `UnlockMilestones` array content: replace `(float threshold, string[] rooms)` tuples with `(int wishCount, string[] rooms)` tuples. The milestone-checking loop (`while (_crossedMilestoneCount < UnlockMilestones.Length)`) is structurally identical.
 
 ---
 
-## Build Order (Dependencies Between Components)
+## Integration Points Summary
 
-```
-Phase 1 — Foundation (no dependencies)
-├── GameEvents autoload (signal definitions only)
-├── RoomDefinition resource class
-├── RingData resource class
-└── CameraRig scene (no game dependencies)
-
-Phase 2 — Ring Geometry (depends on: Foundation)
-├── Ring scene + SegmentGrid + RoomSlots
-├── Flat donut mesh (TorusMesh or procedural)
-└── Walkway scene with NavigationRegion3D
-
-Phase 3 — Economy + Build Flow (depends on: Ring, GameEvents)
-├── EconomyManager autoload
-├── BuildPanel UI
-└── Room placement + demolish via Ring.PlaceRoom()
-
-Phase 4 — Citizens (depends on: Ring Geometry, Walkway navmesh)
-├── Citizen scene with NavigationAgent3D
-├── CitizenData resource class
-├── Citizen FSM (Idle → Walking → Visiting)
-└── CitizenContainer spawn logic in GameWorld
-
-Phase 5 — Wishes + Happiness (depends on: Citizens, Economy, Rooms)
-├── WishData resource class
-├── WishBoard autoload
-├── HappinessManager autoload
-├── WishTracker UI
-└── Citizen Wishing state + speech bubbles
-
-Phase 6 — Polish + Loop Closure (depends on: all above)
-├── New citizen arrival at happiness milestones
-├── Blueprint unlocks at happiness milestones
-├── HUD wired to EconomyManager + HappinessManager signals
-└── Save/load (serialize RingData + CitizenData resources)
-```
-
-**Key dependency insight:** The NavigationMesh walkway (Phase 2) must exist before citizens can navigate (Phase 4). Room placement mechanics (Phase 3) must exist before the wish fulfillment check in Phase 5 can work. Citizens must exist before happiness aggregation in Phase 5 is meaningful.
-
----
-
-## Integration Points
-
-### Internal Boundaries
-
-| Boundary | Communication | Notes |
-|----------|---------------|-------|
-| Ring ↔ EconomyManager | `GameEvents` signals | Ring never directly references EconomyManager |
-| Ring ↔ HappinessManager | `GameEvents` signals | Ring never directly references HappinessManager |
-| Citizen ↔ WishBoard | Direct: `WishBoard.Instance.AddWish()` | WishBoard is autoload; acceptable direct call |
-| Citizen ↔ Room | Direct: room reference during navigation | Citizen gets room reference from WishBoard target resolution |
-| HappinessManager ↔ Citizen | Signal on CitizenData resource | `CitizenData` emits `HappinessChanged`; manager subscribes at citizen spawn |
-| BuildPanel (UI) ↔ Ring | `GameEvents.PlacementRequested` | UI emits; Ring listens; UI never reaches into Ring directly |
-| CameraRig ↔ rest | None (input only) | Camera is intentionally isolated from game logic |
+| Singleton | Reads From HappinessManager | Writes To HappinessManager | Change Required |
+|-----------|----------------------------|---------------------------|-----------------|
+| `GameEvents` | — | — | Add 3 events, remove 1 |
+| `EconomyManager` | `_currentTier` (via `SetMoodTier`) | — | Swap `SetHappiness` → `SetMoodTier` |
+| `CitizenManager` | Called by `HappinessManager.OnArrivalCheck` | — | None |
+| `WishBoard` | — | Emits `WishFulfilled` (trigger) | None |
+| `BuildManager` | `IsRoomUnlocked` (unchanged API) | — | None |
+| `SaveManager` | `LifetimeHappiness`, `Mood` (via `CollectGameState`) | `RestoreState(int, float, ...)` | Signature + fields + migration |
+| `HappinessBar` (UI) | Subscribes `HappinessChanged` | — | Delete; replace with 2 new widgets |
 
 ---
 
 ## Sources
 
-- [Godot 4 Scene Organization Best Practices](https://docs.godotengine.org/en/stable/tutorials/best_practices/scene_organization.html) — MEDIUM confidence (official docs, fetched indirectly via search)
-- [Autoloads vs. Regular Nodes — Godot 4.x](https://docs.godotengine.org/en/stable/tutorials/best_practices/autoloads_versus_internal_nodes.html) — HIGH confidence (official Godot documentation, multiple versions listed)
-- [Singletons (Autoload) — Godot 4.x](https://docs.godotengine.org/en/stable/tutorials/scripting/singletons_autoload.html) — HIGH confidence (official Godot documentation)
-- [Event Bus Singleton — GDQuest](https://www.gdquest.com/tutorial/godot/design-patterns/event-bus-singleton/) — MEDIUM confidence (authoritative community source, GDQuest)
-- [Using NavigationAgents — Godot 4.x](https://docs.godotengine.org/en/stable/tutorials/navigation/navigation_using_navigationagents.html) — HIGH confidence (official Godot documentation)
-- [Resources — Godot Engine](https://docs.godotengine.org/en/stable/tutorials/scripting/resources.html) — HIGH confidence (official Godot documentation)
-- [Chickensoft: Enjoyable Game Architecture with Godot & C#](https://talks.godotengine.org/godotcon-us-2025/talk/MPC3BC/) — MEDIUM confidence (Chickensoft is authoritative C# Godot tooling source, GodotCon 2025)
-- [Finite State Machine in Godot 4 — GDQuest](https://www.gdquest.com/tutorial/godot/design-patterns/finite-state-machine/) — MEDIUM confidence (GDQuest, authoritative community source)
-- [Making a basic FSM in Godot 4/C#](https://medium.com/codex/making-a-basic-finite-state-machine-godot4-c-fe5ccc0e8cd7) — LOW confidence (single Medium article, unverified)
-- [Custom Resources in C# — Godot Forum](https://forum.godotengine.org/t/custom-resources-in-c/55910) — LOW confidence (community forum, supplementary only)
-- [Third-person camera with SpringArm — Godot docs](https://docs.godotengine.org/en/latest/tutorials/3d/spring_arm.html) — HIGH confidence (official Godot documentation)
+- `/workspace/Scripts/Autoloads/HappinessManager.cs` — direct code analysis, HIGH confidence
+- `/workspace/Scripts/Autoloads/GameEvents.cs` — direct code analysis, HIGH confidence
+- `/workspace/Scripts/Autoloads/SaveManager.cs` — direct code analysis, HIGH confidence
+- `/workspace/Scripts/Autoloads/EconomyManager.cs` — direct code analysis, HIGH confidence
+- `/workspace/Scripts/Citizens/CitizenManager.cs` — direct code analysis, HIGH confidence
+- `/workspace/Scripts/UI/HappinessBar.cs` — direct code analysis, HIGH confidence
+- `/workspace/.planning/design/happiness-v2.md` — design spec, HIGH confidence
+- `/workspace/.planning/PROJECT.md` — project context, HIGH confidence
 
 ---
-*Architecture research for: Godot 4 C# cozy space station builder (Orbital Rings)*
-*Researched: 2026-03-02*
+*Architecture research for: Orbital Rings v1.1 — Happiness v2 integration*
+*Researched: 2026-03-04*

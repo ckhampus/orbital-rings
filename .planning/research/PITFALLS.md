@@ -1,293 +1,345 @@
 # Pitfalls Research
 
-**Domain:** Cozy space station builder game — Godot 4 C#, circular ring geometry, citizen simulation, wish-driven economy
-**Researched:** 2026-03-02
-**Confidence:** MEDIUM (WebSearch + official Godot docs + community issue trackers; no Context7 library coverage for Godot C# specifics)
+**Domain:** Replacing a monotonically increasing happiness float with a dual-value decay system (Lifetime Happiness + Station Mood) in an existing Godot 4 C# cozy game
+**Researched:** 2026-03-04
+**Confidence:** HIGH (based on direct codebase inspection of all affected files + verified general principles from official Godot docs and EDA community sources)
+
+> **Scope note:** This file covers pitfalls specific to the v1.1 Happiness v2 migration.
+> General Godot 4 / Orbital Rings v1.0 pitfalls (navmesh, signal leaks, collision shapes, etc.)
+> remain documented in the original PITFALLS.md above this milestone boundary.
 
 ---
 
 ## Critical Pitfalls
 
-### Pitfall 1: Treating the Circular Walkway Like a Grid
+### Pitfall 1: Save Migration Data Loss — Silently Treating v1 Saves as v2
 
 **What goes wrong:**
-The walkway is a closed circular arc, not a straight path. Developers instinctively reach for Godot's NavigationRegion3D + auto-baked NavigationMesh, which works well for rectilinear geometry. On a curved ring, the auto-bake produces polygon approximations of the arc with subtle gaps, seam artifacts at the 12 o'clock segment join, and agents that cut corners across the arc instead of following the curve. The result: citizens walk through walls, skip segments, or take the "long way around" because the navmesh accidentally represents a shorter straight-line path across the open center.
+`SaveData.Version` is currently hard-coded to `1` in the POCO. When v2 ships, the `Load()` method in `SaveManager` deserializes the JSON without inspecting `Version`. A v1 save file has only the `Happiness` float field (range 0.0–1.0). The new v2 schema adds `LifetimeHappiness` (int) and `Mood` (float) and removes `Happiness`. If the deserializer silently ignores unknown fields (which `System.Text.Json` does by default) and uses default values for missing fields, a v1 save will load with `LifetimeHappiness = 0` and `Mood = 0` — effectively erasing all progression. The player sees their station as if they'd never played.
 
 **Why it happens:**
-The NavigationMesh baking algorithm tessellates the source mesh into triangles and computes walkable polys. Curved geometry — especially thin walkway rings — is approximated, and the tessellation resolution may be too coarse relative to the arc's curvature. Additionally, the ring is a closed loop: an agent navigating from segment 11 to segment 1 has two valid routes of equal or nearly-equal cost. The navmesh cannot inherently express "go clockwise" vs "go counterclockwise", so agents may choose the long path.
+`System.Text.Json` uses `JsonSerializerDefaults.General` by default, which silently drops fields not present in the target type and zero-initializes missing ones. There is no migration gate in the current `Load()` path — it deserializes directly to the current `SaveData` type without branching on `Version`. Developers adding new fields assume forward compatibility without verifying the reverse: loading old files into the new type.
 
 **How to avoid:**
-Do not rely on auto-baked navmesh for the ring walkway. Instead, hand-author the NavigationMesh by constructing it programmatically in C# at ring creation time: generate the polygon vertices for the walkway arc explicitly, respecting the discrete 12-segment layout. Register this mesh with NavigationServer3D directly. Because the walkway is a fixed-topology discrete structure (not a dynamic terrain), a statically authored navmesh per ring is vastly more reliable than runtime baking. If citizens only ever move along the walkway (not through room interiors), a custom path system — a sorted list of waypoint positions around the ring, with arc-distance-based pathfinding — is simpler and more controllable than the full NavigationAgent3D stack.
+Add a migration gate immediately after deserialization in `SaveManager.Load()`:
+
+```csharp
+var raw = JsonSerializer.Deserialize<JsonElement>(json);
+int version = raw.TryGetProperty("Version", out var v) ? v.GetInt32() : 1;
+
+if (version == 1)
+    return MigrateV1ToV2(raw);
+
+return raw.Deserialize<SaveData>();
+```
+
+The migration function reconstructs `LifetimeHappiness` from the v1 `Happiness` float using the inversion formula specified in the design doc (`wishes ≈ (happiness / HappinessGainBase) × (1 + happiness)`), sets `Mood` to the computed baseline, carries over all other fields unchanged, and writes `Version = 2`. Test with an actual v1 save file before shipping.
 
 **Warning signs:**
-- Citizens visually cutting across the ring's empty interior
-- Citizens getting stuck at segment boundaries (particularly segment 12 → segment 1)
-- Citizens choosing the long arc (180+ degrees) when the short arc is obvious
-- NavigationAgent3D "path_desired_distance" and "target_desired_distance" tuning needed to prevent jitter at waypoints
+- Loading an old save file sets `LifetimeHappiness` to 0 in the debugger
+- Blueprint unlocks disappear on load (they're keyed to `_crossedMilestoneCount` which is preserved, but recheck)
+- No `Version` check anywhere in `Load()` or `ApplyState()`
 
 **Phase to address:**
-Phase covering citizen movement / walkway implementation — prototype both approaches (custom waypoint list vs. NavigationAgent3D) before committing to the full nav stack.
+Save migration phase (dedicated task). Must be implemented and tested before any other v2 feature ships, because once a v2 save is written, v1 migration is a narrow window.
 
 ---
 
-### Pitfall 2: C# Signal Connection Memory Leaks
+### Pitfall 2: HappinessChanged Event Contract Break — All Consumers Expect a Float
 
 **What goes wrong:**
-In Godot 4 C#, connecting signals using the `+=` delegate operator (e.g., `citizen.WishFulfilled += OnWishFulfilled`) creates a strong reference from the signal source to the subscriber. If the subscriber is freed or removed from the scene without first disconnecting the signal (`-=`), the GC cannot collect it because Godot's unmanaged side still holds the reference. With many citizens coming and going, leaked connections accumulate. Symptoms appear as slow memory growth and stale callbacks firing after nodes are supposedly dead.
+`GameEvents.HappinessChanged` currently carries `Action<float>` — a single happiness value in [0, 1]. Five subscribers depend on this contract:
+- `HappinessBar` (UI) — reads float to render bar fill and percentage label
+- `SaveManager` — triggers autosave on any happiness change
+- `EconomyManager` — uses the float via `SetHappiness(float)` to compute income multiplier
+- Any future subscribers added before this migration
 
-A related bug: using lambdas as signal callbacks creates anonymous delegate instances that cannot be unsubscribed, causing permanent leaks. As of Godot 4.2+, lambda/callable memory leaks are a confirmed engine-level issue in certain versions.
+In v2, happiness is split into two values with different types and semantics. If the event is renamed/replaced without updating all subscribers, the compiler will catch missing handler registrations — but the subtler failure is that consumers that survive the rename but receive the wrong semantic (e.g., receiving `Mood` where they expected the 0–1 normalized `Happiness`) will produce wrong values silently. `EconomyManager.SetHappiness` clamps to [0, 1] — passing raw `Mood` (which goes to ~20+) will always clamp to 1.0, yielding the maximum economy multiplier forever.
 
 **Why it happens:**
-Godot 4 C# uses a dual-ownership model: Godot's unmanaged engine holds the canonical GodotObject lifetime, and .NET's GC manages the managed wrapper. The .NET GC cannot collect a wrapper if the engine still references it (e.g., via a connected signal). Calling `Dispose()` on a GodotObject only releases the managed handle — it does NOT `Free()` the engine object. This is a documented pitfall: Dispose() ≠ Free() in Godot C#. Citizens that are "removed" by calling Dispose() instead of QueueFree()/Free() leave orphaned engine objects that continue to fire signals.
+When adding new fields to an event bus, developers often create a new event for the new data (`MoodChanged`) while leaving the old event in place "for now." Consumers that should be migrated stay on the old event, reading stale or semantically wrong data. The compiler does not flag this — the code compiles and runs, but produces wrong gameplay.
 
 **How to avoid:**
-- Always disconnect signals in `_ExitTree()` using the `-=` operator, or use `Connect()`/`Disconnect()` with named methods that can be tracked.
-- Never use anonymous lambdas as long-lived signal callbacks; always use named instance methods.
-- Always free Godot nodes with `QueueFree()` or `Free()`, never with `Dispose()` alone.
-- For the citizen lifecycle specifically: when a citizen node is removed, ensure `_ExitTree()` disconnects all outbound signal subscriptions.
-- Consider using the event-style signals Godot 4 generates (`[Signal]` + `EventHandler`) which are automatically disconnected when the GodotObject is freed — but verify this with the current engine version, as behavior has changed across Godot 4.x releases.
+Treat the event migration as a single atomic change:
+1. Add `MoodChanged` (`Action<float>`) and `LifetimeHappinessChanged` (`Action<int>`) to `GameEvents`.
+2. Remove `HappinessChanged` (or keep it as a deprecated alias that fires during a transition period with the normalized mood value for backward compatibility, then delete it).
+3. Migrate `HappinessBar` → subscribe to `MoodChanged` and `LifetimeHappinessChanged` (UI is being replaced anyway).
+4. Migrate `EconomyManager.SetHappiness` → replace with `SetMoodTier(MoodTier)` or `SetEconomyMultiplier(float)` so the economy multiplier is resolved in `HappinessManager` before the event fires, not reconstructed by the consumer.
+5. Migrate `SaveManager` → subscribe to `MoodChanged` as the autosave trigger (it only needs to know "something changed", not the value).
+
+Compile-time enforcement: delete `HappinessChanged` early so any missed subscriber becomes a build error.
 
 **Warning signs:**
-- Gradual memory growth over time that does not plateau
-- Godot's debugger "Orphan Nodes" count rising as citizens are added/removed
-- Signal callbacks firing on objects that have already been freed (prints warning "Object was freed")
-- Memory profile showing GodotObject instances growing unbounded
+- `EconomyManager._currentHappiness` always reads 1.0 after migration
+- Income multiplier is always at maximum regardless of activity
+- Old `HappinessBar` still showing a percentage bar after the new HUD is built
+- `_onHappinessChanged` delegate still wired in `SaveManager.SubscribeEvents()`
 
 **Phase to address:**
-Phase 1 (citizen scene setup) — establish the lifecycle pattern early; retrofitting signal hygiene across a large codebase is expensive.
+HappinessManager v2 refactor phase — implement all event consumer migrations in the same phase, not across multiple phases.
 
 ---
 
-### Pitfall 3: Torus/Ring Collision Shape — No Native Support
+### Pitfall 3: Mood Decay Running Every Frame — Autosave Storm
 
 **What goes wrong:**
-The ring geometry (flat donut) has no corresponding primitive collision shape in Godot 4. Developers who create the visual ring mesh and then try to add a "CollisionShape3D" child expecting a torus option will find it doesn't exist. Godot's physics engine (GodotPhysics or Jolt) does not support torus primitives. Attempting to use a ConcaveMeshShape3D (trimesh collision) generated from the visual mesh works, but detects collisions on both the top AND inside/underside surfaces, causing phantom collisions where citizens or room placement raycasts hit the invisible inner face.
+The mood decay formula (`mood += (baseline - mood) * DecayRate * delta`) runs every frame via `_Process`. When mood does not exactly equal baseline, this fires a non-zero delta every frame. If `HappinessManager` emits `MoodChanged` every frame, and `SaveManager` is subscribed to `MoodChanged` as an autosave trigger, the debounce timer resets every frame — the save never fires (debounce 0.5s, frame interval ~16ms). This sounds safe but it means the save timestamp keeps being pushed forward indefinitely while the player is idle. If the game closes unexpectedly during the decay phase, the last save was before the most recent wish fulfillment.
+
+The converse problem: if the debounce is removed and the save fires every frame during decay, the game writes `save.json` at 60 FPS — massive I/O, perceptible stutter.
 
 **Why it happens:**
-Tori are non-convex shapes. Most real-time physics engines only natively support convex primitives (box, sphere, capsule, cylinder) and approximate concave shapes via triangle meshes. The Godot community has been requesting a torus CollisionShape since at least 2022 (GitHub Discussion #6244) with no resolution as of 2025. CSGTorus can generate mesh collision, but inherits the same inner-face problem.
+Continuous decay creates a continuous stream of micro-changes. The debounce pattern was designed for discrete events (wish fulfilled, room placed) — not continuous floating-point drift. Mixing a continuous simulation update with a discrete event bus causes the event bus to become a fire-hose.
 
 **How to avoid:**
-Use an explicit approximation strategy determined by what collisions actually need to exist:
-- For the ring walkway surface (citizen foot placement): a flat annular mesh (the walkway only) as a StaticBody3D with a ConcaveMeshShape3D or composed BoxShape3D tiles approximating the arc is sufficient. Citizens walk on it; the underside never needs to be walkable.
-- For segment-level room placement hit detection (mouse picking to select a segment): use mathematical collision — project the mouse ray to the ring's plane (Y=0), convert the 2D hit position to polar coordinates, and determine segment from the angle and radius band. This avoids collision shapes entirely for selection.
-- For room occupancy boundaries: invisible BoxShape3D or CylinderShape3D volumes per segment work for overlap detection.
-- Never use the visual ring mesh directly as a trimesh collider for interactive picking; it will cause inner-face hits.
+Do not emit `MoodChanged` every frame. Instead, implement one of two patterns:
+
+**Option A (preferred):** Emit `MoodChanged` only on tier change. Tier is the discrete, meaningful unit. Mood value itself is an internal float that drives the tier. Only tier transitions (Cozy → Lively, etc.) are externally significant. The UI reads `HappinessManager.Instance.Mood` directly on a polling interval or subscribes to a `MoodTierChanged` event.
+
+**Option B:** Emit `MoodChanged` at most once per second using a minimum emission interval guard:
+
+```csharp
+private float _moodEmitAccumulator;
+private const float MoodEmitInterval = 1.0f;
+
+public override void _Process(double delta)
+{
+    UpdateDecay((float)delta);
+    _moodEmitAccumulator += (float)delta;
+    if (_moodEmitAccumulator >= MoodEmitInterval)
+    {
+        _moodEmitAccumulator = 0f;
+        GameEvents.Instance?.EmitMoodChanged(_mood);
+    }
+}
+```
+
+`SaveManager` should be wired to tier changes and explicit state events (wish fulfilled, room placed), NOT to mood value drift.
 
 **Warning signs:**
-- Raycasts hitting invisible faces on the underside of the ring
-- Room placement cursor "teleporting" to the opposite side of the ring on mouse movement
-- Physics bodies falling through the walkway at segment seams
+- Profiler shows `PerformSave` firing continuously or `OnAnyStateChanged` being called every frame
+- `save.json` modification timestamp updates every second while player is idle
+- Mood value in save file has 15 decimal places of floating-point noise
+- Autosave never completes because the debounce timer never expires
 
 **Phase to address:**
-Phase 1 (ring geometry / room placement) — the collision strategy must be decided before implementing room placement UI.
+HappinessManager v2 implementation — establish the decay emission pattern before wiring any consumers.
 
 ---
 
-### Pitfall 4: C# Rebuild-to-See-Changes Kills Iteration Speed
+### Pitfall 4: Tier Boundary Oscillation — Rapid Tier Toggling Near Thresholds
 
 **What goes wrong:**
-In Godot 4, C# does not support true hot reload of gameplay logic. Every time a C# script is changed, the entire .NET assembly must be recompiled, and the game session must be restarted to pick up the changes. GDScript supports near-instant in-editor reload. With a citizen simulation that requires watching 10-20 characters move, interact with rooms, and surface wishes, losing the running simulation state on every code change is extremely disruptive. Developers accustomed to Unity's (limited) hot reload or GDScript's instant reload will underestimate how much this compounds iteration time.
+With the current tier table, `Cozy` ends at 4.9 and `Lively` starts at 5.0. If mood is resting near 5.0 — which happens naturally during moderate activity — a single wish fulfillment pushes mood to 5.0 + 3.0 = 8.0 (Lively), then decay drags it back toward baseline. If baseline is ~4.5 (about 20 lifetime wishes), mood settles around 4.5, then crosses 5.0 again on the next wish. The floating tier notification fires: "Station mood: Lively" ... pause ... "Station mood: Cozy" ... one wish later ... "Station mood: Lively". This looks broken and feels punishing even in a game with no fail state.
+
+The effect is most pronounced when:
+- Baseline sits just below a tier boundary (e.g., baseline = 4.8, tier boundary = 5.0)
+- MoodGainPerWish (3.0) is large enough to push across the boundary but decay brings it back
+- The wish arrival rate is moderate (not constant, not absent)
 
 **Why it happens:**
-Godot 4's C# integration runs the .NET runtime in a separate process from the editor. Assembly hot-swap was planned (GitHub Proposal #7746) but as of Godot 4.2, "hot reloading only implements not restarting the Godot editor — you still need to restart the game." Tool script reloading resets instantiated script state on rebuild, which has side effects for editor tools. This is a known pain point with active proposals but no resolution in the near term.
+Discrete tier labels applied to a continuous, fluctuating float with no hysteresis. The system responds to the instantaneous value crossing a threshold. In control systems this is called "chatter" — the output oscillates around the switching point. The thermostat analogy: a thermostat that turns on at exactly 70°F and off at exactly 70°F would cycle continuously when room temperature is 70°F.
 
 **How to avoid:**
-- Design systems with data-logic separation: keep citizen state in plain C# data objects (not GodotObject-derived nodes where possible) so that scene-tree restarts don't lose in-memory state during development.
-- Invest early in editor debug tooling: expose wish state, happiness values, and citizen positions as Inspector properties or debug overlay UI so you can observe system state without relying on long play sessions.
-- Use Godot's `[Tool]` attribute on scene setup scripts carefully — tool scripts reload on every build, and side-effectful constructors will run unexpectedly.
-- Keep citizen simulation parameters (wish frequency, happiness thresholds, credit generation rates) in `Resource` files editable in the Inspector, so tuning does not require recompilation.
-- Establish a "quick test scene" — a minimal scene with 2-3 citizens and one ring — for rapid iteration without loading the full simulation.
+Apply hysteresis to tier transitions. The tier promotes at the standard threshold, but requires the mood to drop a defined amount below the threshold before demoting:
+
+```csharp
+private MoodTier _currentTier = MoodTier.Quiet;
+private const float TierHysteresis = 0.5f; // must drop 0.5 below boundary to demote
+
+private MoodTier ComputeTier(float mood)
+{
+    // Promotion uses standard thresholds
+    if (mood >= 18.0f) return MoodTier.Radiant;
+    if (mood >= 10.0f) return MoodTier.Vibrant;
+    if (mood >= 5.0f)  return MoodTier.Lively;
+    if (mood >= 2.0f)  return MoodTier.Cozy;
+    return MoodTier.Quiet;
+}
+
+private void UpdateTier(float mood)
+{
+    var rawTier = ComputeTier(mood);
+
+    // Demotion requires crossing below (boundary - hysteresis)
+    if (rawTier < _currentTier)
+    {
+        float demotionThreshold = GetLowerBoundaryForTier(_currentTier) - TierHysteresis;
+        if (mood >= demotionThreshold) return; // suppress demotion
+    }
+
+    if (rawTier != _currentTier)
+    {
+        _currentTier = rawTier;
+        GameEvents.Instance?.EmitMoodTierChanged(_currentTier);
+    }
+}
+```
+
+Additionally, consider a minimum tier hold time (e.g., 5 seconds) before a demotion can fire after a promotion. This prevents the "promoted then immediately demoted in one wish cycle" scenario.
 
 **Warning signs:**
-- Compile + restart cycle exceeding 30 seconds on the development machine
-- Developers making multiple back-to-back tweaks to values that "should" be data, not code
-- Reluctance to change C# files because the restart cost is painful
+- Tier change notification fires twice within a few seconds without any player action
+- "Station mood: Cozy / Lively / Cozy / Lively" in rapid succession in the test console
+- The tier label in the HUD flickers between two states
+- Playtest feedback: "The mood thing seems glitchy"
 
 **Phase to address:**
-Phase 1 (project architecture) — establish the data/logic separation pattern before writing citizen simulation code.
+HappinessManager v2 implementation — implement hysteresis before the tier notification UI is connected, so the notification fires correctly from the start.
 
 ---
 
-### Pitfall 5: Wish Economy Positive Feedback Loop Runaway
+### Pitfall 5: Decay Feels Punishing — Mood Drops Visibly While Player Is Building
 
 **What goes wrong:**
-The wish-driven economy has a structural runaway risk: more citizens generate more credits → more rooms can be built → more wishes are fulfilled → more citizens arrive → more credits. With no fail state and no credit sink beyond room construction costs, the credit supply rapidly outpaces the demand (room costs). Once players have a few dozen citizens, they become effectively unconstrained — credits accumulate faster than rooms can be built, wishes are trivially satisfiable, and the game loses tension. Conversely, early game progression can stall if the income curve is too shallow: one or two citizens generate almost nothing, the player cannot afford even a basic room, and the game feels broken.
+DecayRate = 0.02 with delta gives a half-life of ~35 seconds. A wish fulfillment gives +3.0 mood. After 35 seconds of no further wishes, mood has dropped 1.5 — possibly crossing a tier boundary. If the player spends 45–60 seconds browsing the build panel, placing a room, and placing another, the station tier may quietly demote before the player notices. They placed two rooms and the station feels worse. The cozy promise ("mood breathes with your activity") becomes "mood punishes you for thinking".
+
+This is especially acute in early game: with a low baseline (e.g., 0–2), a single wish raises mood from 0 to 3 (Cozy tier), then decay brings it back to 0 (Quiet) within about 2 minutes. The player who started a fresh station and fulfilled one wish sees their "Cozy" notification disappear while they're still celebrating.
 
 **Why it happens:**
-Open-ended builder games without a fail state have no natural corrective mechanism. Positive feedback loops (wealth → more wealth) dominate without explicit counters. The design intentionally avoids debt, maintenance costs, and scarcity crises — but this removes the tools typically used to control runaway growth. The happiness multiplier on credit generation compounds the problem: as happiness rises, credits flow faster, wishes are fulfilled more often, happiness rises more, repeat.
+Linear exponential decay feels faster near the upper tier boundary than near the baseline. A 35-second half-life feels fine at high mood (the player is active, fulfilling wishes rapidly) but brutal at low mood (each wish matters more, and the decay window is tight). The design doc's note that "decay is gentle, not punitive" is a goal, not a guarantee — the numbers need validation against real session behavior.
 
 **How to avoid:**
-- Apply diminishing returns to the citizens-per-happiness curve: the rate of citizen arrival should increase steeply at first and flatten significantly at high happiness. Use a sigmoid or square-root-shaped relationship, not linear.
-- Apply diminishing returns or step increases to credit generation per citizen: the 50th citizen should generate meaningfully less per capita than the 5th, reflecting "mature station economics."
-- Scale room costs with ring number rather than room type only: ring 2 rooms should cost more than ring 1 equivalents, acting as a natural credit sink that keeps pace with income growth.
-- Introduce a credit-per-citizen income cap: once citizens are above a threshold happiness, they generate at a flat rate, not a multiplier-boosted rate.
-- Test the economy in a spreadsheet simulation before implementing it in code: model 30 turns of the loop with expected player behavior to verify it does not go infinite within 20 minutes.
+Three strategies, apply all three:
+
+1. **Slow the decay at low tiers.** Use a tier-aware decay rate: lower tiers decay slower than higher tiers. Example: Quiet/Cozy decay at 0.01 (half-life ~70s), Lively at 0.02, Vibrant/Radiant at 0.03. This gives the player more time to enjoy their first tier promotion.
+
+2. **Use the baseline as a floor properly.** The formula `mood += (baseline - mood) * rate * delta` already provides a floor — mood decays toward baseline, not toward zero. Verify in code that baseline is recomputed correctly from `lifetimeHappiness` before each decay step, not cached from session start.
+
+3. **Never demote below the resting tier.** If the current baseline implies the player's resting tier is Cozy, prevent mood from displaying the Quiet label even if a momentary dip sends the raw float below 2.0. Clamp the displayed tier to `max(ComputeTier(mood), ComputeTier(baseline))`. The resting tier is the player's "floor identity" for the station — they earned it permanently through Lifetime Happiness.
 
 **Warning signs:**
-- Playtester has more credits than they know what to do with by the 15-minute mark
-- Playtester stops looking at the wish board because they can just build everything
-- Credit balance never dips below 50% of building cost of the most expensive room
-- Playtester says "I'm not sure what I'm supposed to do" — the game has no meaningful choices left
+- Playtest feedback: "I built a room and the mood got worse"
+- Tier demotes within 60 seconds of a tier promotion without any inactivity
+- New game: first wish gives Cozy, but Cozy disappears before the second wish can spawn
+- The decay half-life at low mood feels shorter than at high mood (not true mathematically, but perceived as so because each tier step represents more emotional weight early in the game)
 
 **Phase to address:**
-Phase covering economy implementation — before connecting happiness to citizen arrival rate; verify the curve shape before wiring it to citizen spawning.
+Playtesting / tuning phase after initial implementation. Do not tune decay rates in code — put them in the `EconomyConfig` resource or a dedicated `HappinessConfig` resource so they can be adjusted without recompilation.
 
 ---
 
-### Pitfall 6: GDScript-Only Addons Blocking C# Workflow
+### Pitfall 6: Blueprint Unlock Milestone Carry-Over — Double-Firing Unlocks on Migration
 
 **What goes wrong:**
-The Godot asset library and community ecosystem is approximately 84% GDScript. When reaching for a third-party addon (save system, localization, UI tweening, analytics, dialogue), the most popular options will be GDScript-only. Calling a GDScript addon from C# is possible via `GD.Load<GDScript>()` and `Call()`, but this:
-1. Loses type safety entirely
-2. Incurs marshalling overhead on every call
-3. Cannot call GDExtension-backed addons at all (Godot does not generate C# bindings for GDExtensions)
-4. Breaks IDE autocomplete and refactoring
+In v1, `_crossedMilestoneCount` tracks how many percentage-based thresholds were crossed (0, 1, or 2). In v2, milestones are keyed to wish counts (4, 12). The migration sets `LifetimeHappiness` by inverting the v1 formula. If a v1 player had ~60% happiness (≈12 wishes crossed), the migration correctly estimates 12 wishes. On load, `CheckUnlockMilestones()` runs from `_crossedMilestoneCount`. If `_crossedMilestoneCount` is carried from v1 (value = 2), the milestone check starts at index 2 and fires nothing (already past both milestones). Correct.
 
-For Orbital Rings, the most likely addon needs are: UI management, save/load (serialization), and possibly localization. Each of these has GDScript-first implementations in the ecosystem.
+BUT: if the migration estimates `LifetimeHappiness = 14` and the code resets `_crossedMilestoneCount = 0` (naively starting fresh), the milestone loop will fire `BlueprintUnlocked` for rooms the player already built — causing duplicate blueprint notifications and potentially confusing unlock state in `BuildPanel`.
 
 **Why it happens:**
-Only ~16% of the Godot community uses C# (per 2025 survey). Plugin authors optimize for the majority. The official plugin documentation defaults to GDScript. GDExtension — the high-performance native extension API — explicitly has no C# binding generation.
+The migration logic has two independent concerns: computing `LifetimeHappiness` from the old `Happiness` float, and determining which milestones should be considered already crossed. These are easy to conflate. If one path resets `_crossedMilestoneCount` while another leaves it, behavior is inconsistent.
 
 **How to avoid:**
-- Before adopting any addon, check: is there a C# port? Is the .NET NuGet ecosystem an alternative? For save/load: use `System.Text.Json` or `Newtonsoft.Json` directly — these are vastly better than Godot's built-in serialization and have no GDScript dependency. For UI tweening: Godot's `Tween` class is fully C# accessible. For localization: Godot's built-in CSV/PO localization system is accessible from C#.
-- Maintain a policy: if an addon cannot be used natively from C# with full type safety, either port the relevant parts to C# or solve the problem with the .NET ecosystem instead.
-- Do not mix C# and GDScript in the same game logic layer. Reserve GDScript calls exclusively for editor tooling or one-off integration shims.
+In the v1→v2 migration function, carry `CrossedMilestoneCount` forward unchanged from the v1 save. The v1 value (0, 1, or 2) maps directly to the v2 milestone count since v2 has the same number of unlock milestones (2). Do not recompute it from the estimated `LifetimeHappiness`. Explicitly document in the migration code why `CrossedMilestoneCount` is not recomputed.
+
+If the unlock milestone count changes in v3 (e.g., adding a third milestone), that migration will need a proper mapping — but for v1→v2, the count is stable.
 
 **Warning signs:**
-- `GD.Load<GDScript>()` appearing anywhere outside of editor-tool scripts
-- IDE showing "no completions" warnings on addon API calls
-- Runtime errors instead of compile-time errors when calling addon methods
+- `BlueprintUnlocked` event fires on session start for rooms the player already unlocked
+- `BuildPanel` shows "New!" badges on already-known rooms after loading a save
+- `_crossedMilestoneCount` is 0 in the debugger immediately after loading a save where `LifetimeHappiness > 12`
 
 **Phase to address:**
-Phase 1 (project setup / dependency decisions) — evaluate all potential addons against C# compatibility before writing any code that depends on them.
+Save migration phase — verify with a saved game that has at least one crossed milestone before considering migration complete.
 
 ---
 
 ## Technical Debt Patterns
 
-Shortcuts that seem reasonable but create long-term problems.
-
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Store all citizen state in Node properties (not separate data objects) | Easy to inspect in editor | Cannot simulate or test citizen logic without a running scene; rebuild kills state | Never — keep data in plain C# classes from the start |
-| Auto-bake NavigationMesh for the ring walkway | Zero setup time | Curved geometry bakes badly; agents cut corners or take wrong arc | Never — hand-author the ring navmesh |
-| Use anonymous lambda for signal connections | Concise code | Lambda/Callable memory leaks; cannot disconnect | Never for signals on long-lived objects |
-| Hard-code economy numbers as C# constants | Fast to write | Every balance change requires recompile + restart | MVP only — move to Resource files before beta |
-| Use trimesh collision on the full ring mesh | Single collision node | Inner-face phantom hits on raycasts; room placement cursor misbehaves | Never — use mathematical segment selection instead |
-| Heap-allocate per-citizen Update() data each frame | Simple code | GC pressure with 20+ citizens; frame spikes during GC | Acceptable for prototype; profile before shipping |
+| Emit `MoodChanged` every frame from `_Process` | Simple code, no accumulator needed | Autosave debounce never expires; I/O storm if debounce removed | Never — use tier change events or interval throttle |
+| Keep `HappinessChanged (float)` event alongside new events | No consumer migration needed immediately | Consumers on old event receive semantically wrong data; economy multiplier maxes out | Never — migrate all consumers atomically |
+| Hard-code decay rate and tier thresholds as C# constants | Faster to write | Balance tuning requires recompile + restart each iteration | MVP only — move to `HappinessConfig` resource before first playtest |
+| Skip hysteresis on tier transitions | Simpler tier evaluation code | Tier oscillation near boundaries; player-visible "glitchy" notification spam | Never — hysteresis is a one-time addition, not ongoing complexity |
+| Set `Mood = 0` on migration instead of computing from baseline | No migration math needed | New session after loading v1 save shows Quiet tier despite accomplished station | Never — baseline math is 3 lines, worth it |
+| Reuse `EconomyManager.SetHappiness(float)` by passing normalized mood | No API change to EconomyManager | Mood is not in [0, 1], clamp produces wrong multiplier; economy always at maximum | Never — create `SetEconomyMultiplier(float)` that takes the tier multiplier directly |
 
 ---
 
 ## Integration Gotchas
 
-Common mistakes when connecting systems in this specific project.
-
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| Citizen → Wish system | Citizen node owns and manages its own wishes inline | Wish system is a separate singleton/manager; citizens emit events, manager tracks wish state independently |
-| Room placement → Segment grid | Using 3D collision picking on ring geometry to determine which segment was clicked | Project mouse ray to ring plane, convert polar coordinates to segment index mathematically |
-| Economy → Happiness | Wiring happiness as a direct linear multiplier on credit income | Apply happiness as a soft bonus with diminishing returns; cap maximum multiplier at 1.5x or 2x |
-| Navigation → Room placement | Rebaking the walkway navmesh every time a room is placed | Room placement does not change the walkway; only bake navmesh when walkway geometry actually changes (never, for v1) |
-| C# NuGet packages → Godot build | Adding NuGet packages without verifying AOT/trimming compatibility | Check NuGet package for AOT-safe or Godot-compatible tag; avoid packages that use heavy reflection |
+| `EconomyManager` ↔ `HappinessManager` | Pass raw `_mood` float to `SetHappiness(float)` | Resolve the tier in `HappinessManager`, pass the tier's economy multiplier value directly: `EconomyManager.Instance?.SetEconomyMultiplier(tier.EconomyMultiplier)` |
+| `SaveManager` ↔ `MoodChanged` event | Subscribe autosave trigger to `MoodChanged` (fires every frame during decay) | Subscribe autosave trigger to `MoodTierChanged` + explicit discrete events (wish fulfilled, room placed) — not continuous mood drift |
+| `HappinessBar` → v2 UI | Rename/repurpose the existing node | The entire widget is being replaced (bar → counter + tier label); delete `HappinessBar.cs` and its scene node rather than patching it to avoid stale code paths |
+| `RestoreState(float, ...)` on `HappinessManager` | Call old `RestoreState` signature from `SaveManager.ApplyState()` | Add new `RestoreStateV2(int lifetimeHappiness, float mood, ...)` overload; update `SaveManager.ApplyState()` to call the new signature; remove the old one |
+| `SaveData.Happiness` field | Leave the old field in `SaveData` for backward compatibility | Leave it present for JSON deserialization of v1 files (deserialization reads it), but mark it `[Obsolete]` and only access it in the migration function; never write it in v2 saves |
 
 ---
 
 ## Performance Traps
 
-Patterns that work at small scale but degrade as citizen count grows.
-
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| Each citizen calls `NavigationServer3D.MapGetClosestPoint()` every physics frame | Frame drops as citizen count increases | Citizens on a fixed-topology ring don't need continuous navmesh queries; use arc-distance waypoint paths | ~15-20 citizens with per-frame nav queries |
-| All citizen state updates in `_Process()` | CPU time scales linearly with citizen count | Use `_PhysicsProcess()` only for movement; batch happiness/wish updates on a timer (e.g., every 2 seconds) | ~30+ citizens with complex per-frame logic |
-| Scripted citizen nodes with expensive `_Process()` | Godot 4 has known perf issues with many scripted nodes calling `_Process` | Confirmed engine bug: adding `_Process` to scripts instantiated ~4000 times causes severe slowdown; even 50-100 scripted citizens with busy `_Process` can show measurable cost | Scales poorly; measure at 20 citizens |
-| Instantiating citizen scenes at runtime without pooling | Hitches when citizens arrive | Pre-instantiate a small pool of citizen nodes at scene load; reuse on arrival | Noticeable hitch at each citizen spawn |
-| Re-baking NavigationMesh at runtime when rooms change | Frame drop on room placement | Room placement does not change the walkway mesh; navmesh never needs runtime rebake for v1 | Every room placement event |
-| Reading/writing GodotObject properties in tight loops | Marshalling overhead on every property access | Cache GodotObject property values in local C# variables before loops; avoid repeated engine interop in hot paths | Any loop touching 10+ GodotObject properties per frame |
+| `sqrt(lifetimeHappiness)` computed every frame in baseline recalculation | Negligible on its own, but compounds if decay + baseline + tier check all run every `_Process` frame | Cache baseline; recompute only when `lifetimeHappiness` changes (on wish fulfillment, never during decay) | Not a performance problem at expected scale, but wastes CPU for no gain |
+| Tier change notification spawning `FloatingText` while autosave debounce is pending | Multiple `FloatingText` nodes live simultaneously if tier oscillates | Hysteresis prevents oscillation; also enforce a minimum 5s cooldown before the same tier change notification can re-fire | Visible with tier boundary oscillation (see Pitfall 4) |
+| Per-frame `_Process` in `HappinessManager` that emits events consumed by UI | UI receives 60 updates/second for data that changes slowly | Rate-limit UI updates; UI should poll current tier on a 250ms timer rather than subscribing to continuous mood events | Becomes noticeable if mood animation is added to tier labels |
 
 ---
 
 ## UX Pitfalls
 
-Common user experience mistakes specific to this game's design.
-
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
-| Too many simultaneous wishes visible | Player paralysis — unclear which to act on | Limit visible active wishes to 3-5 at a time; queue the rest; surface them gradually |
-| Wish text too abstract | Player doesn't understand what to build | Pair wish text with a room type icon or highlight the relevant build menu category |
-| No feedback when a wish is fulfilled | Player doesn't feel rewarded | Animate the citizen's speech bubble with a "thank you" moment; update happiness bar visibly |
-| Camera orbit with mouse drag also triggers room placement | Misclicks during orbit place unwanted rooms | Separate camera control (right-mouse-button drag or middle-mouse) from room selection (left-click) |
-| Fixed camera tilt makes inner vs. outer segment ambiguous | Player places rooms on wrong ring face | Use hover highlight to clearly indicate which segment (inner/outer) is under the cursor before click confirmation |
-| Economy progress invisible | Player doesn't know if they're "doing well" | Show credit income rate (credits/minute) in the HUD, not just current balance |
-| Citizen names never reinforced | Attachment to named citizens doesn't form | Surface citizen names in wish bubbles, tooltips, and happiness events — repetition builds attachment |
+| Showing raw mood float anywhere in the UI | Players optimize around the number instead of playing naturally | Never expose the raw float; only show the tier name and lifetime counter |
+| Tier change notification on every minor fluctuation | Notification spam feels broken; player tunes it out | Hysteresis + minimum hold time; notification fires at most once per ~10 seconds |
+| Demoting tier while player is actively building | Player perceives building as causing mood to drop | Enforce the "resting tier floor" — displayed tier cannot go below `ComputeTier(baseline)` |
+| Lifetime counter ticking up without visible celebration | The permanent achievement is invisible | Pulse the counter on increment (same pattern as credit counter flash already in `CreditHUD`); ensure this animation is wired in the wish fulfillment handler |
+| "Station mood: Quiet" on a mature station | Station with 50 wishes feels dead | Baseline formula ensures mature stations rest above Quiet; verify the formula at 25, 50, 100 wishes in a spreadsheet before shipping |
+| No feedback when Radiant tier is reached | Radiant is the peak state; player doesn't notice | Give Radiant a distinct visual treatment — ambient glow or ring color shift — not just a text label |
 
 ---
 
 ## "Looks Done But Isn't" Checklist
 
-Things that appear complete but are missing critical pieces.
-
-- [ ] **Citizen pathfinding:** Citizens move to destinations — but verify they take the shorter arc around the ring, not always clockwise or always counterclockwise
-- [ ] **Room placement:** Rooms visually snap to segments — but verify collision/selection works correctly on the inner arc (smaller radius) vs. outer arc, which subtend different angular widths in screen space
-- [ ] **Wish fulfillment:** Wishes disappear when a room is built — but verify the matching logic accounts for room TYPE and SIZE (a 1-segment Café should not fulfill a wish that requires a 3-segment Lounge)
-- [ ] **Economy:** Credits accumulate and rooms can be built — but verify the credit income formula has been tested at 5 citizens, 15 citizens, and 30 citizens to confirm it does not go flat or go runaway
-- [ ] **Signal connections:** Citizens connect to wish/happiness signals at spawn — but verify they disconnect cleanly at removal (check Godot Orphan Nodes counter)
-- [ ] **Camera orbit:** Camera orbits around the ring center — but verify the tilt angle is fixed and does not drift over long orbit sessions (floating-point quaternion accumulation error)
-- [ ] **Segment coordinate system:** Segments are numbered and positioned correctly — but verify that segment 1 and segment 12 are adjacent (the ring closes correctly) and that the "clock face" numbering is consistent between the data model and the visual geometry
+- [ ] **Save migration:** v1 save file loads correctly with non-zero `LifetimeHappiness` and correct starting `Mood` — verify by loading an actual `save.json` from a v1 session, not a newly created test save
+- [ ] **Blueprint milestone carry-over:** Loading a v1 save with both milestones crossed does NOT re-fire `BlueprintUnlocked` events on session start
+- [ ] **EconomyManager multiplier:** After v2 migration, `EconomyManager._currentHappiness` is no longer used; verify income calculation uses tier multiplier, not the old clamped float
+- [ ] **HappinessChanged event removed:** Confirm no subscriber is still wired to the old `HappinessChanged` event; grep for `HappinessChanged +=` and `OnHappinessChanged`
+- [ ] **Decay runs correctly:** Verify mood decays toward baseline (not toward zero) — confirm with a save that has `LifetimeHappiness = 36` (baseline = 6.0); idle the game; mood should settle at ~6.0, not 0.0
+- [ ] **Tier oscillation absent:** With mood at 4.9 and baseline at 4.5, fulfill one wish — verify the "Lively" notification fires once, not twice, even after decay returns mood to ~4.5
+- [ ] **Autosave frequency:** With no player input and mood decaying, verify `save.json` is NOT written every second — check the file's modification timestamp is stable during idle decay
 
 ---
 
 ## Recovery Strategies
 
-When pitfalls occur despite prevention, how to recover.
-
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Auto-baked navmesh producing bad paths | HIGH | Throw out the NavMesh approach; implement custom waypoint arc system; 2-5 days rework |
-| Signal leak causing memory growth | MEDIUM | Audit all signal connections in citizen and room scripts; add disconnect calls to _ExitTree(); run with Godot memory profiler to confirm resolution |
-| Economy runaway discovered in late playtesting | MEDIUM | Economy is data-driven (Resource files); adjust income/cost curves without recompile; 1-2 days tuning |
-| GDScript addon dependency embedded in core systems | HIGH | Port the addon subset needed to C# or replace with .NET NuGet equivalent; difficulty scales with how deeply the addon is integrated |
-| Torus collision causing phantom raycast hits | MEDIUM | Replace trimesh collider with mathematical polar-coordinate segment selection; 1-2 days rework |
-| Citizen count causing frame drops | MEDIUM | Profile to identify hot path; batch update logic; reduce _Process frequency; may require citizen pooling rework |
+| Migration silently zeroes lifetime happiness | HIGH — affects all existing players | Ship a hotfix that reads the old `Happiness` float from the JSON before migration runs; re-derive `LifetimeHappiness`; re-save |
+| EconomyManager always at maximum multiplier | MEDIUM — silent wrong behavior | Trace `_currentHappiness` in EconomyManager; replace `SetHappiness` call site with tier multiplier; 1–2 hours fix |
+| Autosave storm from mood decay events | MEDIUM — I/O issue, not data loss | Remove `MoodChanged` from autosave trigger subscriptions; add back only `MoodTierChanged`; 30 minutes fix |
+| Tier oscillation visible in playtest | LOW — UI/feel issue | Add hysteresis constant and hold timer to `UpdateTier()`; 1–2 hours fix |
+| Decay feels punishing in first session | MEDIUM — requires tuning, not rewrites | Expose decay rates and tier thresholds in a `HappinessConfig` Resource; adjust via Inspector without recompile; 1–3 hours tuning |
+| Double-fired `BlueprintUnlocked` on migration | LOW — notification annoyance | Carry `CrossedMilestoneCount` forward from v1 save unchanged; 15 minutes fix |
 
 ---
 
 ## Pitfall-to-Phase Mapping
 
-How roadmap phases should address these pitfalls.
-
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| Circular walkway navmesh | Ring geometry + citizen movement phase | Playtest: 5 citizens, verify arc choice, no stuck states |
-| C# signal memory leaks | Phase 1 architecture (citizen lifecycle) | Run for 10 minutes; check Godot Orphan Nodes count = 0 |
-| No torus collision shape | Ring geometry / room placement phase | Verify raycast segment selection uses math, not trimesh collision |
-| C# rebuild iteration speed | Phase 1 setup | Economy and wish params in Resource files; quick test scene established |
-| Economy runaway | Economy implementation phase | Spreadsheet model before coding; playtested at 5/15/30 citizens |
-| GDScript addon incompatibility | Phase 1 dependency audit | All dependencies verified C#-native or .NET NuGet before first use |
-| Camera float drift | Camera implementation phase | Orbit 360 degrees 10 times; verify tilt angle unchanged |
-| Wish paralysis | Wish system UI phase | Playtest: verify player always has clear next action from wish board |
+| v1 save migration data loss | Save migration phase (first task) | Load actual v1 save.json; confirm `LifetimeHappiness > 0` and `Mood = baseline` in debugger |
+| HappinessChanged event contract break | HappinessManager refactor phase | Delete old event; confirm build succeeds; confirm economy multiplier is not always at maximum |
+| Autosave storm from decay events | HappinessManager refactor phase | Idle for 60s with mood decaying; confirm save.json modification timestamp is stable |
+| Tier boundary oscillation | HappinessManager refactor phase | Set mood to 4.9, baseline to 4.5; fulfill one wish; verify one notification fires, not two |
+| Decay feels punishing at low mood | Playtesting / tuning phase | Fresh game: fulfill one wish; verify Cozy tier holds for at least 90 seconds before any demotion |
+| Blueprint unlock double-fire | Save migration phase | Load v1 save with both milestones crossed; confirm no `BlueprintUnlocked` event fires at session start |
 
 ---
 
 ## Sources
 
-- Chickensoft — GDScript vs C# in Godot 4: https://chickensoft.games/blog/gdscript-vs-csharp
-- Godot Engine — What's new in C# for Godot 4.0: https://godotengine.org/article/whats-new-in-csharp-for-godot-4-0/
-- Godot Forum — GC in C# via Godot 4.3 and memory leak with += operator: https://forum.godotengine.org/t/gc-in-c-via-godot-4-3-and-memory-leak-with-using-operator-to-signals/101189
-- Godot GitHub Issue — Lambda/Callable memory leak #85112: https://github.com/godotengine/godot/issues/85112
-- Godot GitHub Issue — Dispose() causes memory leaks #107579: https://github.com/godotengine/godot/issues/107579
-- Godot GitHub Discussion — Torus collision shape #6244: https://github.com/godotengine/godot-proposals/discussions/6244
-- Godot GitHub Proposal — Add support for C# hot reloading #7746: https://github.com/godotengine/godot-proposals/issues/7746
-- Godot Forum — Terrible performance on .NET with many scripted nodes #98175: https://github.com/godotengine/godot/issues/98175
-- Godot Forum — NavigationAgent3D cuts corners and gets stuck #88237: https://github.com/godotengine/godot/issues/88237
-- Godot Forum — Dynamically update NavigationRegion3D: https://forum.godotengine.org/t/dynamically-update-navigationregion3d-navigationmesh/63865
-- Godot Docs — Optimizing Navigation Performance: https://docs.godotengine.org/en/latest/tutorials/navigation/navigation_optimizing_performance.html
-- Godot Docs — When and how to avoid using nodes for everything: https://docs.godotengine.org/en/stable/tutorials/best_practices/node_alternatives.html
-- Machinations.io — Game economy inflation: https://machinations.io/articles/what-is-game-economy-inflation-how-to-foresee-it-and-how-to-overcome-it-in-your-game-design
-- Game Developer — Economy design handbook: https://www.gamedeveloper.com/production/i-designed-economies-for-150m-games-here-s-my-ultimate-handbook
-- Godot 4 Recipes — Camera Gimbal: https://kidscancode.org/godot_recipes/4.x/3d/camera_gimbal/index.html
-- Godot Forum — Cross-language scripting (C# interop): https://docs.godotengine.org/en/stable/tutorials/scripting/cross_language_scripting.html
+- Direct codebase inspection: `HappinessManager.cs`, `SaveManager.cs`, `GameEvents.cs`, `EconomyManager.cs`, `HappinessBar.cs` (all current v1.0 state)
+- Design spec: `.planning/design/happiness-v2.md`
+- Hysteresis for tier boundary control: https://shawnhargreaves.com/blog/hysteresis.html (Shawn Hargreaves, XNA/DirectX veteran)
+- Hysteresis in control systems: https://en.wikipedia.org/wiki/Hysteresis
+- Event-driven architecture breaking changes: https://medium.com/insiderengineering/common-pitfalls-in-event-driven-architectures-de84ad8f7f25
+- Game save migration versioning: https://www.gamedev.net/forums/topic/702903-how-to-transfer-save-data-through-versions/
+- Godot `_Process` delta and frame-rate independence: https://kidscancode.org/godot_recipes/4.x/basics/understanding_delta/index.html
+- `System.Text.Json` default deserialization behavior (missing fields → default values, extra fields → silently ignored): https://learn.microsoft.com/en-us/dotnet/standard/serialization/system-text-json/missing-members
 
 ---
-*Pitfalls research for: Orbital Rings — cozy space station builder (Godot 4 C#)*
-*Researched: 2026-03-02*
+*Pitfalls research for: Orbital Rings — v1.1 Happiness v2 (dual-value decay system migration)*
+*Researched: 2026-03-04*

@@ -1,11 +1,258 @@
 # Project Research Summary
 
+**Project:** Orbital Rings — v1.1 Happiness v2
+**Domain:** Cozy 3D space station builder (Godot 4.4 C# / existing singleton architecture)
+**Researched:** 2026-03-04
+**Confidence:** HIGH
+
+---
+
+> **Milestone scope:** This summary covers the v1.1 Happiness v2 research only.
+> The v1.0 foundation research (ring geometry, citizen navigation, economy, wish system)
+> remains documented in the sections below the v1.1 content.
+
+---
+
+## Executive Summary
+
+Orbital Rings v1.1 replaces a single monotonically increasing happiness float (v1: 0.0–1.0) with a dual-value system: a permanent `lifetimeHappiness` integer counter and a fluctuating `mood` float that decays toward a rising baseline derived from that counter. This is a well-understood pattern in incremental and cozy game design: the permanent counter satisfies the "always-progressing" instinct, while the fluctuating mood gives each active session its emotional texture. The design is correctly non-punishing because the decay floor rises with accumulated play — a player who returns after an absence finds their station at its earned resting state, not at zero.
+
+All new technical surface area maps to APIs already present in Godot 4.4 and the existing codebase. No new packages or addons are required. The implementation is a targeted refactor of `HappinessManager`, a replacement of `HappinessBar` with two smaller HUD widgets, and a one-way save migration. Every API decision (frame-based decay via `_Process`, `AddThemeColorOverride` for tier colors, `FloatingText` reuse for tier notifications, kill-before-create `Tween` for counter pulse, version-gated `SaveData` migration) has a direct precedent already proven in the live codebase.
+
+The primary risks are not technical complexity but correctness of migration and event wiring. The most dangerous failure mode is v1 save data being silently zeroed if the migration gate is omitted. The second most dangerous is a stale `HappinessChanged(float)` subscription surviving in `EconomyManager` after the refactor, causing the income multiplier to permanently clamp to 1.0. Both risks are mechanical to prevent: delete the old event early so the compiler surfaces every missed subscriber, and test migration with an actual v1 `save.json` before shipping.
+
+---
+
+## Key Findings
+
+### Recommended Stack
+
+The existing Godot 4.4 C# stack requires zero additions. All implementation uses built-in engine APIs with direct precedents in this codebase. See `.planning/research/STACK.md` for API-level detail.
+
+**Core technologies:**
+- `_Process(double delta)` in `HappinessManager` — smooth per-frame mood decay; the only correct approach for continuous exponential smoothing (Timer nodes produce stair-step artifacts)
+- `Tween` via `CreateTween()` — all UI animations; kill-before-create pattern already established in `HappinessBar.cs`, `FloatingText.cs`, `CreditHUD.cs`
+- `AddThemeColorOverride("font_color", color)` — tier label color; absolute color override immune to theme conflicts; already used in `HappinessBar.cs` and `FloatingText.cs`
+- `FloatingText : Label` (existing class) — tier change notification; zero new code; proven in production for credit and happiness gain notifications
+- `System.Text.Json` (.NET 8 built-in) — save migration; missing fields default to zero, enabling clean v1→v2 migration without a separate deserializer
+
+**What NOT to add:** No third-party tween library, no Timer for mood decay, no `Label3D` for HUD notifications, no `AnimationPlayer` scene for floating text, no animated number roll-up for the lifetime counter.
+
+### Expected Features
+
+See `.planning/research/FEATURES.md` for full competitive analysis and dependency graph.
+
+**Must have for v1.1 (table stakes from genre research):**
+- Named mood tiers (Quiet / Cozy / Lively / Vibrant / Radiant) — players expect human-readable state names, not raw floats; established by Spiritfarer, RimWorld, Animal Crossing
+- Always-visible mood tier in HUD — cozy game research confirms ambient state must be on-screen without requiring menu interaction
+- Feedback on tier change — floating text auto-fading in ~2 seconds; non-blocking; "Station mood: Lively" pattern
+- Permanent progress counter (♥ N) — monotonically increasing; never regresses; satisfies incremental game instinct without competitive pressure
+- Decay toward rising baseline (not toward zero) — the design's key genre-correctness decision; zero-floor decay is a punishment loop, genre-violating
+
+**Should have (differentiators for this system):**
+- Rising baseline tied to lifetime wish count — mature stations rest above the lowest tier; earned warmth persists
+- Tier label color as ambient mood indicator — space-efficient HUD; five distinct colors (gray → coral → amber → gold → soft white)
+- Wish counter as the always-increasing "score" — ♥ 47 is a legible, warm brag number; no new systems needed
+
+**Defer to v1.x:**
+- "About to tier up" visual pulse — medium complexity; implement after core system is validated in play
+- Persistent wish board supplement — relevant once citizen count exceeds ~10
+- Additional blueprint milestones beyond v1.1 set (e.g., at 30, 50, 100 wishes)
+
+**Anti-features to firmly avoid:**
+- Raw mood float exposed anywhere in player-facing UI
+- Mood decay toward zero (punishment loop)
+- Blocking or semi-blocking tier change notifications
+- Diminishing returns on mood gain per wish (decay already provides the natural ceiling)
+- Multiple simultaneous mood dimensions (station + room + citizen) — scope explosion
+
+### Architecture Approach
+
+The refactor is surgical: `HappinessManager` is the source of truth and is fully replaced; all consumers update against its new API. The singleton event-bus pattern (`GameEvents`) is preserved and extended with three new typed events. No new singletons or scene nodes are introduced. See `.planning/research/ARCHITECTURE.md` for full data-flow diagrams and build order.
+
+**Major components and their changes:**
+1. `HappinessManager` — **Replace**: owns `int _lifetimeHappiness` + `float _mood` + `float _baseline` + `MoodTier _currentTier`; drives per-frame decay via `_Process`; calls `EconomyManager.SetMoodTier` directly on tier change
+2. `GameEvents` — **Extend**: add `LifetimeHappinessChanged(int)`, `MoodTierChanged(MoodTier, MoodTier)`, `MoodChanged(float)`; remove `HappinessChanged(float)` atomically to let the compiler surface all missed subscribers
+3. `EconomyManager` — **Modify**: replace `_currentHappiness float` + `SetHappiness(float)` with `_currentTier MoodTier` + `SetMoodTier(MoodTier)`; income multiplier becomes a tier lookup table (1.0 / 1.1 / 1.2 / 1.3 / 1.4), not a formula
+4. `SaveManager / SaveData` — **Extend + migrate**: bump `Version` 1→2; add `LifetimeHappiness` and `Mood` fields; static `MigrateV1ToV2` method; update event subscriptions
+5. `HappinessBar` (UI) — **Replace entirely**: create `HappinessCounter.cs` (subscribes to `LifetimeHappinessChanged`) and `MoodDisplay.cs` (subscribes to `MoodTierChanged`, spawns floating text)
+6. `CitizenManager`, `WishBoard`, `BuildManager` — **No change**
+
+**Build order (dependency-driven):** HappinessManager refactor → GameEvents event changes → EconomyManager update → SaveManager migration → HUD replacement → Integration smoke test.
+
+### Critical Pitfalls
+
+See `.planning/research/PITFALLS.md` for full detail, warning signs, and recovery strategies.
+
+1. **Save migration data loss** — v1 saves silently zeroing all lifetime happiness if no version gate exists. Prevention: add `if (data.Version < 2) data = MigrateV1ToV2(data)` immediately after deserialization in `Load()`; test with an actual v1 `save.json`. Highest-severity risk.
+
+2. **HappinessChanged event contract break** — stale subscribers on the old `Action<float>` event receive raw `mood` (not in [0,1]); `EconomyManager.SetHappiness` clamps to 1.0, producing maximum income multiplier forever. Prevention: delete `HappinessChanged` early; migrate all consumers in the same phase.
+
+3. **Autosave storm from continuous mood decay** — `MoodChanged` emitted every frame from `_Process` causes `SaveManager` debounce timer to reset every frame; game never saves during idle decay. Prevention: emit `MoodChanged` only on tier change or with a 1-second minimum interval; wire `SaveManager` to `MoodTierChanged` and discrete events only.
+
+4. **Tier boundary oscillation (chatter)** — rapid tier toggling when mood rests near a threshold produces repeated notifications that look broken. Prevention: implement hysteresis (demotion threshold = boundary - 0.5) and a minimum tier hold time of 5 seconds.
+
+5. **Decay feels punishing at low lifetime happiness** — first wish grants Cozy tier, but half-life returns mood below threshold before the next wish. Prevention: tier-aware decay rates (lower tiers decay slower); enforce "resting tier floor" (displayed tier cannot fall below `ComputeTier(baseline)`); put decay rates in a config resource for tuning without recompile.
+
+---
+
+## Implications for Roadmap
+
+`HappinessManager` is the dependency root of this milestone. All consumer phases must follow it. The save migration window is narrow — once a v2 save exists on disk, v1 migration is a legacy concern. HUD is purely cosmetic and has no downstream impact, making it the safest last step.
+
+### Phase 1: HappinessManager Refactor + Event Bus Migration
+
+**Rationale:** This is the dependency root. All other phases consume `HappinessManager`'s new API and `GameEvents`'s new events. `MoodTier` enum (Step 1) must exist before the new `GameEvents` signatures (Step 2) can compile. Deleting `HappinessChanged` here forces the compiler to surface every missed subscriber — the most effective early-warning mechanism available.
+
+**Delivers:** New `HappinessManager` with `int _lifetimeHappiness` + `float _mood` dual-value state; `MoodTier` enum; three new `GameEvents` events; old `HappinessChanged` deleted; `_Process` decay loop with hysteresis and tier-aware decay rates; `MoodGainPerWish` applied on wish fulfillment; integer-threshold blueprint milestone checks.
+
+**Avoids:** Autosave storm (emit discipline established here); tier boundary oscillation (hysteresis implemented here); event contract break (old event deleted here, compiler enforces migration).
+
+**Research flag:** No additional research needed — all APIs verified at HIGH confidence against live codebase and Godot 4.4 docs.
+
+---
+
+### Phase 2: Save Migration (v1 → v2)
+
+**Rationale:** Highest-severity risk and must be verified against a real v1 `save.json` before any v2 save is written. Once a v2 save exists, the migration window is narrow. This phase is second — before consumer updates — so migration is tested with a stable but not-yet-fully-wired system.
+
+**Delivers:** `SaveData.Version` bumped to 2; `LifetimeHappiness` and `Mood` fields added; `Happiness` field retained for migration read-only; static `MigrateV1ToV2` in `SaveManager`; `CollectGameState` and `ApplyState` updated to new `RestoreState` signature; `SaveManager` event subscriptions migrated from `HappinessChanged` to `MoodTierChanged` + `LifetimeHappinessChanged`.
+
+**Avoids:** Pitfall 1 (migration data loss); Pitfall 6 (blueprint double-fire — carry `CrossedMilestoneCount` forward unchanged from v1 save).
+
+**Verification gate:** Load an actual v1 `save.json`; confirm `LifetimeHappiness > 0`; confirm no `BlueprintUnlocked` events fire on session start; confirm mood is set to computed baseline (not zero).
+
+**Research flag:** No additional research needed — `System.Text.Json` missing-field behavior verified at HIGH confidence.
+
+---
+
+### Phase 3: EconomyManager Consumer Update
+
+**Rationale:** Smallest consumer change; validates the new `MoodTier` API against a real downstream system before the HUD is built. Contains all changes in a single file.
+
+**Delivers:** `EconomyManager._currentTier` replaces `_currentHappiness`; tier lookup table for income multiplier (1.0 / 1.1 / 1.2 / 1.3 / 1.4 per tier); `GetIncomeBreakdown()` returns tier multiplier value; `HappinessManager` calls `SetMoodTier` directly on tier change (matching the existing `SetHappiness` direct-call pattern).
+
+**Avoids:** Pitfall 2 (economy multiplier maxing out due to stale `SetHappiness` receiving un-clamped mood float).
+
+**Research flag:** No additional research needed — standard pattern, all changes contained in one file.
+
+---
+
+### Phase 4: HUD Replacement
+
+**Rationale:** Purely a consumer with no downstream impact. A broken HUD does not break the game loop, making it the safest phase to iterate on. `HappinessBar.cs` is deleted entirely (not patched) to eliminate stale code paths.
+
+**Delivers:** `HappinessCounter.cs` subscribing to `LifetimeHappinessChanged(int)`, displaying `♥ N` with kill-before-create scale pulse (matching `CreditHUD` pattern); `MoodDisplay.cs` subscribing to `MoodTierChanged`, updating tier name with `AddThemeColorOverride("font_color", tierColor)`, spawning `FloatingText` tier change notification; both widgets initialize from `HappinessManager.Instance` in `_Ready()`; both wired into `QuickTestScene.tscn`.
+
+**Uses:** `FloatingText` (existing, zero modifications); `Tween` kill-before-create pulse; `AddThemeColorOverride` for tier colors.
+
+**Avoids:** Stale `HappinessBar` node persisting alongside new widgets; fighting tweens from un-killed previous animations.
+
+**Research flag:** No additional research needed — all patterns proven in this codebase.
+
+---
+
+### Phase 5: Integration Smoke Test + Tuning
+
+**Rationale:** End-to-end verification before any v1.x additions. Decay feel is a tuning concern, not a code correctness concern — it requires playtesting with real session behavior, not further implementation.
+
+**Delivers:** Verified smoke test suite (fresh game → first wish → tier promotion → decay → save/load round-trip → v1 migration → blueprint unlock → economy multiplier change); decay rates and tier thresholds moved to a `HappinessConfig` resource for Inspector tuning without recompile; tier color contrast validated in-engine against the soft-3D pastel art style.
+
+**Avoids:** Pitfall 5 (punishing early-game decay) — validated through first-session playtest at low lifetime happiness counts (0–5, 5–20, 20+ wishes).
+
+**Research flag:** Playtesting-driven. No code research needed; tuning values require iterative testing.
+
+---
+
+### Phase Ordering Rationale
+
+- **HappinessManager first** — defines the contract (MoodTier enum, event signatures, RestoreState signature) that every other phase consumes. Building consumers before the source of truth is defined guarantees rework.
+- **Save migration second** — the migration window is narrow; once a v2 save exists, v1 migration becomes legacy work. Testing migration against a real file before any v2 session can be created is the only safe order.
+- **EconomyManager third** — smallest consumer change; serves as API validation before the more visible HUD work.
+- **HUD last among consumers** — HUD failure is purely cosmetic; does not break the game loop; safest place for iteration.
+- **Tuning after integration** — decay feel cannot be assessed until all systems are wired and the full wish-fulfillment-to-tier-display loop is observable in a real session.
+
+### Research Flags
+
+No phase in this milestone requires `/gsd:research-phase` during planning. All technical decisions are resolved at HIGH confidence.
+
+Phases with standard patterns (all verified against live code or Godot 4.4 docs):
+- **Phase 1:** HappinessManager refactor — `_Process` decay, `GameEvents` C# event delegates, `MoodTier` enum lookup table
+- **Phase 2:** Save migration — `System.Text.Json` missing-field behavior, `SaveData.Version` pattern
+- **Phase 3:** EconomyManager update — direct-call pattern from HappinessManager already established
+- **Phase 4:** HUD replacement — `AddThemeColorOverride`, `Tween` kill-before-create, `FloatingText.Setup()` reuse
+- **Phase 5:** Tuning — empirical, not research-dependent
+
+---
+
+## Confidence Assessment
+
+| Area | Confidence | Notes |
+|------|------------|-------|
+| Stack | HIGH | All APIs verified against Godot 4.4 official docs and live codebase usage; no new packages required; every pattern has a proven precedent in the existing codebase |
+| Features | MEDIUM | Cozy game genre research from developer/community sources (Kitfox, Lostgarden, wiki analysis); no direct competitor in the cozy-space-station-wish-loop niche; patterns cross-validate well against established genre conventions |
+| Architecture | HIGH | Based on direct reading of every affected source file in the live codebase; no speculative API research; build order confirmed against actual dependency graph; all integration points identified with specific file locations |
+| Pitfalls | HIGH | Six specific pitfalls identified with warning signs, recovery strategies, and phase assignments; each grounded in direct codebase inspection; not speculative |
+
+**Overall confidence:** HIGH
+
+### Gaps to Address
+
+- **Decay rate tuning:** `DecayRate = 0.02`, `BaselineFactor = 1.0`, and `MoodGainPerWish = 3.0` are design-spec values not yet validated against real play sessions. Move to `HappinessConfig` resource in Phase 5 — these numbers will change. Verify against fresh-game (0–5 wishes), early-game (5–20 wishes), and mid-game (20+ wishes) scenarios before shipping.
+
+- **Tier threshold validation:** The design-spec thresholds (2.0 / 5.0 / 10.0 / 18.0) and their interaction with the baseline formula (`sqrt(lifetimeHappiness)`) need spreadsheet validation. At 25 wishes, baseline = 5.0 (Lively resting tier); at 50 wishes, baseline ≈ 7.07; at 100 wishes, baseline = 10.0 (Vibrant resting tier). Verify these feel earned, not automatic.
+
+- **Tier colors in-engine:** The five tier colors (gray / coral / amber / gold / soft white) need visual validation against the game's soft-3D pastel art style and HUD background. Confirm contrast in-engine, not just in code. This cannot be verified from code inspection alone.
+
+- **Radiant tier visual treatment:** The pitfalls research flags that reaching the peak tier deserves visual treatment beyond a text label color change. Deferred to v1.x but noted as a known emotional payoff gap at the progression ceiling.
+
+---
+
+## Sources
+
+### Primary (HIGH confidence — live codebase + official docs)
+
+- `/workspace/Scripts/Autoloads/HappinessManager.cs` — current v1 state; all change points identified
+- `/workspace/Scripts/Autoloads/GameEvents.cs` — event bus pattern confirmed; event signatures verified
+- `/workspace/Scripts/Autoloads/SaveManager.cs` — migration hook location confirmed
+- `/workspace/Scripts/Autoloads/EconomyManager.cs` — `SetHappiness` call site confirmed; income formula confirmed
+- `/workspace/Scripts/UI/HappinessBar.cs` — replacement target; widget structure analyzed
+- `/workspace/Scripts/UI/FloatingText.cs` — reuse confirmed; `Setup()` API verified
+- `/workspace/.planning/design/happiness-v2.md` — design spec; all formulas and tier values sourced here
+- [Godot 4.4 Tween class docs](https://docs.godotengine.org/en/4.4/classes/class_tween.html) — `TweenProperty`, `Kill`, `SetParallel` verified
+- [Frame Rate Independent Damping using Lerp](https://www.rorydriscoll.com/2016/03/07/frame-rate-independent-damping-using-lerp/) — exponential decay math
+- [System.Text.Json missing members behavior](https://learn.microsoft.com/en-us/dotnet/standard/serialization/system-text-json/missing-members) — default-to-zero on missing fields confirmed
+
+### Secondary (MEDIUM confidence — community/genre sources)
+
+- [Designing for Coziness — Kitfox Games](https://medium.com/kitfox-games/designing-for-coziness-d33d2519a59e) — cozy genre design principles; no-punishment loop definition
+- [Cozy Games — Lostgarden](https://lostgarden.com/2018/01/24/cozy-games/) — foundational genre theory; permanent progress vs. fluctuating state pattern
+- [RimWorld Mood Wiki](https://rimworldwiki.com/wiki/Mood) — named tier anti-pattern reference (named tiers with consequences)
+- [Spiritfarer Mood Wiki](https://spiritfarer.fandom.com/wiki/Mood) — named tier pattern reference (named tiers without punishment)
+- [Hysteresis — Shawn Hargreaves](https://shawnhargreaves.com/blog/hysteresis.html) — tier boundary oscillation prevention
+- [Hysteresis — Wikipedia](https://en.wikipedia.org/wiki/Hysteresis) — control systems context for tier chatter
+
+### Tertiary (LOW confidence — industry blogs)
+
+- [Balancing Relaxation and Engagement in Cozy Games — SDLC Corp](https://sdlccorp.com/post/balancing-game-mechanics-for-relaxation-and-engagement-in-cozy-games/) — general UX guidance; cross-referenced with higher-confidence sources
+- [Event-Driven Architecture pitfalls — Medium/InsiderEngineering](https://medium.com/insiderengineering/common-pitfalls-in-event-driven-architectures-de84ad8f7f25) — event contract break patterns
+
+---
+
+---
+
+# V1.0 Foundation Research Summary
+
+*Preserved from 2026-03-02. Covers the original Orbital Rings v1.0 implementation research.*
+
+---
+
 **Project:** Orbital Rings
 **Domain:** Cozy 3D space station builder / management game with citizen wish loop
 **Researched:** 2026-03-02
 **Confidence:** MEDIUM-HIGH
 
-## Executive Summary
+## Executive Summary (v1.0)
 
 Orbital Rings is a cozy 3D builder in a largely unoccupied market position: no competitor combines named individual citizens with personal wishes, a genuinely no-punishment loop, and a soft-3D space setting. The engine foundation is already locked — Godot 4.6 C# with Forward Plus rendering and Jolt Physics — and is the right choice for this scope. The architecture is well-understood: a layered Node + service pattern with a small set of Autoload singletons, custom Resource data definitions, and an EventBus for cross-system communication. The ring geometry is the only genuinely novel engineering problem, and it has a clear solution: a custom polar-coordinate SegmentGrid (not Godot's GridMap), mathematical segment selection (not trimesh collision), and a hand-authored walkway navmesh (not auto-baked).
 
@@ -15,227 +262,5 @@ The most critical pitfalls are all addressable at project setup time: C# signal 
 
 ---
 
-## Key Findings
-
-### Recommended Stack
-
-The project is already configured on a solid foundation (Godot 4.6, C#/.NET 8, Forward Plus, Jolt). No engine decisions remain open. All gameplay logic should be C# exclusively — mixing GDScript creates a split codebase with no shared typing. The primary architectural pattern is a layered Node + service model: thin Node scripts drive visuals and handle input, pure C# classes hold game rules, and a minimal set of Autoload singletons manage cross-cutting state (credits, happiness, event bus). The Chickensoft ecosystem (LogicBlocks for state machines, AutoInject for dependency wiring) is available as a NuGet upgrade path but is not required for initial scope.
-
-Custom Godot Resource subclasses with `[GlobalClass]` are the right data model for room definitions, wish templates, and citizen archetypes — the direct equivalent of Unity ScriptableObjects. This enables Inspector editing, asset referencing, and native save/load via `ResourceSaver.Save()`. JSON should be avoided for save files because Godot types require manual conversion.
-
-**Core technologies:**
-- Godot 4.6 / Forward Plus / Jolt: engine, renderer, physics — already configured, no changes needed
-- C# / .NET 8: all gameplay logic, systems, data — enforces type safety, enables NuGet and Chickensoft toolchain
-- Custom `SegmentGrid` C# class: polar ring layout — GridMap is rectilinear and cannot represent arc segments
-- Godot `Resource` subclasses: game data (rooms, wishes, citizens) — Godot's ScriptableObject equivalent
-- `GameEvents` Autoload (signal bus): cross-system decoupling — emits typed C# delegate signals, no direct system references
-- `NavigationAgent3D` + hand-authored navmesh: citizen pathfinding — auto-baked navmesh fails on curved ring geometry
-- `CharacterBody3D`: citizen movement — never `RigidBody3D`, which fights pathfinding
-- JetBrains Rider + gdUnit4Net: IDE and testing — Rider 2024.2+ has native Godot plugin; gdUnit4Net v5 runs logic tests without Godot runtime
-
-See `/workspace/.planning/research/STACK.md` for full stack detail.
-
-### Expected Features
-
-The cozy builder genre has clear table stakes: immediate visual feedback on placement, no fail state, a single soft-progression currency, visible named NPCs, satisfying audio/visual feedback, readable room diversity, and graceful unlock progression. Every one of these is already present in the design — the project is correctly scoped for the genre.
-
-The two core differentiators are: (1) the ring as a constrained canvas (geometric scarcity creates meaningful layout decisions without punishment), and (2) individual named citizen wishes as the teaching and reward mechanism (no other space builder does individual wishes at this personal scale). These must ship in v1 or the game has no identity. The space setting in a soft-3D pastel palette is a third differentiator that is essentially free — it is an art and tone decision, not a feature to build.
-
-**Must have (v1 table stakes and differentiators):**
-- Segment grid + room placement (1-3 segment sizes) — the ring is the game
-- Credit economy (single currency, passive income, partial demolish refund) — pacing without punishment
-- 5 room categories with visually distinct placeholder art — legibility at a glance
-- Named citizens walking the walkway and entering rooms — emotional core; static citizens kill cozy feel
-- Citizen wish system with speech bubbles — the defining differentiator; must ship with v1
-- Happiness tracking driving citizen arrival + blueprint unlocks — the growth half of the loop
-- Satisfying placement audio/visual feedback — non-negotiable genre feel; this IS the feel
-- Orbiting 3D camera with zoom — diorama fantasy requires it
-- Demolish with partial refund — prevents trap states in layout experimentation
-
-**Should have (v1.x, after core loop validated):**
-- Persistent wish board / notification panel — supplements speech bubbles when citizen count exceeds ~10
-- Room-entry animations + citizen reactions to wish fulfillment — deepens emotional payoff
-- Random positive events (celestial, visitor, milestone) — adds variety without threat
-- Day/night ambient lighting cycle — cosmetic warmth, zero mechanical weight
-
-**Defer (v2+):**
-- Multi-ring vertical expansion — architecture must support it, but do not build it for v1
-- Citizen personality traits and daily routines — proves base wish loop first
-- Procedural room interiors — high effort, high delight; placeholder interiors ship v1
-- Citizen relationships and shared wishes — requires player attachment that develops over time
-
-See `/workspace/.planning/research/FEATURES.md` for full feature analysis and competitor matrix.
-
-### Architecture Approach
-
-The architecture is a scene-composition model with three narrow Autoload singletons (`GameEvents` as pure signal bus, `EconomyManager` for credits, `HappinessManager` for happiness/milestones), a `Ring` node that is the authoritative owner of all segment state, and individual `Citizen` scenes running simple FSMs. All cross-system communication flows through `GameEvents` signals — no system directly calls another. The `Ring` node is the single source of truth for placement; UI never reaches into Ring directly. Citizen state is held in `CitizenData` Resource objects (not Node properties) so it survives scene restarts and serializes cleanly for save/load.
-
-**Major components:**
-1. `GameEvents` (Autoload) — pure signal bus; all cross-system event declarations live here; no state
-2. `EconomyManager` (Autoload) — credits balance, income ticks, cost validation
-3. `HappinessManager` (Autoload) — station happiness score, milestone tracking, citizen arrival trigger
-4. `Ring` (Node3D scene) — owns 24-slot segment array; all placement, validation, and demolish goes through here; emits `GameEvents` signals on change
-5. `SegmentGrid` (child of Ring) — visual/spatial 24-slot layout; maps world positions to segment indices via polar math, not raycast trimesh
-6. `Citizen` (CharacterBody3D scene) — named NPC with FSM: Idle → WalkingToRoom → VisitingRoom → Wishing; state in `CitizenData` Resource
-7. `WishBoard` (Autoload or Node) — tracks active wishes; resolves targets for citizen navigation
-8. `CameraRig` (Node3D scene) — SpringArm3D at fixed tilt; input drives Y-axis orbit and zoom only; intentionally isolated from game logic
-9. `BuildPanel` / `HUD` / `WishTracker` (UI, CanvasLayer) — emit `GameEvents` signals; never directly reference Ring or Citizens
-
-**Build order dependency chain (from ARCHITECTURE.md):**
-Foundation → Ring Geometry → Economy + Build Flow → Citizens → Wishes + Happiness → Polish + Loop Closure
-
-See `/workspace/.planning/research/ARCHITECTURE.md` for full scene tree, data flow diagrams, and component boundary table.
-
-### Critical Pitfalls
-
-1. **Circular walkway navmesh baking produces bad paths** — Do not auto-bake NavigationMesh on ring geometry. Curved arcs tessellate poorly; agents cut corners or take the long arc. Hand-author the walkway navmesh programmatically in C# at ring creation, or use a custom sorted-waypoint arc system. Prototype both approaches before committing. The navmesh covers only the walkway corridor, not the full ring mesh — room placement does not change the walkway, so navmesh never needs runtime rebaking.
-
-2. **C# signal connections leak memory when citizens are removed** — The `+=` delegate operator creates strong references. Lambdas as callbacks cannot be unsubscribed and are a confirmed Godot engine-level leak. Always disconnect signals in `_ExitTree()` using `-=`. Always free nodes with `QueueFree()`, never `Dispose()` alone. Establish this pattern in Phase 1 — retrofitting signal hygiene across a large codebase is expensive.
-
-3. **No native torus collision shape in Godot** — Do not use trimesh collision on the ring mesh for segment selection. Inner-face phantom hits will break room placement. Use mathematical segment selection: project mouse ray to ring plane (Y=0), convert to polar coordinates, derive segment index from angle and radius band. Use ConcaveMeshShape3D only for the walkway surface where citizens need foot placement.
-
-4. **C# rebuild kills iteration speed** — Every code change requires full assembly recompile and game restart; there is no hot reload. Keep all tunable parameters (economy rates, happiness thresholds, wish frequency) in `Resource` files editable in the Inspector without recompile. Establish a minimal quick-test scene (2-3 citizens, one ring) for rapid iteration. Separate citizen state into plain C# data objects so scene-tree restarts do not lose simulation state during development.
-
-5. **Wish economy positive feedback loop can go runaway** — More citizens → more credits → more rooms → more wish fulfillment → more citizens → repeat. Without a fail state or credit sink, credit supply outpaces demand within 15-20 minutes. Apply diminishing returns to citizen arrival rate at high happiness (sigmoid curve, not linear). Cap happiness multiplier on credit income at 1.5x-2x. Model the economy in a spreadsheet before writing any credit numbers in code.
-
-6. **GDScript-only addons block C# workflow** — ~84% of Godot asset library is GDScript. Before adopting any addon, verify C# native access or .NET NuGet equivalence. Establish a policy: if an addon cannot be used with full type safety, port or replace it. Evaluate all potential addons before writing any dependent code.
-
-See `/workspace/.planning/research/PITFALLS.md` for full pitfall analysis, recovery strategies, and verification checklists.
-
----
-
-## Implications for Roadmap
-
-The architecture research provides a clear build-order dependency chain. These map directly to roadmap phases.
-
-### Phase 1: Foundation and Project Setup
-**Rationale:** All other systems depend on signal definitions, data schema, and camera being established first. Signal hygiene and data/logic separation are architectural decisions that are expensive to retrofit — they must be locked in before gameplay code is written. This phase has no prerequisites and carries the highest architectural leverage.
-**Delivers:** Working Godot project structure, signal bus skeleton, Resource data classes, camera rig, quick-test scene, addon policy established.
-**Features addressed:** Orbiting 3D camera with zoom (camera rig); segment grid data schema (RoomDefinition, RingData resources)
-**Pitfalls addressed:** C# signal memory leaks (establish lifecycle pattern early); GDScript addon incompatibility (audit before first use); C# rebuild iteration speed (quick-test scene + Resource-based parameters from day one)
-**Research flag:** Standard patterns — well-documented Godot architecture; no research phase needed.
-
-### Phase 2: Ring Geometry and Room Placement
-**Rationale:** The ring is the game. Every other system — citizens, economy, wishes — depends on rooms existing on the ring. Segment collision and placement interaction are the highest-risk engineering problems due to the polar geometry. This must be proven before building systems on top of it.
-**Delivers:** Placeable and demolishable rooms on a 24-segment polar ring; visual segment selection; 5 distinct room category placeholder meshes; partial refund demolish.
-**Features addressed:** Segment grid + room placement (1-3 segment sizes); 5 room categories with distinct art; demolish with partial refund
-**Pitfalls addressed:** No torus collision shape (mathematical polar segment selection, not trimesh); ring as authoritative state owner (Ring.PlaceRoom() is the only mutation path); CSG nodes not used at runtime
-**Research flag:** Needs deeper research during planning — the polar-coordinate segment selection math, RoomSlot positioning via trig, and the ring navmesh strategy (custom waypoint list vs. NavigationAgent3D) should be prototyped and verified before full implementation.
-
-### Phase 3: Economy Foundation
-**Rationale:** Economy must be designed and balanced before rooms are meaningfully interactive. Credit costs and income rates must be set before the wish loop can be tuned. The economy is pure math — no scene tree dependency — so it can be developed in parallel with or immediately after the ring geometry.
-**Delivers:** EconomyManager Autoload, passive income tick, room cost deduction, credit display in HUD, economy balance spreadsheet.
-**Features addressed:** Credit economy (single currency, passive income); HUD credit display
-**Pitfalls addressed:** Economy runaway (spreadsheet model before code; diminishing returns baked in from the start); hard-coded constants avoided (all rates in Resource files)
-**Research flag:** Standard patterns — Godot Autoload + timer-based income tick is well-documented. Economy balance is a design problem, not a research problem.
-
-### Phase 4: Citizens and Navigation
-**Rationale:** Citizens are the emotional core and the other half of the build-wish-grow loop. They depend on the ring geometry (walkway navmesh) and the camera being stable. Navigation approach must be prototyped here — the custom waypoint arc vs. NavigationAgent3D decision cannot be deferred.
-**Delivers:** Named citizens walking the ring walkway; CharacterBody3D + NavigationAgent3D (or custom arc waypoint system); citizen spawning at game start; idle ambient movement; CitizenData Resource lifecycle.
-**Features addressed:** Named citizens walking the walkway; ambient visual aliveness; citizens entering rooms (spatial attraction)
-**Pitfalls addressed:** Circular walkway navmesh (hand-authored or custom waypoint; prototype both; navmesh covers walkway only); C# signal memory leaks (citizen _ExitTree() disconnect pattern implemented here); citizen _Process performance (batch update on timer, not every frame)
-**Research flag:** Needs deeper research during planning — the walkway navmesh strategy (hand-authored NavigationMesh via NavigationServer3D vs. custom arc-distance waypoint system) is a non-standard problem with no single clear best practice. A prototype spike is warranted.
-
-### Phase 5: Wish System and Happiness Loop
-**Rationale:** The wish system is the defining differentiator and can only be built after citizens, rooms, and economy all exist. All three feed into it. This phase closes the core game loop: build → wish → grow.
-**Delivers:** WishBoard Autoload; citizen wish generation and speech bubbles; wish fulfillment detection on room placement; HappinessManager; happiness-gated citizen arrival; happiness-gated blueprint unlocks (2-3 unlock moments minimum).
-**Features addressed:** Citizen wish system with speech bubbles; happiness tracking; blueprint unlocks; citizen arrival growth; no-fail-state (wishes linger harmlessly)
-**Pitfalls addressed:** Wish economy runaway (diminishing returns on citizen arrival rate baked in); wish paralysis UX (limit visible active wishes to 3-5; pair wish text with room type icon); wish fulfillment matching validates room TYPE and SIZE
-**Research flag:** Standard patterns — WishBoard as Autoload, WishData as Resource, FSM Wishing state in Citizen are all well-documented Godot patterns. No research phase needed, but the economy balance verification (5/15/30 citizen playtests) should be a gate before this phase is considered complete.
-
-### Phase 6: Polish and Loop Closure
-**Rationale:** Once the core build-wish-grow loop is proven, this phase adds the feel layer that makes the game feel finished vs. a prototype. Audio, visual feedback, and UI polish are what separate a cozy game from a management tool.
-**Delivers:** Satisfying room placement snap sound + animation; wish fulfillment celebration moment; HUD wired to all signals; save/load (RingData + CitizenData serialized via ResourceSaver); ambient sound; camera orbit float-drift fix verified.
-**Features addressed:** Satisfying placement audio/visual feedback; wish fulfillment visual feedback; complete HUD; save/load
-**Pitfalls addressed:** Camera float drift (verify tilt angle after 10+ full orbits); signal connections verified complete (Orphan Nodes counter = 0); wish fulfillment feedback closes the emotional loop
-**Research flag:** Standard patterns — Godot Tween for UI animation, ResourceSaver for save/load, AudioManager Autoload for pooled sounds are all well-documented. No research phase needed.
-
-### Phase Ordering Rationale
-
-- Foundation before everything: signal definitions, Resource schema, and camera must precede any system that uses them.
-- Ring before citizens: citizens need a walkway to navigate and rooms to visit.
-- Economy before wishes: wishes need rooms to target; room costs need an economy to validate against.
-- Citizens before wishes: wishes are generated by citizens; wish fulfillment is observed by citizens.
-- Wishes before polish: no point polishing a loop that does not yet close.
-- This ordering directly matches the dependency chain in ARCHITECTURE.md and the feature dependency tree in FEATURES.md. No phase introduces a dependency that its predecessor has not satisfied.
-
-### Research Flags
-
-Phases needing deeper research during planning:
-- **Phase 2 (Ring Geometry):** Non-standard polar geometry. The mathematical segment selection, RoomSlot trigonometric positioning, and ring mesh construction should be prototyped before full implementation. Prototype: place one room in one segment, verify inner/outer selection, verify click-to-segment math.
-- **Phase 4 (Citizens and Navigation):** The walkway navigation strategy is the highest-risk technical decision in the project. Hand-authored NavigationMesh via NavigationServer3D is the recommended approach but has sparse documentation for circular geometry. A prototype spike comparing custom arc-waypoint vs. NavigationAgent3D should be the first deliverable of this phase.
-
-Phases with standard patterns (skip research-phase):
-- **Phase 1 (Foundation):** Godot Autoload, Resource, signal bus, SpringArm3D camera — all well-documented with multiple verified sources.
-- **Phase 3 (Economy):** Timer-based income tick on an Autoload, Inspector-editable Resource parameters — standard patterns.
-- **Phase 5 (Wish System):** WishBoard Autoload, WishData Resource, FSM Wishing state — established Godot patterns.
-- **Phase 6 (Polish):** Tween animations, ResourceSaver save/load, AudioManager — fully documented.
-
----
-
-## Confidence Assessment
-
-| Area | Confidence | Notes |
-|------|------------|-------|
-| Stack | HIGH | Engine already configured in project.godot. Core technology decisions sourced directly from Godot 4.6 release notes, official C# docs, and Chickensoft. Only supporting library versions (LogicBlocks, AutoInject) are MEDIUM — verify against current NuGet versions before adding. |
-| Features | MEDIUM | No direct competitor in cozy-space-station-wish-loop niche. Findings cross-validated across multiple cozy builders (Townscaper, Islanders, Fabledom, Before We Leave, Aven Colony, Spiritfarer). Table stakes are well-established; differentiator value is an informed bet, not a proven pattern. |
-| Architecture | MEDIUM-HIGH | Godot 4 patterns are well-documented in official sources. Ring-specific geometry (polar SegmentGrid, circular navmesh, mathematical segment selection) is a novel application of standard patterns — confident in the approach, but prototype validation is warranted before full implementation. |
-| Pitfalls | MEDIUM | Sourced from official Godot issue trackers (GitHub), forum threads, and Godot docs. C# signal leaks and navmesh limitations are confirmed engine-level issues. Economy runaway is an informed extrapolation from cozy game design theory and general game economy research — not a confirmed failure mode from a shipped Orbital Rings playtest. |
-
-**Overall confidence:** MEDIUM-HIGH
-
-### Gaps to Address
-
-- **Walkway navmesh strategy:** The hand-authored NavigationMesh approach for circular geometry has limited documentation. A proof-of-concept prototype (citizens navigating a circular ring without corner-cutting or wrong-arc choices) must validate the approach in Phase 4 before committing to the full NavigationAgent3D stack.
-- **Economy balance numbers:** No concrete credit rates, room costs, or happiness multiplier values have been researched — these are game design decisions, not engineering ones. A spreadsheet model must be produced before Phase 3 implementation. The shape (diminishing returns sigmoid) is decided; the parameters are not.
-- **Citizen count ceiling:** Performance analysis at 20 citizens is projected from Godot forum data about scripted node overhead, not from a profiled prototype. The 20-citizen target should be profiled in Phase 4 with the actual Citizen scene before scaling assumptions are locked in.
-- **Wish matching algorithm:** The mechanics of how wishes are matched to placed rooms (room type + size validation, citizen proximity, wish priority) are not fully specified. This needs design clarity before Phase 5 implementation.
-- **Save/load scope for v1:** Whether v1 ships with save/load or autosave-only is not resolved. ResourceSaver supports it architecturally, but the design decision affects Phase 6 scope.
-
----
-
-## Sources
-
-### Primary (HIGH confidence)
-- [Godot 4.6 Release Notes](https://godotengine.org/releases/4.6/) — Jolt default, Forward Plus, C# bindings
-- [Godot C# Signals docs](https://docs.godotengine.org/en/stable/tutorials/scripting/c_sharp/c_sharp_signals.html) — Typed signal pattern, delegate lifecycle
-- [Godot Resources docs](https://docs.godotengine.org/en/stable/tutorials/scripting/resources.html) — Resource as ScriptableObject equivalent
-- [Godot Singletons/Autoload docs](https://docs.godotengine.org/en/stable/tutorials/scripting/singletons_autoload.html) — Autoload best practices
-- [Godot NavigationAgent3D docs](https://docs.godotengine.org/en/stable/tutorials/navigation/navigation_using_navigationagents.html) — Navigation system
-- [Godot CSG docs](https://docs.godotengine.org/en/stable/tutorials/3d/csg_tools.html) — CSG prototyping only
-- [Godot Why Not ECS](https://godotengine.org/article/why-isnt-godot-ecs-based-game-engine/) — Anti-ECS rationale
-- [Godot Autoloads vs. Regular Nodes](https://docs.godotengine.org/en/stable/tutorials/best_practices/autoloads_versus_internal_nodes.html) — Autoload scope guidance
-- [Godot SpringArm3D docs](https://docs.godotengine.org/en/latest/tutorials/3d/spring_arm.html) — Camera rig pattern
-- [Godot .NET 8 announcement](https://godotengine.org/article/godotsharp-packages-net8/) — NuGet compatibility confirmed
-- [Townscaper on Steam](https://store.steampowered.com/app/1291340/Townscaper) — Cozy builder table stakes
-- [Tiny Glade on Steam](https://store.steampowered.com/app/2198150/Tiny_Glade) — No-tutorial cozy design
-- [Aven Colony on Steam](https://store.steampowered.com/app/484900/Aven_Colony/) — Space builder reference
-- [Before We Leave on Steam](https://store.steampowered.com/app/1073910/Before_We_Leave/) — Space cozy builder reference
-- [Designing for Coziness — Game Developer / Kitfox Games](https://www.gamedeveloper.com/design/designing-for-coziness) — Genre theory
-- [Cozy Games — Lostgarden](https://lostgarden.com/2018/01/24/cozy-games/) — Foundational genre theory
-
-### Secondary (MEDIUM confidence)
-- [Chickensoft game architecture blog](https://chickensoft.games/blog/game-architecture) — Layered architecture, signal vs event
-- [Chickensoft LogicBlocks GitHub](https://github.com/chickensoft-games/LogicBlocks) — State machine library
-- [Chickensoft AutoInject GitHub](https://github.com/chickensoft-games/AutoInject) — Dependency injection
-- [GDQuest Event Bus Singleton](https://www.gdquest.com/tutorial/godot/design-patterns/event-bus-singleton/) — EventBus pattern
-- [GDQuest Finite State Machine](https://www.gdquest.com/tutorial/godot/design-patterns/finite-state-machine/) — FSM pattern
-- [GDQuest save/load guide](https://www.gdquest.com/library/save_game_godot4/) — Resource-based saves
-- [Godot Forum: NavigationAgent3D cuts corners #88237](https://github.com/godotengine/godot/issues/88237) — Navmesh curved geometry limitations
-- [Godot GitHub: Torus collision shape #6244](https://github.com/godotengine/godot-proposals/discussions/6244) — Confirmed missing primitive
-- [Godot GitHub: C# hot reload proposal #7746](https://github.com/godotengine/godot-proposals/issues/7746) — No hot reload in 4.x
-- [Godot GitHub: Lambda/Callable memory leak #85112](https://github.com/godotengine/godot/issues/85112) — Confirmed signal leak
-- [Godot GitHub: Dispose() memory leak #107579](https://github.com/godotengine/godot/issues/107579) — Dispose != Free
-- [Godot GitHub: Scripted node _Process performance #98175](https://github.com/godotengine/godot/issues/98175) — Known perf issue with many scripted nodes
-- [Fabledom reviews](https://game8.co/articles/reviews/fabledom-review) — Cozy builder happiness progression
-- [Howp Townscaper Works — Game Developer](https://www.gamedeveloper.com/game-platforms/how-townscaper-works-a-story-four-games-in-the-making) — Sound design as core cozy feel
-
-### Tertiary (LOW confidence)
-- [Godot Forum: NavigationAgent3D large agent counts](https://godotforums.org/d/31934-how-to-handle-large-amounts-of-navigationagents-pathfinding) — Avoidance overhead; forum source
-- [SDLC Corp: Cozy game mechanics](https://sdlccorp.com/post/balancing-game-mechanics-for-relaxation-and-engagement-in-cozy-games/) — Industry blog, unverified claims
-- [Machinations.io: Game economy inflation](https://machinations.io/articles/what-is-game-economy-inflation-how-to-foresee-it-and-how-to-overcome-it-in-your-game-design) — Economy design theory; general, not Godot-specific
-- [Godot 4 Recipes: Camera Gimbal](https://kidscancode.org/godot_recipes/4.x/3d/camera_gimbal/index.html) — Camera rig supplementary reference
-
----
-*Research completed: 2026-03-02*
+*Research completed: 2026-03-04 (v1.1 update) | 2026-03-02 (v1.0 foundation)*
 *Ready for roadmap: yes*
