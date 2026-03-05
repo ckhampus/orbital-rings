@@ -1,422 +1,341 @@
-# Stack Research
+# Technology Stack: v1.2 Housing System
 
-**Domain:** Cozy 3D builder/management game (Orbital Rings) — v1.1 Happiness v2 additions
-**Researched:** 2026-03-04
-**Confidence:** HIGH — all APIs verified against existing live codebase and Godot 4.4 official documentation
-
----
-
-## Scope
-
-This document covers only the **new technical surface area** introduced by the v1.1 Happiness v2 milestone. The existing stack (Godot 4.4, C#/.NET 8, 7 Autoload singletons, System.Text.Json save) is validated and unchanged. No new packages or addons are needed.
+**Project:** Orbital Rings
+**Researched:** 2026-03-05
+**Scope:** Stack additions for citizen housing assignment, return-home behavior, HousingManager autoload, HousingConfig resource, room tooltip residents, and save/load housing data
+**Confidence:** HIGH -- all recommendations based on patterns already working in production code within this codebase
 
 ---
 
-## Core API Map: Four Technical Problems
+## Verdict: Zero New Dependencies
 
-### 1. Frame-Based Float Decay (`_Process` vs `Timer`)
-
-**Decision: use `_Process(double delta)` in `HappinessManager`.**
-
-The mood decay formula from the design spec is:
-
-```
-mood += (baseline - mood) * DecayRate * delta
-```
-
-This is exponential smoothing — it must run every frame because its output depends on its previous output. A `Timer` cannot implement this correctly (it runs at discrete intervals, producing visible stair-step behavior at low decay rates). The existing `EconomyManager` correctly uses `Timer` for discrete income ticks; mood decay is fundamentally different and belongs in `_Process`.
-
-**Frame-rate independence:** The naive `Mathf.Lerp(mood, baseline, t)` called each frame is frame-rate dependent. The correct frame-rate-independent form is:
-
-```csharp
-// Frame-rate-independent exponential decay
-// Equivalent to: mood moves toward baseline with a half-life of ln(2)/DecayRate seconds
-mood += (baseline - mood) * (1f - Mathf.Exp(-DecayRate * (float)delta));
-```
-
-At `DecayRate = 0.02` this gives a half-life of ~34.7 seconds, matching the design spec's "~35 seconds." At `DecayRate = 0.02` and 60fps (delta = 0.0167s), the per-frame factor is `1 - exp(-0.02 * 0.0167) ≈ 0.000333` — imperceptible per frame but smooth over time.
-
-**Why not the simpler `mood += (baseline - mood) * DecayRate * delta`?**
-
-The simpler linear form from the design spec is acceptable at these small decay rates (the difference from the exponential form is less than 0.01% per frame at 60fps). Use it as written in the spec — the frame-rate independence concern only becomes material at `DecayRate > 0.1`. Document this as a known approximation.
-
-**Integration with existing singleton:**
-
-`HappinessManager` does not currently use `_Process`. Add it:
-
-```csharp
-public override void _Process(double delta)
-{
-    float baseline = BaselineFactor * Mathf.Sqrt(_lifetimeHappiness);
-    _mood += (baseline - _mood) * DecayRate * (float)delta;
-    _mood = Mathf.Max(_mood, 0f); // never below zero
-
-    MoodTier newTier = CalculateTier(_mood);
-    if (newTier != _currentTier)
-    {
-        _currentTier = newTier;
-        GameEvents.Instance?.EmitMoodTierChanged(_currentTier);
-    }
-}
-```
-
-`ProcessMode = ProcessModeEnum.Pausable` is already set on `HappinessManager` (the Timer uses it), so mood decay will correctly pause with the scene tree.
-
-**Performance note:** A single `_Process` on an Autoload singleton is negligible. The existing Godot C# `_Process` performance concern (reflection overhead when many instances each define `_Process`) does not apply to a singleton called once per frame.
-
-**Confidence:** HIGH — `_Process` API verified against Godot 4.4 docs; exponential decay math verified against [Frame Rate Independent Damping using Lerp](https://www.rorydriscoll.com/2016/03/07/frame-rate-independent-damping-using-lerp/).
+The housing system requires **no new libraries, packages, or external dependencies**. Every feature maps directly onto existing Godot 4.4 C# APIs and project patterns already validated in v1.0/v1.1. This is a feature addition, not a technology change.
 
 ---
 
-### 2. Color Lerping for Tier Label
+## Recommended Stack (Additions Only)
 
-**Decision: `AddThemeColorOverride("font_color", color)` for instant tier color switch, with a brief Tween-driven modulate pulse for transition feel.**
+### New Autoload Singleton: HousingManager
 
-The five tier colors are discrete states, not a continuous gradient. When tier changes:
+| Component | Technology | Version | Purpose | Why |
+|-----------|-----------|---------|---------|-----|
+| HousingManager | Godot `Node` (C#) | Godot 4.4 | Citizen-to-room assignment mapping, reassignment on build/demolish, resident queries | Follows the exact pattern of all 7 existing autoloads. New singleton because housing assignment is a distinct concern from mood/happiness (PRD recommendation). Keeps HappinessManager focused on mood math, not room-citizen bookkeeping. |
 
-1. Set the label color immediately (no lerp needed — the floating text notification signals the change)
-2. Apply a brief brightness pulse via `modulate` to draw attention
+**Registration:** Add to Project > Autoloads in project.godot, ordered **after HappinessManager, before SaveManager**. HousingManager needs GameEvents and BuildManager (both load earlier). SaveManager must load last to subscribe to all state-change events including housing events.
 
+**Namespace:** `OrbitalRings.Autoloads` -- same as all other autoloads.
+
+**Instance pattern:** Static singleton `HousingManager.Instance` set in `_EnterTree()`, matching GameEvents pattern. Include `StateLoaded` guard to skip initialization on save restore, matching HappinessManager/CitizenManager pattern.
+
+**File location:** `Scripts/Autoloads/HousingManager.cs`
+
+### New Config Resource: HousingConfig
+
+| Component | Technology | Version | Purpose | Why |
+|-----------|-----------|---------|---------|-----|
+| HousingConfig | Godot `Resource` (`[GlobalClass]`) | Godot 4.4 | Inspector-tunable timing constants for return-home cycle | Follows HappinessConfig and EconomyConfig pattern exactly. Resource file at `res://Resources/Housing/default_housing.tres`. Loaded in HousingManager._Ready() with fallback to code defaults. |
+
+**Exported fields (all `[Export]`):**
+
+| Field | Type | Default | Rationale |
+|-------|------|---------|-----------|
+| `HomeTimerMin` | `float` | `90.0f` | Lower bound of return-home cycle (PRD spec: 90-150s) |
+| `HomeTimerMax` | `float` | `150.0f` | Upper bound of return-home cycle |
+| `RestDurationMin` | `float` | `8.0f` | Min time "inside" home room (PRD: 8-15s, intentionally longer than regular 4-8s visits to feel like sleeping) |
+| `RestDurationMax` | `float` | `15.0f` | Max time inside home room |
+| `ZzzFontSize` | `int` | `14` | Smaller than standard FloatingText (18) per PRD "subtle" requirement |
+
+**File locations:**
+- `Scripts/Data/HousingConfig.cs` (follows `HappinessConfig.cs` pattern)
+- `Resources/Housing/default_housing.tres` (follows `Resources/Happiness/default_happiness.tres` pattern)
+
+**Resource loading pattern** (identical to HappinessManager):
 ```csharp
-private static readonly Color[] TierColors = new Color[]
+if (Config == null)
+    Config = ResourceLoader.Load<HousingConfig>("res://Resources/Housing/default_housing.tres");
+if (Config == null)
 {
-    new Color(0.72f, 0.72f, 0.72f), // Quiet   — soft gray
-    new Color(0.95f, 0.60f, 0.50f), // Cozy    — warm coral
-    new Color(0.95f, 0.78f, 0.35f), // Lively  — sunny amber
-    new Color(1.00f, 0.85f, 0.30f), // Vibrant — bright gold
-    new Color(0.98f, 0.96f, 0.92f), // Radiant — soft white glow
-};
-
-private void OnMoodTierChanged(MoodTier tier)
-{
-    // Instant color switch — no lerp, the floating notification handles signaling
-    _tierLabel.AddThemeColorOverride("font_color", TierColors[(int)tier]);
-
-    // Brief pulse: overbrighten modulate then return to normal
-    _activePulseTween?.Kill();
-    _activePulseTween = _tierLabel.CreateTween();
-    _activePulseTween.TweenProperty(_tierLabel, "modulate",
-        new Color(1.4f, 1.4f, 1.4f, 1.0f), 0.12f)
-        .SetEase(Tween.EaseType.Out);
-    _activePulseTween.TweenProperty(_tierLabel, "modulate",
-        new Color(1.0f, 1.0f, 1.0f, 1.0f), 0.30f)
-        .SetEase(Tween.EaseType.In);
+    GD.PushWarning("HousingManager: No HousingConfig found. Using code defaults.");
+    Config = new HousingConfig();
 }
 ```
-
-**Why `AddThemeColorOverride` not `modulate`:**
-
-`modulate` multiplies the existing render color. If the label's base color is white (`modulate = Color(1,1,1,1)`), then `modulate` and `font_color` give the same result. But if the base theme sets a non-white font color, `modulate` will multiply incorrectly. `AddThemeColorOverride("font_color", ...)` sets the absolute text color, which is the correct approach when changing tier color. This pattern is already used in the codebase: `HappinessBar._heartLabel` and `FloatingText.Setup()` both use `AddThemeColorOverride("font_color", ...)`.
-
-**"Near promotion" pulse (subtle glow when approaching tier boundary):**
-
-The design spec calls for a subtle visual hint when mood is near the top of its range. Implement as a periodic scale pulse using `SetAutoRestart(true)` or by re-triggering in `_Process` when `moodFractionInTier > 0.85f`:
-
-```csharp
-// In _Process, after tier calculation:
-float tierTop = TierUpperBound(_currentTier);
-float tierBottom = TierLowerBound(_currentTier);
-float fraction = (tierTop > tierBottom)
-    ? (_mood - tierBottom) / (tierTop - tierBottom)
-    : 0f;
-
-bool nearPromotion = fraction > 0.85f;
-if (nearPromotion != _wasNearPromotion)
-{
-    _wasNearPromotion = nearPromotion;
-    GameEvents.Instance?.EmitMoodNearPromotion(nearPromotion);
-}
-```
-
-The HUD responds to `MoodNearPromotion` by starting or stopping a looping gentle scale tween on the tier label (`Scale` from `Vector2.One` to `Vector2(1.05f, 1.05f)` and back, `SetLoops(0)` for infinite).
-
-**Confidence:** HIGH — `AddThemeColorOverride` API confirmed from Godot forum examples and matches existing usage in `HappinessBar.cs` and `FloatingText.cs` in this codebase.
 
 ---
 
-### 3. Floating Text for Tier Change Notification
+## Godot APIs Used (All Existing in 4.4, All Validated in This Codebase)
 
-**Decision: reuse the existing `FloatingText` class with no modifications.**
+### Timer (Godot.Timer) -- Return-Home Cycle
 
-`FloatingText.cs` already implements the complete pattern:
+**Used for:** Per-citizen periodic return-home timer on CitizenNode.
 
+**Pattern:** Identical to existing `_visitTimer` and `_wishTimer` in CitizenNode:
+- Create `new Timer()`, configure `OneShot = true`, set `WaitTime` from random range, connect `Timeout`, call `AddChild()`, start in `_Ready()`
+- Re-arm with new random interval in timeout handler
+- One-shot timer that re-arms itself (same as `_wishTimer`)
+
+**Why Timer, not `_Process` accumulator:** The project uses Timer nodes for all periodic behavior (visit checks at 20-40s, wish generation at 30-60s, arrival checks at 60s, autosave debounce at 0.5s). Timer nodes automatically pause with the scene tree (`ProcessMode.Pausable`), handle object lifetime correctly via the scene tree, and add zero per-frame overhead when not firing.
+
+**Priority interaction with visit/wish timers:** The home timer fires independently of visit/wish timers. When home timer fires during an active visit or wish pursuit, it simply resets (no interruption). This is implemented as a guard at the top of the handler:
 ```csharp
-// FloatingText.Setup() already does:
-// - AddThemeColorOverride("font_color", color)
-// - Drift upward 55px over 0.9s with ease-out
-// - Fade out (modulate:a → 0) with 0.2s delay
-// - QueueFree() on tween completion
+if (_isVisiting) { ResetHomeTimer(); return; }
+if (_currentWish != null) { ResetHomeTimer(); return; }
 ```
 
-For the tier change notification ("Station mood: Lively"), spawn via `HappinessManager`'s existing `_arrivalCanvasLayer`:
+**Confidence: HIGH** -- Timer pattern used in 6+ places across the codebase. Exact same configuration and lifecycle.
 
+### Tween (Godot.Tween) -- Return-Home Animation
+
+**Used for:** Return-home animation sequence (walk to home segment, drift to room edge, fade out, rest inside, fade in, drift back).
+
+**Pattern:** Structurally identical to `StartVisit()` in CitizenNode. The return-home animation is the same tween chain with three differences:
+1. Target segment comes from `_homeSegmentIndex` instead of proximity search
+2. Rest duration is 8-15s instead of 4-8s (from HousingConfig)
+3. Zzz floater spawns before fade-out
+
+The existing `StartVisit()` tween chain has 8 phases. The return-home chain will have 9 (inserting Zzz spawn):
+1. `TweenMethod` -- angular walk to home segment mid-angle
+2. `TweenCallback` -- update `_currentAngle`
+3. `TweenMethod` -- radial drift to room edge
+4. `TweenCallback` -- spawn Zzz floater
+5. `TweenMethod` -- fade out (alpha 0)
+6. `TweenCallback` -- hide + emit `CitizenEnteredRoom`
+7. `TweenInterval` -- rest duration (8-15s, from HousingConfig)
+8. `TweenCallback` -- show + emit `CitizenExitedRoom`
+9. `TweenMethod` -- fade in (alpha 1)
+10. `TweenMethod` -- drift back to walkway
+11. `TweenCallback` -- restore state, resume walking, reset home timer
+
+**Kill-before-create pattern:** Reuses existing `_activeTween?.Kill()` before creating new tween (pitfall #7 from v1.0). A single `_activeTween` field governs both visit and home-return tweens since they cannot overlap.
+
+**Confidence: HIGH** -- Tween chain pattern proven in CitizenNode.StartVisit() with ~80 lines of working code.
+
+### FloatingText (OrbitalRings.UI.FloatingText) -- Zzz Floater
+
+**Used for:** Subtle "Zzz" text appearing when citizen enters home room.
+
+**Pattern:** Same as arrival text in HappinessManager.SpawnArrivalText():
+- `new FloatingText()`, add to CanvasLayer, call `Setup(text, color, position)`
+- Self-destructs after animation (~1.1s)
+
+**Screen-space positioning from 3D world position:**
 ```csharp
-private void SpawnTierChangeText(MoodTier newTier)
-{
-    var floater = new FloatingText();
-    _arrivalCanvasLayer.AddChild(floater);
-
-    var viewport = GetViewport().GetVisibleRect().Size;
-    // Position below center (HUD is top-right, tier notification sits center-lower)
-    Vector2 pos = new Vector2(viewport.X / 2 - 100f, viewport.Y * 0.6f);
-    Color tierColor = TierColors[(int)newTier];
-    floater.Setup($"Station mood: {newTier}", tierColor, pos);
-}
+var camera = GetViewport().GetCamera3D();
+Vector2 screenPos = camera.UnprojectPosition(citizen.GlobalPosition);
+floater.Setup("Zzz", new Color(0.75f, 0.70f, 0.85f, 0.7f), screenPos + new Vector2(15, -30));
 ```
 
-**Why not `Label3D`:**
+**Why FloatingText (2D), not Sprite3D (3D):**
 
-`Label3D` renders into 3D world space and requires billboard setup to face the camera. For a 2D HUD notification that is anchored to screen coordinates, `Label` (via `FloatingText : Label`) on a `CanvasLayer` is correct. `Label3D` is appropriate for wish bubbles above citizens (3D-positioned, which the project already uses for wish speech bubbles). This is a screen-space notification, not a world-space label.
+| Approach | Pros | Cons |
+|----------|------|------|
+| FloatingText (2D Label) with UnprojectPosition | Zero new code, self-destructs, proven system | Screen-space position won't track if camera moves during 0.9s float |
+| Sprite3D "Zzz" badge (like wish badges) | Stays in 3D world, visually consistent with badges | Requires texture creation, manual lifecycle, more complex |
 
-**Why not an `AnimationPlayer` scene:**
+**Decision: FloatingText.** The Zzz appears for <1 second. The camera almost never moves in that window (orbit is player-initiated). The PRD says "same style as existing FloatingText but smaller and lighter colored" -- so the spec itself directs FloatingText reuse.
 
-Using a packed scene with `AnimationPlayer` for floating text adds an asset that must be kept in sync with the code. The existing `FloatingText` class is a pure-code approach that is already proven in production (used for `+N credit` and `+X% happiness` in v1.0). Reuse it.
+**Visual tuning:** Font size 14 (vs standard 18), muted lavender color `Color(0.75f, 0.70f, 0.85f)` for subtlety per PRD.
 
-**Confidence:** HIGH — pattern verified against existing `FloatingText.cs`, `HappinessManager.SpawnArrivalText()`, and `HappinessBar.SpawnFloatingText()` in this codebase.
+**Confidence: HIGH** -- FloatingText is battle-tested in production. UnprojectPosition is standard Godot 4.4 Camera3D API.
+
+### C# Event Delegates (System.Action) -- Housing Events
+
+**Used for:** New events on GameEvents signal bus for housing state changes.
+
+**New events on GameEvents:**
+
+| Event | Signature | Emitted By | Consumed By |
+|-------|-----------|------------|-------------|
+| `CitizenHoused` | `Action<string, int>` (citizenName, segmentIndex) | HousingManager | SaveManager (autosave trigger) |
+| `CitizenUnhoused` | `Action<string>` (citizenName) | HousingManager | SaveManager (autosave trigger) |
+
+**Why only two new events:** Housing assignment/unassignment are the only new cross-system state mutations. The existing `RoomPlaced`, `RoomDemolished`, and `CitizenArrived` events already fire at the right times -- HousingManager subscribes to these as triggers. The new events propagate assignment *results* to SaveManager for autosave triggering.
+
+**Pattern:** Identical to all existing GameEvents: `public event Action<...>`, `public void Emit...()` with `?.Invoke()`. SaveManager adds stored delegate references for these events in its subscription list.
+
+**Confidence: HIGH** -- C# event delegate pattern used for all 20+ existing events without issue.
+
+### Dictionary<string, int> -- Citizen-to-Room Mapping
+
+**Used for:** Internal assignment map in HousingManager (`citizenName -> anchorSegmentIndex`).
+
+**Why citizen name as key:** Citizen names are unique (enforced by `CitizenNames.GetNextName()` which draws from a pool without replacement). Using names avoids object references that break across save/load cycles. The existing save system already keys `ActiveWishes` by citizen name (`Dictionary<string, string>` in WishBoard), validating this approach.
+
+**Reverse lookup (room to residents, for tooltip):** Iterate the mapping filtered by segment index. With max ~30-50 citizens in a typical game, linear scan of a Dictionary is negligible. No bidirectional map needed.
+
+**Sentinel value:** `-1` means unhoused. Do not use `0` because `0` is a valid segment index (Outer position 0).
+
+**Confidence: HIGH** -- Same collection types and keying strategy as existing WishBoard tracking.
 
 ---
 
-### 4. HUD Counter Animation (Lifetime Happiness)
+## Data Model Changes
 
-**Decision: kill-before-create Tween with `TweenProperty` on `scale` for pulse, `AddThemeColorOverride` for warm flash. Update text immediately (do not animate the number rolling up).**
-
-The design spec says the counter "ticks up with a brief warm pulse (same pattern as the credit counter flash)." Look at `CreditHUD.cs` for the exact pattern to match:
-<br>
+### SavedCitizen (Add Field)
 
 ```csharp
-// Pattern (from HappinessBar.cs -- same idiom as CreditHUD):
-_activeTween?.Kill(); // kill-before-create is critical -- prevents fighting tweens
-
-_activeTween = CreateTween();
-_activeTween.SetParallel(true);
-
-// Pulse the heart icon scale
-_activeTween.TweenProperty(_heartLabel, "scale",
-    new Vector2(1.3f, 1.3f), 0.12f)
-    .SetEase(Tween.EaseType.Out);
-_activeTween.TweenProperty(_counterLabel, "scale",
-    new Vector2(1.2f, 1.2f), 0.12f)
-    .SetEase(Tween.EaseType.Out);
-
-_activeTween.SetParallel(false); // switch to sequential
-
-// Return to normal size
-_activeTween.TweenProperty(_heartLabel, "scale",
-    Vector2.One, 0.25f)
-    .SetEase(Tween.EaseType.In);
-_activeTween.TweenProperty(_counterLabel, "scale",
-    Vector2.One, 0.25f)
-    .SetEase(Tween.EaseType.In);
-```
-
-Update the counter label text immediately before starting the tween (not after) so the number shows the new value during the pulse:
-
-```csharp
-_counterLabel.Text = $"\u2665 {_lifetimeHappiness}";
-// Then start tween
-```
-
-**Why immediate text update instead of animated roll-up:**
-
-The design spec says "same pattern as the credit counter flash." `CreditHUD` updates the number immediately and pulses the widget. Rolling the number up (counting from 46 to 47 over 300ms) adds complexity, creates timing issues when multiple wishes fire in quick succession, and makes the display momentarily show an incorrect value. Immediate update with a visual pulse is the established pattern in this codebase and is visually satisfying.
-
-**Note on `SetParallel` with sequential follow-up:** The `TweenProperty` calls after `SetParallel(false)` run sequentially but only affect the heart and counter labels — so both labels return to `Vector2.One` at the same time because they each get their own sequential call. If you want them to animate back simultaneously, add a parallel block for the return:
-
-```csharp
-_activeTween.SetParallel(true);
-_activeTween.TweenProperty(_heartLabel, "scale", Vector2.One, 0.25f).SetEase(Tween.EaseType.In);
-_activeTween.TweenProperty(_counterLabel, "scale", Vector2.One, 0.25f).SetEase(Tween.EaseType.In);
-```
-
-**Confidence:** HIGH — `CreateTween`, `TweenProperty`, `SetParallel`, `Kill`, `TweenCallback` all verified against [Godot 4.4 Tween docs](https://docs.godotengine.org/en/4.4/classes/class_tween.html) and confirmed by usage in existing `HappinessBar.cs`, `HappinessManager.cs` (fade-in tween), and `FloatingText.cs` in this codebase.
-
----
-
-## Save Migration
-
-**Decision: version field in `SaveData` with explicit migration block in `SaveManager.Load()` / `SaveManager.ApplyState()`.**
-
-The existing `SaveData` already has `public int Version { get; set; } = 1;`. The migration path is:
-
-**v1 format** (existing): has `float Happiness` (0.0–1.0)
-**v2 format** (new): has `int LifetimeHappiness` and `float Mood` instead
-
-Migration in `SaveManager.Load()`:
-
-```csharp
-public SaveData Load()
+public class SavedCitizen
 {
-    // ... existing file read + JsonDeserialize ...
-
-    if (data.Version < 2)
-        data = MigrateV1ToV2(data);
-
-    return data;
-}
-
-private static SaveData MigrateV1ToV2(SaveData v1)
-{
-    // Invert diminishing returns formula to estimate wish count:
-    // gain = HappinessGainBase / (1 + currentHappiness) accumulated to happiness
-    // Approximate inverse: wishes ≈ happiness / HappinessGainBase * (1 + happiness)
-    const float HappinessGainBase = 0.08f;
-    int estimatedWishes = Mathf.RoundToInt(
-        v1.Happiness / HappinessGainBase * (1f + v1.Happiness));
-
-    float baseline = Mathf.Sqrt(estimatedWishes); // BaselineFactor = 1.0
-    float initialMood = baseline;                  // Start at resting baseline
-
-    v1.LifetimeHappiness = estimatedWishes;
-    v1.Mood = initialMood;
-    v1.Happiness = 0f;    // Clear old field (will be ignored in v2)
-    v1.Version = 2;
-
-    return v1; // now a valid v2 save
+    // ... existing fields unchanged ...
+    public int HomeSegmentIndex { get; set; } = -1;  // NEW: -1 = unhoused
 }
 ```
 
-**Why not a separate migration class:** The migration is a one-step, one-direction transform. A static method in `SaveManager` is the lowest-friction approach that keeps migration logic co-located with the save/load code. If the save format grows across many versions, extract to a `SaveMigration` class at that point.
+**Serialization behavior:** System.Text.Json will write `-1` for unhoused citizens. When deserializing v2 saves that lack this field, the JSON default for `int` is `0` -- but the version gate handles this (see below).
 
-**`SaveData` changes needed:**
+### SaveData (Version Bump)
 
 ```csharp
 public class SaveData
 {
-    public int Version { get; set; } = 2;       // bump from 1
-    public int Credits { get; set; }
-    public float Happiness { get; set; }         // keep for v1 migration reads — do not remove
-    public int LifetimeHappiness { get; set; }   // NEW
-    public float Mood { get; set; }              // NEW
-    public int CrossedMilestoneCount { get; set; } // remove after v2 (keyed to wish count now)
-    // ... rest unchanged
+    public int Version { get; set; } = 3;  // bumped from 2
+    // ... all existing fields unchanged ...
 }
 ```
 
-`System.Text.Json` will silently ignore unknown fields and default-initialize missing fields when deserializing a v1 save, so a v1 file with no `LifetimeHappiness` field will deserialize with `LifetimeHappiness = 0`, `Mood = 0.0f` — the migration block then overwrites those defaults with the computed values.
-
-**Confidence:** HIGH — `System.Text.Json` missing-field behavior verified as default-initialization (not exception); `SaveData.Version` pattern confirmed from existing `SaveManager.cs` in this codebase.
-
----
-
-## GameEvents Bus Additions
-
-Two new events must be added to `GameEvents.cs` to keep the singleton architecture consistent (UI reacts to events, never polls HappinessManager directly):
-
+**Version-gated restore in SaveManager:**
 ```csharp
-// In GameEvents.cs — add alongside existing HappinessChanged
-
-/// <param name="newCount">Updated lifetime happiness wish count.</param>
-public event Action<int> LifetimeHappinessChanged;
-public void EmitLifetimeHappinessChanged(int newCount)
-    => LifetimeHappinessChanged?.Invoke(newCount);
-
-/// <param name="newTier">The new mood tier after transition.</param>
-public event Action<MoodTier> MoodTierChanged;
-public void EmitMoodTierChanged(MoodTier newTier)
-    => MoodTierChanged?.Invoke(newTier);
-
-/// <param name="isNear">True when mood fraction within current tier exceeds 0.85.</param>
-public event Action<bool> MoodNearPromotion;
-public void EmitMoodNearPromotion(bool isNear)
-    => MoodNearPromotion?.Invoke(isNear);
-```
-
-`MoodTier` is an enum defined in `HappinessManager.cs` (or a shared Data namespace), with values `Quiet, Cozy, Lively, Vibrant, Radiant` matching the design spec tiers.
-
-**Why `MoodNearPromotion` as a bool event and not a float:** The HUD only needs to know "start pulsing" or "stop pulsing." Exposing the raw fraction would couple the HUD to the tier threshold math. The bool event is the minimal interface.
-
-**Confidence:** HIGH — matches the existing `GameEvents` pattern (pure C# event delegates, null-safe emit, typed signatures) confirmed from `GameEvents.cs` in this codebase.
-
----
-
-## EconomyManager Integration Point
-
-`EconomyManager.SetHappiness(float happiness)` currently receives a raw float and computes `1 + (happiness * 0.3x)`. For v2, this must be replaced with a tier-based lookup. The simplest approach is a new method:
-
-```csharp
-// In EconomyManager.cs — add alongside SetHappiness
-public void SetMoodTier(MoodTier tier)
+// In ApplySceneState, after restoring citizens:
+if (data.Version >= 3)
 {
-    _currentEconomyMultiplier = tier switch
+    // Restore housing assignments from saved HomeSegmentIndex values
+    foreach (var citizen in data.Citizens)
     {
-        MoodTier.Quiet   => 1.0f,
-        MoodTier.Cozy    => 1.1f,
-        MoodTier.Lively  => 1.2f,
-        MoodTier.Vibrant => 1.3f,
-        MoodTier.Radiant => 1.4f,
-        _                => 1.0f,
-    };
+        if (citizen.HomeSegmentIndex >= 0)
+            HousingManager.Instance?.AssignFromSave(citizen.Name, citizen.HomeSegmentIndex);
+    }
+}
+else
+{
+    // v2 saves: no housing data, run fresh assignment for all citizens
+    HousingManager.Instance?.AssignAllUnhoused();
 }
 ```
 
-Replace `_currentHappiness`-based multiplier in `CalculateTickIncome()` with `_currentEconomyMultiplier`. Keep `SetHappiness` temporarily during migration (it is used in `HappinessManager.RestoreState`; remove once `RestoreState` is updated to v2).
+**Backward compatibility matrix:**
 
-**Confidence:** HIGH — confirmed from `EconomyManager.CalculateTickIncome()` in this codebase.
+| Save Version | Loaded By v1.2 Code | Behavior |
+|-------------|---------------------|----------|
+| v1 | Existing v1 restore path, then fresh housing assignment | Works |
+| v2 | Existing v2 restore path, then fresh housing assignment | Works |
+| v3 | Full restore including housing assignments | Works |
+
+| Save Version | Loaded By v1.1 Code (forward compat) | Behavior |
+|-------------|--------------------------------------|----------|
+| v3 | `HomeSegmentIndex` silently ignored by System.Text.Json | Works (housing data lost but no crash) |
+
+**Confidence: HIGH** -- Version-gated restore already proven in v1-to-v2 migration. System.Text.Json missing/extra field behavior validated in production.
 
 ---
 
-## Recommended Stack (Summary)
+## Integration Points
 
-### Core Technologies
+### HousingManager Subscribes To (Existing Events)
 
-No changes to core engine stack. All APIs used are built into Godot 4.4.
+| Event | Source | HousingManager Response |
+|-------|--------|------------------------|
+| `RoomPlaced` | BuildManager via GameEvents | Check if Housing category via BuildManager.GetPlacedRoom(). If yes, assign unhoused citizens (oldest first, even-spread by lowest occupancy). |
+| `RoomDemolished` | BuildManager via GameEvents | If demolished room was housing (check _housingRoomCapacities in HappinessManager or track separately), unhouse its residents, attempt reassignment to other housing rooms. |
+| `CitizenArrived` | CitizenManager via GameEvents | Assign new citizen to housing room with fewest occupants. Ties broken randomly. |
 
-| Technology | Version | Purpose | Why Recommended |
-|------------|---------|---------|-----------------|
-| Godot 4.4 C# | already set | Engine + all APIs below | No additions needed |
-| `_Process(double delta)` | Godot built-in | Mood decay per frame | Only correct approach for continuous exponential smoothing |
-| `Tween` (via `CreateTween()`) | Godot built-in | All UI animations | Kill-before-create pattern already proven in this codebase |
-| `AddThemeColorOverride("font_color", color)` | Godot built-in | Tier label color change | Absolute color override, not affected by base theme conflicts |
-| `FloatingText : Label` (existing) | This codebase | Tier change notification | Zero new code — existing implementation handles all needed behavior |
-| `System.Text.Json` | .NET 8 built-in | Save migration | Already in use; missing fields default to zero, enabling v1→v2 migration |
+### HousingManager Reads From (Existing Singletons)
 
-### Supporting Libraries
+| Singleton | API | Purpose |
+|-----------|-----|---------|
+| `BuildManager.Instance` | `GetPlacedRoom(segmentIndex)` | Get room definition and category to verify housing rooms |
+| `CitizenManager.Instance` | `Citizens` list | Iterate citizens for reassignment after demolish |
 
-None required. No new NuGet packages needed for any v1.1 feature.
+### HousingManager Provides To (Existing Systems)
 
-### Development Tools
+| Consumer | API | Purpose |
+|----------|-----|---------|
+| `CitizenNode` | `GetHomeSegment(citizenName)` | Return home segment index for return-home animation target |
+| `CitizenInfoPanel` | `GetHomeRoomName(citizenName)` | Display "Home: Bunk Pod (Outer 3)" |
+| `SegmentTooltip` | `GetResidents(segmentIndex)` | Display "Residents: Pip, Nova" in room hover tooltip |
+| `SaveManager` | Consumes `CitizenHoused`/`CitizenUnhoused` events | Triggers debounced autosave |
 
-No changes — existing Rider + Godot 4.4 toolchain is sufficient.
+### BuildManager API Change Needed
+
+`BuildManager.GetPlacedRoom()` currently returns `(RoomDefinition Definition, int AnchorIndex, int Cost)?`. HousingManager needs segment count for size-scaled capacity calculation (`BaseCapacity + segmentCount - 1`).
+
+**Change:** Add `SegmentCount` to the return tuple:
+```csharp
+// Before:
+public (RoomDefinition Definition, int AnchorIndex, int Cost)? GetPlacedRoom(int flatIndex)
+
+// After:
+public (RoomDefinition Definition, int AnchorIndex, int SegmentCount, int Cost)? GetPlacedRoom(int flatIndex)
+```
+
+**Impact:** Only HappinessManager.OnRoomPlaced() and HappinessManager.OnRoomDemolished() call this method externally. Both need the added field anyway (to compute size-scaled capacity). The change is additive -- add the field to destructuring at each call site.
+
+**Confidence: HIGH** -- Return type is internal to the codebase with only 2 external callers identified.
+
+---
+
+## Existing Systems Modified (Minimal Changes)
+
+| System | Change | Estimated LOC |
+|--------|--------|--------------|
+| **CitizenNode** | Add `_homeSegmentIndex` field, `_homeTimer` Timer, `StartHomeVisit()` method (mirrors `StartVisit()`), Zzz floater spawn, `SetHomeSegment()` setter for HousingManager | ~80 |
+| **CitizenInfoPanel** | Add `_homeLabel` Label showing "Home: Bunk Pod (Outer 3)" or "Home: ---" in VBoxContainer | ~15 |
+| **SegmentTooltip** (via SegmentInteraction) | Append resident names when hovering housing room: query HousingManager.GetResidents() | ~20 |
+| **SaveManager** | Add `HomeSegmentIndex` to SavedCitizen serialization, bump Version to 3, version-gated restore, subscribe to new housing events | ~25 |
+| **GameEvents** | Add `CitizenHoused` and `CitizenUnhoused` events with emit methods | ~10 |
+| **BuildManager** | Add `SegmentCount` to `GetPlacedRoom()` return tuple | ~5 |
+
+**Architecture unchanged:** No new design patterns, no new node types, no scene changes. All modifications follow existing code conventions exactly.
 
 ---
 
 ## What NOT to Add
 
-| Avoid | Why | Use Instead |
-|-------|-----|-------------|
-| Third-party tween library (GTweensGodot, GoTween) | Project already has `CreateTween()` patterns working correctly; adding a library creates a dependency for zero benefit | Godot `CreateTween()` — already used in `FloatingText`, `HappinessBar`, `HappinessManager` |
-| `Timer` node for mood decay | Discrete ticks produce stair-step decay instead of smooth continuous drift | `_Process(double delta)` in `HappinessManager` |
-| `Label3D` for tier change notification | 3D world-space label requires billboard setup and camera-facing math; wrong for a screen-space HUD notification | `FloatingText : Label` on `_arrivalCanvasLayer` (existing) |
-| Separate `AnimationPlayer` scene for floating text | Adds asset that must be kept in sync with code; existing code-driven `FloatingText` is already proven | `FloatingText.Setup()` reuse |
-| Rolling number counter (counting 46→47 over 300ms) | Creates timing issues on rapid wish fulfillment; shows incorrect intermediate values | Immediate text update + scale pulse (CreditHUD pattern) |
+| Technology | Why Not | Use Instead |
+|------------|---------|-------------|
+| **NavigationAgent3D** | Citizens use polar coordinate movement on a 1D circular walkway. Return-home uses the same angular walk as room visits. Navigation mesh is massive overkill for angle-based movement. | Existing `TweenMethod` angular interpolation in `StartVisit()` pattern |
+| **Godot Signals (`[Signal]`)** | Project-wide locked decision: pure C# event delegates avoid marshalling overhead and IsConnected bugs (GitHub #76690, #72994). Validated across 9+ phases. | `System.Action` delegates on GameEvents |
+| **Any NuGet package** | Zero external dependencies needed. System.Text.Json (in .NET 8) handles serialization. All game logic uses Godot built-in types. | Built-in .NET 8 and Godot 4.4 APIs |
+| **State machine library** | Citizen behavior states (walking, visiting, resting-at-home) are simple enough for boolean flags and tween chains. Four states do not justify a formal FSM framework. | `_isVisiting` bool + `_activeTween` null check (existing pattern) |
+| **Observable collections** | The GameEvents event bus already provides change notification. Adding reactive wrappers creates a second notification mechanism with no benefit. | GameEvents `CitizenHoused`/`CitizenUnhoused` events |
+| **Separate .tscn scene for HousingManager** | All autoloads are pure C# scripts registered in project.godot with no associated scene. | Script-only autoload registration |
+| **Database / SQLite** | Housing data is one `int` per citizen added to existing JSON save. No query patterns, no relational data, no volume justifying a database. | `System.Text.Json` POCO serialization (already in use) |
+| **Unit test framework** | Not in scope for this milestone. Worth adding later but should be a separate effort with its own research. | Manual testing in-engine |
 
 ---
 
-## Alternatives Considered
+## Capacity Tracking: HousingManager vs HappinessManager
 
-| Recommended | Alternative | When to Use Alternative |
-|-------------|-------------|-------------------------|
-| `_Process` for mood decay | `SceneTreeTimer` / `Timer` | Only if decay is meant to be discrete steps (it is not — it is continuous drift) |
-| `AddThemeColorOverride` for tier color | `modulate` tinting | Only if the label's base `font_color` is always white; `AddThemeColorOverride` is safer |
-| Immediate text + scale pulse for counter | Animated number roll-up | Only if the UX specifically requires showing intermediate values (e.g., a score screen); not for a live HUD counter |
-| In-place `SaveData` version migration | Separate `SaveData_v2` class | Appropriate when formats diverge significantly across many fields; v1→v2 changes only 2 fields |
+Housing capacity tracking (`_housingCapacity`, `_housingRoomCapacities`) currently lives in HappinessManager because it gates citizen arrivals there. The PRD raised whether to move it.
+
+**Decision: Keep capacity tracking in HappinessManager.** HousingManager owns only the citizen-to-room *mapping*.
+
+**Rationale:**
+- Capacity tracking gates arrivals in `HappinessManager.OnArrivalCheck()`. Moving it to HousingManager would force HappinessManager to call `HousingManager.Instance.CalculateHousingCapacity()` on every arrival check -- adding a cross-singleton dependency to a hot path.
+- Size-scaled capacity (`BaseCapacity + segmentCount - 1`) affects the capacity count, which is already computed in HappinessManager.OnRoomPlaced(). The formula change is a one-line edit there.
+- HousingManager needs to know room capacity only for assignment (how many citizens can live in a room). It queries BuildManager for this, not HappinessManager.
+
+This keeps responsibilities clean: HappinessManager owns "can citizens arrive?" (capacity gate), HousingManager owns "where does each citizen live?" (assignment mapping).
 
 ---
 
 ## Sources
 
-- [Godot 4.4 Tween class docs](https://docs.godotengine.org/en/4.4/classes/class_tween.html) — `TweenProperty`, `TweenCallback`, `SetParallel`, `Kill` — HIGH confidence
-- [Godot 4.4 CanvasLayer docs](https://docs.godotengine.org/en/4.4/classes/class_canvaslayer.html) — screen-space UI layer — HIGH confidence
-- [Godot 4.4 Label3D docs](https://docs.godotengine.org/en/4.4/classes/class_label3d.html) — confirmed world-space, not suitable for HUD notifications — HIGH confidence
-- [Frame Rate Independent Damping using Lerp](https://www.rorydriscoll.com/2016/03/07/frame-rate-independent-damping-using-lerp/) — exponential decay math — HIGH confidence
-- Existing `/workspace/Scripts/UI/FloatingText.cs` — confirmed `CreateTween` + `TweenProperty` + `QueueFree` pattern — HIGH confidence (live code)
-- Existing `/workspace/Scripts/UI/HappinessBar.cs` — confirmed `AddThemeColorOverride`, `Color.Lerp`, kill-before-create tween, modulate pulse — HIGH confidence (live code)
-- Existing `/workspace/Scripts/Autoloads/HappinessManager.cs` — confirmed `_arrivalCanvasLayer`, `Timer` usage, event bus pattern — HIGH confidence (live code)
-- Existing `/workspace/Scripts/Autoloads/SaveManager.cs` — confirmed `SaveData.Version`, `System.Text.Json` deserialization, missing-field behavior — HIGH confidence (live code)
-- Existing `/workspace/Scripts/Autoloads/GameEvents.cs` — confirmed pure C# event delegate pattern — HIGH confidence (live code)
-- [Godot forum: Tweening a Label's Text Color](https://forum.godotengine.org/t/tweening-a-labels-text-color/72218) — `add_theme_color_override("font_color", ...)` confirmed as standard approach — MEDIUM confidence (forum, consistent with official docs)
+All findings based on direct codebase analysis with HIGH confidence:
+- `Scripts/Autoloads/GameEvents.cs` -- event bus pattern, C# delegate conventions
+- `Scripts/Citizens/CitizenNode.cs` -- Timer lifecycle, Tween chain pattern, visit animation pipeline
+- `Scripts/Citizens/CitizenManager.cs` -- citizen spawning, singleton pattern, save/load API
+- `Scripts/Autoloads/HappinessManager.cs` -- housing capacity tracking, arrival gating, config resource loading
+- `Scripts/Autoloads/SaveManager.cs` -- version-gated save format, System.Text.Json serialization, debounced autosave
+- `Scripts/Data/HappinessConfig.cs` -- [GlobalClass] Resource pattern, [Export] fields with defaults
+- `Scripts/Data/EconomyConfig.cs` -- same Resource pattern, establishing convention for config files
+- `Scripts/Data/RoomDefinition.cs` -- BaseCapacity field, RoomCategory enum
+- `Scripts/UI/FloatingText.cs` -- self-destructing floating text, Setup() API
+- `Scripts/UI/CitizenInfoPanel.cs` -- programmatic UI panel, VBoxContainer labels
+- `Scripts/UI/SegmentTooltip.cs` -- tooltip text composition pattern
+- `Scripts/Build/BuildManager.cs` -- GetPlacedRoom() API, room tracking dictionary
+- `Scripts/Ring/SegmentGrid.cs` -- flat index mapping, ToIndex/FromIndex
+- `docs/prd-housing.md` -- feature requirements, design decisions, timing constants
 
 ---
 
-*Stack research for: Orbital Rings v1.1 — Happiness v2 dual-value mood system*
-*Researched: 2026-03-04*
+*Stack research for: Orbital Rings v1.2 -- Housing system*
+*Researched: 2026-03-05*

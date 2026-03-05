@@ -1,245 +1,211 @@
 # Pitfalls Research
 
-**Domain:** Replacing a monotonically increasing happiness float with a dual-value decay system (Lifetime Happiness + Station Mood) in an existing Godot 4 C# cozy game
-**Researched:** 2026-03-04
-**Confidence:** HIGH (based on direct codebase inspection of all affected files + verified general principles from official Godot docs and EDA community sources)
-
-> **Scope note:** This file covers pitfalls specific to the v1.1 Happiness v2 migration.
-> General Godot 4 / Orbital Rings v1.0 pitfalls (navmesh, signal leaks, collision shapes, etc.)
-> remain documented in the original PITFALLS.md above this milestone boundary.
-
----
+**Domain:** Adding citizen housing assignment and return-home behavior to an existing Godot 4 C# cozy space station builder with event-driven autoload architecture
+**Researched:** 2026-03-05
+**Confidence:** HIGH (derived from direct codebase analysis of 15+ source files, not external sources)
 
 ## Critical Pitfalls
 
-### Pitfall 1: Save Migration Data Loss — Silently Treating v1 Saves as v2
+### Pitfall 1: Event Ordering Race Between RoomDemolished Handlers
 
 **What goes wrong:**
-`SaveData.Version` is currently hard-coded to `1` in the POCO. When v2 ships, the `Load()` method in `SaveManager` deserializes the JSON without inspecting `Version`. A v1 save file has only the `Happiness` float field (range 0.0–1.0). The new v2 schema adds `LifetimeHappiness` (int) and `Mood` (float) and removes `Happiness`. If the deserializer silently ignores unknown fields (which `System.Text.Json` does by default) and uses default values for missing fields, a v1 save will load with `LifetimeHappiness = 0` and `Mood = 0` — effectively erasing all progression. The player sees their station as if they'd never played.
+Both HappinessManager and the new HousingManager subscribe to `GameEvents.RoomDemolished`. HappinessManager already decrements `_housingCapacity` and removes from `_housingRoomCapacities` in its `OnRoomDemolished` handler (HappinessManager.cs:386-397). If HousingManager also subscribes to `RoomDemolished` to evict citizens from a demolished room, the execution order of these two handlers is determined by C# delegate invocation order (subscription order), which depends on Autoload initialization order in project.godot. If HousingManager tries to query HappinessManager's housing capacity during its own demolish handler, it may see pre- or post-decrement values depending on who fires first.
 
 **Why it happens:**
-`System.Text.Json` uses `JsonSerializerDefaults.General` by default, which silently drops fields not present in the target type and zero-initializes missing ones. There is no migration gate in the current `Load()` path — it deserializes directly to the current `SaveData` type without branching on `Version`. Developers adding new fields assume forward compatibility without verifying the reverse: loading old files into the new type.
+C# multicast delegates invoke subscribers in subscription order, but developers rarely reason about this. The existing codebase has never had two singletons both reacting to the same event with interdependent state mutations. Adding HousingManager as an 8th autoload creates this cross-handler dependency for the first time.
 
 **How to avoid:**
-Add a migration gate immediately after deserialization in `SaveManager.Load()`:
+HousingManager should own its own citizen-to-room mapping and NOT depend on HappinessManager's `_housingCapacity` value during the same event frame. When `RoomDemolished` fires, HousingManager should:
+1. Look up citizens assigned to that segment index from its own dictionary.
+2. Mark them unhoused.
+3. Attempt reassignment to other rooms (using its own room tracking, not HappinessManager's).
 
-```csharp
-var raw = JsonSerializer.Deserialize<JsonElement>(json);
-int version = raw.TryGetProperty("Version", out var v) ? v.GetInt32() : 1;
-
-if (version == 1)
-    return MigrateV1ToV2(raw);
-
-return raw.Deserialize<SaveData>();
-```
-
-The migration function reconstructs `LifetimeHappiness` from the v1 `Happiness` float using the inversion formula specified in the design doc (`wishes ≈ (happiness / HappinessGainBase) × (1 + happiness)`), sets `Mood` to the computed baseline, carries over all other fields unchanged, and writes `Version = 2`. Test with an actual v1 save file before shipping.
+The key principle: each handler should be self-contained, mutating only its own state. Cross-singleton queries should happen AFTER the event propagation settles (e.g., next frame or via a deferred call).
 
 **Warning signs:**
-- Loading an old save file sets `LifetimeHappiness` to 0 in the debugger
-- Blueprint unlocks disappear on load (they're keyed to `_crossedMilestoneCount` which is preserved, but recheck)
-- No `Version` check anywhere in `Load()` or `ApplyState()`
+- Citizens remain "assigned" to a demolished room (ghost assignments).
+- Capacity count becomes negative or desynchronized between HappinessManager and HousingManager.
+- Reassignment silently fails because HousingManager thought there was capacity that HappinessManager already decremented.
 
 **Phase to address:**
-Save migration phase (dedicated task). Must be implemented and tested before any other v2 feature ships, because once a v2 save is written, v1 migration is a narrow window.
+Phase 1 (HousingManager core) -- the very first phase must establish the principle that HousingManager tracks its own room-to-citizen map independently.
 
 ---
 
-### Pitfall 2: HappinessChanged Event Contract Break — All Consumers Expect a Float
+### Pitfall 2: Demolish-Then-Rebuild Cascade Creates Phantom Assignments
 
 **What goes wrong:**
-`GameEvents.HappinessChanged` currently carries `Action<float>` — a single happiness value in [0, 1]. Five subscribers depend on this contract:
-- `HappinessBar` (UI) — reads float to render bar fill and percentage label
-- `SaveManager` — triggers autosave on any happiness change
-- `EconomyManager` — uses the float via `SetHappiness(float)` to compute income multiplier
-- Any future subscribers added before this migration
-
-In v2, happiness is split into two values with different types and semantics. If the event is renamed/replaced without updating all subscribers, the compiler will catch missing handler registrations — but the subtler failure is that consumers that survive the rename but receive the wrong semantic (e.g., receiving `Mood` where they expected the 0–1 normalized `Happiness`) will produce wrong values silently. `EconomyManager.SetHappiness` clamps to [0, 1] — passing raw `Mood` (which goes to ~20+) will always clamp to 1.0, yielding the maximum economy multiplier forever.
+When a housing room is demolished, citizens are evicted and reassignment is attempted. If all other housing is full, those citizens become unhoused. But `RoomPlaced` also triggers reassignment of unhoused citizens to newly built rooms. If a player rapidly demolishes one room and places another in the same frame group (remember: the debounce timer batches saves at 0.5s), the event sequence becomes `RoomDemolished -> evict -> RoomPlaced -> reassign`. The citizen could be mid-eviction-tween (returning to walkway) when reassignment fires, sending them to a new room before they visually finished leaving the old one.
 
 **Why it happens:**
-When adding new fields to an event bus, developers often create a new event for the new data (`MoodChanged`) while leaving the old event in place "for now." Consumers that should be migrated stay on the old event, reading stale or semantically wrong data. The compiler does not flag this — the code compiles and runs, but produces wrong gameplay.
+The existing visit system in CitizenNode uses a single `_activeTween` with kill-before-create pattern (CitizenNode.cs:425). A return-home tween would need to follow the same pattern. But if HousingManager reassigns mid-animation, the citizen's home segment changes while a tween referencing the old segment is still running.
 
 **How to avoid:**
-Treat the event migration as a single atomic change:
-1. Add `MoodChanged` (`Action<float>`) and `LifetimeHappinessChanged` (`Action<int>`) to `GameEvents`.
-2. Remove `HappinessChanged` (or keep it as a deprecated alias that fires during a transition period with the normalized mood value for backward compatibility, then delete it).
-3. Migrate `HappinessBar` → subscribe to `MoodChanged` and `LifetimeHappinessChanged` (UI is being replaced anyway).
-4. Migrate `EconomyManager.SetHappiness` → replace with `SetMoodTier(MoodTier)` or `SetEconomyMultiplier(float)` so the economy multiplier is resolved in `HappinessManager` before the event fires, not reconstructed by the consumer.
-5. Migrate `SaveManager` → subscribe to `MoodChanged` as the autosave trigger (it only needs to know "something changed", not the value).
-
-Compile-time enforcement: delete `HappinessChanged` early so any missed subscriber becomes a build error.
+1. HousingManager should track a `_isReturningHome` state on citizen nodes (or a flag on HousingManager's side).
+2. On demolish eviction, if the citizen is mid-return-home-tween, kill the tween first, snap citizen to walkway, THEN mark unhoused.
+3. On reassignment, don't start a new return-home cycle immediately -- just update the assignment data. The next natural home timer tick will use the new assignment.
 
 **Warning signs:**
-- `EconomyManager._currentHappiness` always reads 1.0 after migration
-- Income multiplier is always at maximum regardless of activity
-- Old `HappinessBar` still showing a percentage bar after the new HUD is built
-- `_onHappinessChanged` delegate still wired in `SaveManager.SubscribeEvents()`
+- Citizens teleport or disappear during demolish-rebuild sequences.
+- The `_activeTween` is killed mid-fade, leaving a citizen with alpha=0 (invisible) on the walkway.
+- Citizen appears to "visit" a room that no longer exists.
 
 **Phase to address:**
-HappinessManager v2 refactor phase — implement all event consumer migrations in the same phase, not across multiple phases.
+Phase 2 (return-home behavior) -- the tween interruption logic must be designed alongside the behavior, not bolted on after.
 
 ---
 
-### Pitfall 3: Mood Decay Running Every Frame — Autosave Storm
+### Pitfall 3: Home Timer Interfering With Existing Visit/Wish Cycle
 
 **What goes wrong:**
-The mood decay formula (`mood += (baseline - mood) * DecayRate * delta`) runs every frame via `_Process`. When mood does not exactly equal baseline, this fires a non-zero delta every frame. If `HappinessManager` emits `MoodChanged` every frame, and `SaveManager` is subscribed to `MoodChanged` as an autosave trigger, the debounce timer resets every frame — the save never fires (debounce 0.5s, frame interval ~16ms). This sounds safe but it means the save timestamp keeps being pushed forward indefinitely while the player is idle. If the game closes unexpectedly during the decay phase, the last save was before the most recent wish fulfillment.
-
-The converse problem: if the debounce is removed and the save fires every frame during decay, the game writes `save.json` at 60 FPS — massive I/O, perceptible stutter.
+CitizenNode already has `_visitTimer` (20-40s, periodic) and `_wishTimer` (30-60s, one-shot). Adding a `_homeTimer` (90-150s) creates three independent timers that can fire simultaneously or in rapid succession. The PRD says home return is lower priority than wish visits, but the existing visit system doesn't have a priority concept -- `_isVisiting` is a simple boolean guard. If `_homeTimer` fires while `_isVisiting` is false but `_visitTimer` fires 0.1s later with a wish-matching room nearby, the citizen starts going home and misses the wish visit.
 
 **Why it happens:**
-Continuous decay creates a continuous stream of micro-changes. The debounce pattern was designed for discrete events (wish fulfilled, room placed) — not continuous floating-point drift. Mixing a continuous simulation update with a discrete event bus causes the event bus to become a fire-hose.
+Timer-based systems have inherent race conditions. The existing system works because visit and wish timers cooperate -- a visit CAN fulfill a wish. But a home-return visit cannot fulfill a wish (different destination), so it directly competes with the wish system.
 
 **How to avoid:**
-Do not emit `MoodChanged` every frame. Instead, implement one of two patterns:
+Do NOT implement home return as a separate timer that independently starts tweens. Instead:
+1. Add home-return as an alternative destination within the existing `OnVisitTimerTimeout` logic.
+2. When the home timer fires, set a `_wantsToGoHome` flag.
+3. On the next `OnVisitTimerTimeout`, if `_wantsToGoHome` is true AND no wish-matching room is nearby, execute the home visit. If a wish-matching room IS nearby, clear the flag and visit the wish room instead (home timer resets).
+4. This preserves the existing single-tween-at-a-time architecture.
 
-**Option A (preferred):** Emit `MoodChanged` only on tier change. Tier is the discrete, meaningful unit. Mood value itself is an internal float that drives the tier. Only tier transitions (Cozy → Lively, etc.) are externally significant. The UI reads `HappinessManager.Instance.Mood` directly on a polling interval or subscribes to a `MoodTierChanged` event.
-
-**Option B:** Emit `MoodChanged` at most once per second using a minimum emission interval guard:
-
-```csharp
-private float _moodEmitAccumulator;
-private const float MoodEmitInterval = 1.0f;
-
-public override void _Process(double delta)
-{
-    UpdateDecay((float)delta);
-    _moodEmitAccumulator += (float)delta;
-    if (_moodEmitAccumulator >= MoodEmitInterval)
-    {
-        _moodEmitAccumulator = 0f;
-        GameEvents.Instance?.EmitMoodChanged(_mood);
-    }
-}
-```
-
-`SaveManager` should be wired to tier changes and explicit state events (wish fulfilled, room placed), NOT to mood value drift.
+Alternatively, keep separate timers but add a priority check: when home timer fires, check if `_currentWish != null` and a fulfilling room is nearby. If yes, skip and reset. This is simpler but less elegant.
 
 **Warning signs:**
-- Profiler shows `PerformSave` firing continuously or `OnAnyStateChanged` being called every frame
-- `save.json` modification timestamp updates every second while player is idle
-- Mood value in save file has 15 decimal places of floating-point noise
-- Autosave never completes because the debounce timer never expires
+- Citizens go home right after getting a wish (should visit the wish room instead).
+- Three active tweens fighting over `_activeTween` (kill-create-kill-create churn).
+- Wish fulfillment rate drops after housing is implemented (citizens spending too much time going home).
 
 **Phase to address:**
-HappinessManager v2 implementation — establish the decay emission pattern before wiring any consumers.
+Phase 2 (return-home behavior) -- the priority rules must be implemented as part of the core behavior, not patched after.
 
 ---
 
-### Pitfall 4: Tier Boundary Oscillation — Rapid Tier Toggling Near Thresholds
+### Pitfall 4: Save Format v3 Breaking v2 Load Path
 
 **What goes wrong:**
-With the current tier table, `Cozy` ends at 4.9 and `Lively` starts at 5.0. If mood is resting near 5.0 — which happens naturally during moderate activity — a single wish fulfillment pushes mood to 5.0 + 3.0 = 8.0 (Lively), then decay drags it back toward baseline. If baseline is ~4.5 (about 20 lifetime wishes), mood settles around 4.5, then crosses 5.0 again on the next wish. The floating tier notification fires: "Station mood: Lively" ... pause ... "Station mood: Cozy" ... one wish later ... "Station mood: Lively". This looks broken and feels punishing even in a game with no fail state.
-
-The effect is most pronounced when:
-- Baseline sits just below a tier boundary (e.g., baseline = 4.8, tier boundary = 5.0)
-- MoodGainPerWish (3.0) is large enough to push across the boundary but decay brings it back
-- The wish arrival rate is moderate (not constant, not absent)
+The save system currently handles v1->v2 migration via `data.Version >= 2` guard (SaveManager.cs:389). Adding `CitizenHomes` (Dictionary<string, int>) to SaveData creates a v3 format. If the new field is added without a version bump, old v2 saves will deserialize `CitizenHomes` as null (System.Text.Json default for missing dictionary fields is null, not empty). Every null-check-free access crashes. If the version IS bumped to 3, the existing v2 restore path needs to handle the missing field.
 
 **Why it happens:**
-Discrete tier labels applied to a continuous, fluctuating float with no hysteresis. The system responds to the instantaneous value crossing a threshold. In control systems this is called "chatter" — the output oscillates around the switching point. The thermostat analogy: a thermostat that turns on at exactly 70°F and off at exactly 70°F would cycle continuously when room temperature is 70°F.
+System.Text.Json deserializes missing properties as their C# default value. For `Dictionary<string, int>`, the default is `null` (not an empty dictionary), unlike the `List<T>` fields which are initialized in the class definition with `= new()`. The existing SaveData initializes lists with `= new()` but a developer adding a dictionary might forget this pattern.
 
 **How to avoid:**
-Apply hysteresis to tier transitions. The tier promotes at the standard threshold, but requires the mood to drop a defined amount below the threshold before demoting:
-
-```csharp
-private MoodTier _currentTier = MoodTier.Quiet;
-private const float TierHysteresis = 0.5f; // must drop 0.5 below boundary to demote
-
-private MoodTier ComputeTier(float mood)
-{
-    // Promotion uses standard thresholds
-    if (mood >= 18.0f) return MoodTier.Radiant;
-    if (mood >= 10.0f) return MoodTier.Vibrant;
-    if (mood >= 5.0f)  return MoodTier.Lively;
-    if (mood >= 2.0f)  return MoodTier.Cozy;
-    return MoodTier.Quiet;
-}
-
-private void UpdateTier(float mood)
-{
-    var rawTier = ComputeTier(mood);
-
-    // Demotion requires crossing below (boundary - hysteresis)
-    if (rawTier < _currentTier)
-    {
-        float demotionThreshold = GetLowerBoundaryForTier(_currentTier) - TierHysteresis;
-        if (mood >= demotionThreshold) return; // suppress demotion
-    }
-
-    if (rawTier != _currentTier)
-    {
-        _currentTier = rawTier;
-        GameEvents.Instance?.EmitMoodTierChanged(_currentTier);
-    }
-}
-```
-
-Additionally, consider a minimum tier hold time (e.g., 5 seconds) before a demotion can fire after a promotion. This prevents the "promoted then immediately demoted in one wish cycle" scenario.
+1. Initialize the new field in SaveData class definition: `public Dictionary<string, int> CitizenHomes { get; set; } = new();`
+2. Bump version to 3 in `CollectGameState`.
+3. In `ApplySceneState`, after restoring citizens, call `HousingManager.RestoreAssignments(data.CitizenHomes)` -- but guard it: if `data.Version < 3` or `CitizenHomes` is null/empty, skip and let HousingManager auto-assign on first frame (the same path as a new game).
+4. Keep the v2 restore path untouched -- it already works.
 
 **Warning signs:**
-- Tier change notification fires twice within a few seconds without any player action
-- "Station mood: Cozy / Lively / Cozy / Lively" in rapid succession in the test console
-- The tier label in the HUD flickers between two states
-- Playtest feedback: "The mood thing seems glitchy"
+- NullReferenceException on load with old saves.
+- Citizens all become unhoused after loading a save from before housing was implemented.
+- Version check cascading: adding v3 guard makes the code confusing if v4 comes later.
 
 **Phase to address:**
-HappinessManager v2 implementation — implement hysteresis before the tier notification UI is connected, so the notification fires correctly from the start.
+Phase for save/load integration -- must be designed with backward compatibility from the start. Do NOT add the dictionary field without the `= new()` initializer.
 
 ---
 
-### Pitfall 5: Decay Feels Punishing — Mood Drops Visibly While Player Is Building
+### Pitfall 5: Capacity Scaling Changing BaseCapacity Interpretation Globally
 
 **What goes wrong:**
-DecayRate = 0.02 with delta gives a half-life of ~35 seconds. A wish fulfillment gives +3.0 mood. After 35 seconds of no further wishes, mood has dropped 1.5 — possibly crossing a tier boundary. If the player spends 45–60 seconds browsing the build panel, placing a room, and placing another, the station tier may quietly demote before the player notices. They placed two rooms and the station feels worse. The cozy promise ("mood breathes with your activity") becomes "mood punishes you for thinking".
-
-This is especially acute in early game: with a low baseline (e.g., 0–2), a single wish raises mood from 0 to 3 (Cozy tier), then decay brings it back to 0 (Quiet) within about 2 minutes. The player who started a fresh station and fulfilled one wish sees their "Cozy" notification disappear while they're still celebrating.
+The PRD recommends size-scaled capacity: `BaseCapacity + (segmentCount - 1)`. But `BaseCapacity` is already used by HappinessManager to track housing capacity (HappinessManager.cs:373-376). HappinessManager's `OnRoomPlaced` reads `def.BaseCapacity` directly and adds it to `_housingCapacity`. If HousingManager uses the scaled formula `BaseCapacity + (segmentCount - 1)` but HappinessManager continues using raw `BaseCapacity`, the two will track different capacity numbers. Player sees "5/7" but HousingManager thinks capacity is 8.
 
 **Why it happens:**
-Linear exponential decay feels faster near the upper tier boundary than near the baseline. A 35-second half-life feels fine at high mood (the player is active, fulfilling wishes rapidly) but brutal at low mood (each wish matters more, and the decay window is tight). The design doc's note that "decay is gentle, not punitive" is a goal, not a guarantee — the numbers need validation against real session behavior.
+`BaseCapacity` currently means "max occupants for this room type" and is treated as a fixed value in HappinessManager. The scaling formula changes its meaning to "base occupants for the smallest version of this room type." This semantic change affects every consumer of `BaseCapacity`.
 
 **How to avoid:**
-Three strategies, apply all three:
+The capacity scaling formula must be centralized in ONE place. Two approaches:
 
-1. **Slow the decay at low tiers.** Use a tier-aware decay rate: lower tiers decay slower than higher tiers. Example: Quiet/Cozy decay at 0.01 (half-life ~70s), Lively at 0.02, Vibrant/Radiant at 0.03. This gives the player more time to enjoy their first tier promotion.
+**Option A (recommended):** Add a static helper method `HousingManager.CalculateCapacity(RoomDefinition def, int segmentCount)` that returns `def.BaseCapacity + (segmentCount - 1)`. Both HousingManager and HappinessManager call this method. HappinessManager's `OnRoomPlaced` and `OnRoomDemolished` are updated to use the scaled value.
 
-2. **Use the baseline as a floor properly.** The formula `mood += (baseline - mood) * rate * delta` already provides a floor — mood decays toward baseline, not toward zero. Verify in code that baseline is recomputed correctly from `lifetimeHappiness` before each decay step, not cached from session start.
+**Option B:** Move all capacity tracking into HousingManager and have HappinessManager query `HousingManager.TotalCapacity` instead of tracking its own `_housingCapacity`. This is cleaner but requires more refactoring of HappinessManager.
 
-3. **Never demote below the resting tier.** If the current baseline implies the player's resting tier is Cozy, prevent mood from displaying the Quiet label even if a momentary dip sends the raw float below 2.0. Clamp the displayed tier to `max(ComputeTier(mood), ComputeTier(baseline))`. The resting tier is the player's "floor identity" for the station — they earned it permanently through Lifetime Happiness.
+Either way, the `_housingRoomCapacities` dictionary in HappinessManager (which stores capacity per anchor index for demolish lookup) must store the SCALED value, not the raw BaseCapacity.
 
 **Warning signs:**
-- Playtest feedback: "I built a room and the mood got worse"
-- Tier demotes within 60 seconds of a tier promotion without any inactivity
-- New game: first wish gives Cozy, but Cozy disappears before the second wish can spawn
-- The decay half-life at low mood feels shorter than at high mood (not true mathematically, but perceived as so because each tier step represents more emotional weight early in the game)
+- PopulationDisplay shows different numbers than what gates citizen arrivals.
+- Building a 2-segment Bunk Pod shows capacity +2 in one place and +3 in another.
+- Demolishing a room subtracts the wrong capacity amount.
 
 **Phase to address:**
-Playtesting / tuning phase after initial implementation. Do not tune decay rates in code — put them in the `EconomyConfig` resource or a dedicated `HappinessConfig` resource so they can be adjusted without recompilation.
+Phase 1 (HousingManager core) -- capacity calculation must be centralized BEFORE any assignment logic uses it.
 
 ---
 
-### Pitfall 6: Blueprint Unlock Milestone Carry-Over — Double-Firing Unlocks on Migration
+### Pitfall 6: Autoload Initialization Order Dependency
 
 **What goes wrong:**
-In v1, `_crossedMilestoneCount` tracks how many percentage-based thresholds were crossed (0, 1, or 2). In v2, milestones are keyed to wish counts (4, 12). The migration sets `LifetimeHappiness` by inverting the v1 formula. If a v1 player had ~60% happiness (≈12 wishes crossed), the migration correctly estimates 12 wishes. On load, `CheckUnlockMilestones()` runs from `_crossedMilestoneCount`. If `_crossedMilestoneCount` is carried from v1 (value = 2), the milestone check starts at index 2 and fires nothing (already past both milestones). Correct.
-
-BUT: if the migration estimates `LifetimeHappiness = 14` and the code resets `_crossedMilestoneCount = 0` (naively starting fresh), the milestone loop will fire `BlueprintUnlocked` for rooms the player already built — causing duplicate blueprint notifications and potentially confusing unlock state in `BuildPanel`.
+HousingManager is the 8th autoload. It needs references to CitizenManager (to get citizen list for assignment), BuildManager (to query placed rooms), and HappinessManager (for capacity coordination). If HousingManager is listed before any of these in project.godot's autoload order, their `.Instance` properties will be null when HousingManager's `_Ready()` runs. The existing autoloads work because they were carefully ordered: GameEvents first, then domain singletons, SaveManager last.
 
 **Why it happens:**
-The migration logic has two independent concerns: computing `LifetimeHappiness` from the old `Happiness` float, and determining which milestones should be considered already crossed. These are easy to conflate. If one path resets `_crossedMilestoneCount` while another leaves it, behavior is inconsistent.
+Godot initializes autoloads in the order they appear in project.godot. The existing codebase documents this (SaveManager comment: "Registered as Autoload in project.godot (last, after all other singletons)"). A new autoload inserted at the wrong position breaks this chain.
 
 **How to avoid:**
-In the v1→v2 migration function, carry `CrossedMilestoneCount` forward unchanged from the v1 save. The v1 value (0, 1, or 2) maps directly to the v2 milestone count since v2 has the same number of unlock milestones (2). Do not recompute it from the estimated `LifetimeHappiness`. Explicitly document in the migration code why `CrossedMilestoneCount` is not recomputed.
-
-If the unlock milestone count changes in v3 (e.g., adding a third milestone), that migration will need a proper mapping — but for v1→v2, the count is stable.
+1. HousingManager must be registered AFTER CitizenManager and BuildManager but BEFORE SaveManager in project.godot.
+2. In HousingManager._Ready(), assert that required singletons are non-null: `if (CitizenManager.Instance == null) GD.PushError(...)`.
+3. SaveManager must be updated to also subscribe to housing-related events for autosave triggers, and its `CollectGameState` / `ApplySceneState` must include housing data.
+4. Document the required order in a comment at the top of HousingManager, matching the existing pattern (e.g., HappinessManager.cs:16: "Registered as an Autoload in project.godot (6th, after all other singletons)").
 
 **Warning signs:**
-- `BlueprintUnlocked` event fires on session start for rooms the player already unlocked
-- `BuildPanel` shows "New!" badges on already-known rooms after loading a save
-- `_crossedMilestoneCount` is 0 in the debugger immediately after loading a save where `LifetimeHappiness > 12`
+- NullReferenceException in HousingManager._Ready() on first launch.
+- Housing assignments silently fail (null-conditional `?.` swallows the error).
+- Save file never includes housing data because SaveManager doesn't know about HousingManager.
 
 **Phase to address:**
-Save migration phase — verify with a saved game that has at least one crossed milestone before considering migration complete.
+Phase 1 (HousingManager core) -- autoload registration is literally the first thing to get right.
+
+---
+
+### Pitfall 7: FloatingText Reuse for Zzz Creates Wrong Visual Layer
+
+**What goes wrong:**
+The existing `FloatingText` is a 2D `Label` that lives on a `CanvasLayer` (HappinessManager creates `_arrivalCanvasLayer` at layer 5, CreditHUD uses layer 5). It takes a `Vector2 startPosition` in screen space. The Zzz floater needs to appear at a 3D world position (above the citizen or at the room entrance). Using FloatingText directly requires projecting the 3D position to screen space, which looks wrong when the camera orbits -- the text stays at a fixed screen position while the 3D world rotates.
+
+**Why it happens:**
+FloatingText was designed for HUD notifications (screen-center arrival text, credit +/- amounts). It self-destructs after 0.9s. The Zzz visual needs to be anchored in 3D space (billboarded, like the wish badge), not screen space.
+
+**How to avoid:**
+Two approaches:
+
+**Option A (PRD suggestion, simpler):** Use FloatingText but spawn it with a projected screen position and accept it won't track camera movement (it's only visible for ~1s, camera rarely moves that fast). This is acceptable if the float duration is short enough.
+
+**Option B (better visual):** Create the Zzz as a `Label3D` or `Sprite3D` (like the wish badge) attached to the citizen node. Billboard mode makes it always face the camera. This is consistent with the existing badge system and doesn't fight the 3D camera.
+
+Option B is recommended because the PRD says "same style as the existing FloatingText but smaller and lighter colored" -- this means matching the AESTHETIC, not the implementation class. The wish badge (Sprite3D, billboard) is the better pattern to follow for 3D-anchored indicators.
+
+**Warning signs:**
+- Zzz text appears at screen center instead of near the citizen.
+- Zzz text doesn't move with camera orbit (frozen in screen space).
+- Multiple Zzz labels stack on top of each other when many citizens go home simultaneously.
+
+**Phase to address:**
+Phase 2 (return-home behavior) -- the Zzz visual is part of the return-home sequence and should be designed alongside it.
+
+---
+
+### Pitfall 8: Stale Home Assignment After Save/Load With Room Layout Changes
+
+**What goes wrong:**
+The save file stores `CitizenHomes` as `citizenName -> segmentIndex`. On load, if the player demolished and rebuilt rooms between the save and the load (possible if autosave fires mid-session and player continues playing), the segment index might now point to a different room type or an empty segment. The PRD edge case table mentions this: "Save/load with demolished home -- citizen's saved homeSegmentIndex won't match a placed room." But the implementation must actively validate, not just document.
+
+**Why it happens:**
+Segment indices are positional, not room-identity-based. There's no room UUID. A room at segment 5 today might be a different room (or no room) after demolish+rebuild. The existing save system has a similar implicit coupling -- `SavedRoom` stores position, not ID-based references -- but rooms are rebuilt from scratch on load so it works. Citizen home assignments reference rooms by position, and positions can be reused.
+
+**How to avoid:**
+On load, after restoring rooms and citizens, HousingManager must VALIDATE every assignment:
+1. For each `citizenName -> segmentIndex` in the loaded data, check if `BuildManager.GetPlacedRoom(segmentIndex)` returns a Housing-category room.
+2. If yes, assign. If no (room gone, or now a non-Housing room), mark citizen as unhoused.
+3. After validation, run reassignment for all unhoused citizens (same logic as new game).
+4. This validation loop is the same logic used when a room is demolished at runtime -- reuse it.
+
+**Warning signs:**
+- Citizens "assigned" to a Workshop or Air Recycler after load.
+- Citizens assigned to empty segments (no room there).
+- Population display shows assigned citizens but no home-return behavior occurs.
+
+**Phase to address:**
+Save/load integration phase -- validation must be part of the restore path.
 
 ---
 
@@ -247,99 +213,92 @@ Save migration phase — verify with a saved game that has at least one crossed 
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Emit `MoodChanged` every frame from `_Process` | Simple code, no accumulator needed | Autosave debounce never expires; I/O storm if debounce removed | Never — use tier change events or interval throttle |
-| Keep `HappinessChanged (float)` event alongside new events | No consumer migration needed immediately | Consumers on old event receive semantically wrong data; economy multiplier maxes out | Never — migrate all consumers atomically |
-| Hard-code decay rate and tier thresholds as C# constants | Faster to write | Balance tuning requires recompile + restart each iteration | MVP only — move to `HappinessConfig` resource before first playtest |
-| Skip hysteresis on tier transitions | Simpler tier evaluation code | Tier oscillation near boundaries; player-visible "glitchy" notification spam | Never — hysteresis is a one-time addition, not ongoing complexity |
-| Set `Mood = 0` on migration instead of computing from baseline | No migration math needed | New session after loading v1 save shows Quiet tier despite accomplished station | Never — baseline math is 3 lines, worth it |
-| Reuse `EconomyManager.SetHappiness(float)` by passing normalized mood | No API change to EconomyManager | Mood is not in [0, 1], clamp produces wrong multiplier; economy always at maximum | Never — create `SetEconomyMultiplier(float)` that takes the tier multiplier directly |
-
----
+| Duplicating capacity tracking in both HappinessManager and HousingManager | Quick implementation, no refactoring | Two sources of truth that drift apart; every future capacity change must update both | Never -- centralize from day one |
+| Storing home assignment on CitizenNode directly (not in HousingManager) | Fewer cross-references, simpler citizen code | Assignment logic scattered across CitizenNode and HousingManager; save/load must reach into CitizenNode to serialize | Never -- HousingManager should be the single source of truth for assignments |
+| Hardcoding home timer constants in CitizenNode instead of HousingConfig | Faster first implementation | Tuning requires code changes and recompilation, breaks the established Config resource pattern | Only in initial prototype, must extract to HousingConfig before merge |
+| Using `_isVisiting` flag for both regular visits and home visits | Avoids adding a new state field | Cannot distinguish "visiting a room" from "returning home" for priority logic, tooltip display, or save/load | Only if home visits and regular visits are truly identical in every external-facing way (they are not -- Zzz visual, wish timer pause, longer duration) |
+| Skipping unsubscribe for HousingManager events | Saves a few lines | Memory leak if HousingManager is ever re-created (unlikely for autoload but violates SafeNode pattern established in codebase) | Never -- follow the established SubscribeEvents/UnsubscribeEvents pattern |
 
 ## Integration Gotchas
 
-| Integration | Common Mistake | Correct Approach |
-|-------------|----------------|------------------|
-| `EconomyManager` ↔ `HappinessManager` | Pass raw `_mood` float to `SetHappiness(float)` | Resolve the tier in `HappinessManager`, pass the tier's economy multiplier value directly: `EconomyManager.Instance?.SetEconomyMultiplier(tier.EconomyMultiplier)` |
-| `SaveManager` ↔ `MoodChanged` event | Subscribe autosave trigger to `MoodChanged` (fires every frame during decay) | Subscribe autosave trigger to `MoodTierChanged` + explicit discrete events (wish fulfilled, room placed) — not continuous mood drift |
-| `HappinessBar` → v2 UI | Rename/repurpose the existing node | The entire widget is being replaced (bar → counter + tier label); delete `HappinessBar.cs` and its scene node rather than patching it to avoid stale code paths |
-| `RestoreState(float, ...)` on `HappinessManager` | Call old `RestoreState` signature from `SaveManager.ApplyState()` | Add new `RestoreStateV2(int lifetimeHappiness, float mood, ...)` overload; update `SaveManager.ApplyState()` to call the new signature; remove the old one |
-| `SaveData.Happiness` field | Leave the old field in `SaveData` for backward compatibility | Leave it present for JSON deserialization of v1 files (deserialization reads it), but mark it `[Obsolete]` and only access it in the migration function; never write it in v2 saves |
-
----
+| Integration Point | Common Mistake | Correct Approach |
+|-------------------|----------------|------------------|
+| HousingManager + GameEvents | Adding new events to GameEvents without Emit helper methods | Follow the established pattern: add `event Action<...>` field AND `EmitX()` method. Every existing event has both (see GameEvents.cs structure) |
+| HousingManager + SaveManager | Forgetting to add housing events to SaveManager's autosave trigger subscriptions | SaveManager subscribes to state-change events for debounced autosave (SaveManager.cs:144-152). Housing assignment changes MUST trigger autosave. Add subscriber delegates for any new housing events |
+| HousingManager + CitizenManager.SpawnCitizen | Calling HousingManager.AssignHome inside CitizenManager.SpawnCitizen, creating a circular dependency | SpawnCitizen should emit CitizenArrived event (it already does). HousingManager subscribes to CitizenArrived and handles assignment. This follows the existing event-driven pattern |
+| HousingConfig + ResourceLoader | Creating HousingConfig.tres in a different directory than existing configs | Follow existing pattern: `res://Resources/Housing/default_housing.tres` (parallel to `res://Resources/Happiness/default_happiness.tres`). Load with same fallback pattern as HappinessManager.cs:202-208 |
+| SegmentTooltip + resident list | Appending resident names directly in SegmentGrid.GetLabel() | GetLabel is a pure data method on SegmentGrid (no UI concerns). Add resident info in SegmentInteraction.UpdateHover() where the tooltip text is composed, querying HousingManager for residents at that segment |
+| CitizenInfoPanel + home display | Querying BuildManager for room name in CitizenInfoPanel.ShowForCitizen | CitizenInfoPanel should query HousingManager for the citizen's home segment, then query BuildManager for the room definition at that segment. Two-step lookup, not one |
 
 ## Performance Traps
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| `sqrt(lifetimeHappiness)` computed every frame in baseline recalculation | Negligible on its own, but compounds if decay + baseline + tier check all run every `_Process` frame | Cache baseline; recompute only when `lifetimeHappiness` changes (on wish fulfillment, never during decay) | Not a performance problem at expected scale, but wastes CPU for no gain |
-| Tier change notification spawning `FloatingText` while autosave debounce is pending | Multiple `FloatingText` nodes live simultaneously if tier oscillates | Hysteresis prevents oscillation; also enforce a minimum 5s cooldown before the same tier change notification can re-fire | Visible with tier boundary oscillation (see Pitfall 4) |
-| Per-frame `_Process` in `HappinessManager` that emits events consumed by UI | UI receives 60 updates/second for data that changes slowly | Rate-limit UI updates; UI should poll current tier on a 250ms timer rather than subscribing to continuous mood events | Becomes noticeable if mood animation is added to tier labels |
-
----
+| Iterating all citizens on every RoomPlaced/RoomDemolished to find affected assignments | Unnoticeable at 5-20 citizens, frame hitch at 50+ | HousingManager maintains a `Dictionary<int, List<string>>` mapping segment index to citizen names. O(1) lookup on demolish instead of O(n) scan | 50+ citizens (unlikely in current design but good practice) |
+| Running reassignment algorithm (find room with fewest occupants) on every citizen arrival | Linear scan of all housing rooms per arrival | Cache a sorted/priority structure or just scan the `_housingRoomCapacities` dict -- with max 24 rooms, this is not a real problem. Do NOT over-engineer | Never breaks at 24-room scale. This is a non-issue but noted to prevent premature optimization |
+| Creating new Timer nodes for each home-return cycle instead of reusing one | Timer node count grows, tree overhead | Create ONE `_homeTimer` per citizen in Initialize() (same pattern as `_visitTimer`), reuse with WaitTime reset. Never `new Timer()` per cycle | Immediately -- Godot Timer creation has scene tree overhead |
+| Spawning Zzz Label3D/Sprite3D nodes that aren't freed | Node tree grows unboundedly as citizens go home repeatedly | Use self-destructing pattern (FloatingText's `TweenCallback(QueueFree)`) or reuse a single Zzz node per citizen | After 20+ home cycles per citizen (~30 min play session) |
 
 ## UX Pitfalls
 
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
-| Showing raw mood float anywhere in the UI | Players optimize around the number instead of playing naturally | Never expose the raw float; only show the tier name and lifetime counter |
-| Tier change notification on every minor fluctuation | Notification spam feels broken; player tunes it out | Hysteresis + minimum hold time; notification fires at most once per ~10 seconds |
-| Demoting tier while player is actively building | Player perceives building as causing mood to drop | Enforce the "resting tier floor" — displayed tier cannot go below `ComputeTier(baseline)` |
-| Lifetime counter ticking up without visible celebration | The permanent achievement is invisible | Pulse the counter on increment (same pattern as credit counter flash already in `CreditHUD`); ensure this animation is wired in the wish fulfillment handler |
-| "Station mood: Quiet" on a mature station | Station with 50 wishes feels dead | Baseline formula ensures mature stations rest above Quiet; verify the formula at 25, 50, 100 wishes in a spreadsheet before shipping |
-| No feedback when Radiant tier is reached | Radiant is the peak state; player doesn't notice | Give Radiant a distinct visual treatment — ambient glow or ring color shift — not just a text label |
-
----
+| Showing "Unhoused" with negative connotation in citizen info panel | Players feel guilty, breaks cozy philosophy | Show `Home: --` (em dash) with no label text, matching the PRD. No drama, no negative framing |
+| Zzz floater being too prominent (large text, bright color) | Visual noise when 10+ citizens go home simultaneously | Keep it small (smaller than wish badge), muted color (light gray/lavender), short duration (0.5-0.8s). Subtle > noticeable |
+| Room tooltip showing long resident lists for Sky Loft (up to 6 names) | Tooltip becomes unwieldy, overlaps other UI | Cap display at 3-4 names + "and 2 more" truncation. Or use first-name-only display |
+| No visual feedback when citizen is assigned to a new home | Player builds housing but doesn't see the connection to citizens | Consider a brief subtle highlight or the first home-return happening promptly (not waiting 90-150s). Use a short initial delay (5-10s) for the very first home return after assignment |
+| Home-return timer resetting on save/load | Citizens all go home simultaneously after loading (timer synchronization) | On load, randomize home timer's remaining time (same as the existing visit timer randomization in CitizenNode.Initialize) |
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **Save migration:** v1 save file loads correctly with non-zero `LifetimeHappiness` and correct starting `Mood` — verify by loading an actual `save.json` from a v1 session, not a newly created test save
-- [ ] **Blueprint milestone carry-over:** Loading a v1 save with both milestones crossed does NOT re-fire `BlueprintUnlocked` events on session start
-- [ ] **EconomyManager multiplier:** After v2 migration, `EconomyManager._currentHappiness` is no longer used; verify income calculation uses tier multiplier, not the old clamped float
-- [ ] **HappinessChanged event removed:** Confirm no subscriber is still wired to the old `HappinessChanged` event; grep for `HappinessChanged +=` and `OnHappinessChanged`
-- [ ] **Decay runs correctly:** Verify mood decays toward baseline (not toward zero) — confirm with a save that has `LifetimeHappiness = 36` (baseline = 6.0); idle the game; mood should settle at ~6.0, not 0.0
-- [ ] **Tier oscillation absent:** With mood at 4.9 and baseline at 4.5, fulfill one wish — verify the "Lively" notification fires once, not twice, even after decay returns mood to ~4.5
-- [ ] **Autosave frequency:** With no player input and mood decaying, verify `save.json` is NOT written every second — check the file's modification timestamp is stable during idle decay
-
----
+- [ ] **Home assignment:** Verify citizens are EVENLY distributed across rooms (not all crammed into first-built room) -- test with multiple housing rooms of different sizes
+- [ ] **Demolish reassignment:** Verify citizens from demolished room are reassigned to remaining housing, not just marked unhoused permanently -- test demolish-with-alternatives-available
+- [ ] **Unhoused graceful handling:** Verify unhoused citizens still walk, visit rooms, generate wishes, and fulfill them identically to housed citizens -- test with zero housing rooms
+- [ ] **Save/load round-trip:** Verify housing assignments survive save-quit-load cycle AND that loading old v2 saves without housing data doesn't crash -- test with a pre-housing save file
+- [ ] **Capacity arithmetic:** Verify `PopulationDisplay` count matches `HappinessManager._housingCapacity` matches `HousingManager` room capacity tracking -- test after building/demolishing mixed room types
+- [ ] **Timer independence:** Verify home timer doesn't block wish fulfillment -- test by giving citizen a wish, confirming they visit the wish room even when home timer has fired
+- [ ] **Starter citizens:** Verify the 5 starter citizens (spawned before any rooms exist) get assigned when first housing room is built -- test fresh game with first build being a Bunk Pod
+- [ ] **Multi-segment capacity:** Verify a 2-segment Bunk Pod holds 3 citizens (base 2 + 1) and a 3-segment Sky Loft holds 6 (base 4 + 2) -- test exact capacity boundaries
+- [ ] **Zzz visual:** Verify Zzz appears at room/citizen position in 3D space, not screen center -- test with camera at different orbit angles
+- [ ] **Room tooltip residents:** Verify tooltip shows current residents and updates when citizens are reassigned -- test after demolish/rebuild
 
 ## Recovery Strategies
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Migration silently zeroes lifetime happiness | HIGH — affects all existing players | Ship a hotfix that reads the old `Happiness` float from the JSON before migration runs; re-derive `LifetimeHappiness`; re-save |
-| EconomyManager always at maximum multiplier | MEDIUM — silent wrong behavior | Trace `_currentHappiness` in EconomyManager; replace `SetHappiness` call site with tier multiplier; 1–2 hours fix |
-| Autosave storm from mood decay events | MEDIUM — I/O issue, not data loss | Remove `MoodChanged` from autosave trigger subscriptions; add back only `MoodTierChanged`; 30 minutes fix |
-| Tier oscillation visible in playtest | LOW — UI/feel issue | Add hysteresis constant and hold timer to `UpdateTier()`; 1–2 hours fix |
-| Decay feels punishing in first session | MEDIUM — requires tuning, not rewrites | Expose decay rates and tier thresholds in a `HappinessConfig` Resource; adjust via Inspector without recompile; 1–3 hours tuning |
-| Double-fired `BlueprintUnlocked` on migration | LOW — notification annoyance | Carry `CrossedMilestoneCount` forward from v1 save unchanged; 15 minutes fix |
-
----
+| Dual capacity tracking divergence | LOW | Add a `SyncCapacity()` method that recalculates from BuildManager scan. Call on save/load as a consistency check. Similar to existing `InitializeHousingCapacity()` pattern |
+| Event ordering race on demolish | MEDIUM | Refactor to use a single "process housing changes" method called once per frame (collect events, process in batch) instead of immediate event handlers. Only if the race actually manifests |
+| Save format v3 crashes on old saves | LOW | Add null-coalescing: `data.CitizenHomes ?? new()`. Initialize field in SaveData class. No migration code needed since missing = unhoused = auto-assign |
+| Home timer fighting wish timer | MEDIUM | Add explicit state machine (Walking, Visiting, ReturningHome, Resting) instead of boolean `_isVisiting`. Bigger refactor but eliminates all timer races. Only if simple priority check proves insufficient |
+| Zzz visual implementation wrong | LOW | Swap from FloatingText to Sprite3D/Label3D. Localized change in the return-home tween sequence, no architectural impact |
 
 ## Pitfall-to-Phase Mapping
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| v1 save migration data loss | Save migration phase (first task) | Load actual v1 save.json; confirm `LifetimeHappiness > 0` and `Mood = baseline` in debugger |
-| HappinessChanged event contract break | HappinessManager refactor phase | Delete old event; confirm build succeeds; confirm economy multiplier is not always at maximum |
-| Autosave storm from decay events | HappinessManager refactor phase | Idle for 60s with mood decaying; confirm save.json modification timestamp is stable |
-| Tier boundary oscillation | HappinessManager refactor phase | Set mood to 4.9, baseline to 4.5; fulfill one wish; verify one notification fires, not two |
-| Decay feels punishing at low mood | Playtesting / tuning phase | Fresh game: fulfill one wish; verify Cozy tier holds for at least 90 seconds before any demotion |
-| Blueprint unlock double-fire | Save migration phase | Load v1 save with both milestones crossed; confirm no `BlueprintUnlocked` event fires at session start |
-
----
+| Event ordering race (demolish) | Phase 1: HousingManager core | Unit test: demolish room, verify citizens evicted AND capacity decremented correctly in both managers |
+| Demolish-rebuild cascade | Phase 2: Return-home behavior | Manual test: demolish housing, immediately build new housing, verify no visual glitches |
+| Home timer vs wish/visit priority | Phase 2: Return-home behavior | Manual test: give citizen wish, wait for home timer, verify wish visit takes priority |
+| Save format v3 backward compat | Save/load integration phase | Automated test: load v2 save file, verify no crash, citizens auto-assigned |
+| Capacity scaling interpretation | Phase 1: HousingManager core | Verify capacity formula in one central method, all consumers use it |
+| Autoload initialization order | Phase 1: HousingManager core | Verify project.godot ordering, add null-check assertions in _Ready() |
+| FloatingText vs 3D Zzz visual | Phase 2: Return-home behavior | Visual test: orbit camera during home return, verify Zzz tracks 3D position |
+| Stale assignment on load | Save/load integration phase | Manual test: save, demolish room, load, verify evicted citizens are properly unhoused |
 
 ## Sources
 
-- Direct codebase inspection: `HappinessManager.cs`, `SaveManager.cs`, `GameEvents.cs`, `EconomyManager.cs`, `HappinessBar.cs` (all current v1.0 state)
-- Design spec: `.planning/design/happiness-v2.md`
-- Hysteresis for tier boundary control: https://shawnhargreaves.com/blog/hysteresis.html (Shawn Hargreaves, XNA/DirectX veteran)
-- Hysteresis in control systems: https://en.wikipedia.org/wiki/Hysteresis
-- Event-driven architecture breaking changes: https://medium.com/insiderengineering/common-pitfalls-in-event-driven-architectures-de84ad8f7f25
-- Game save migration versioning: https://www.gamedev.net/forums/topic/702903-how-to-transfer-save-data-through-versions/
-- Godot `_Process` delta and frame-rate independence: https://kidscancode.org/godot_recipes/4.x/basics/understanding_delta/index.html
-- `System.Text.Json` default deserialization behavior (missing fields → default values, extra fields → silently ignored): https://learn.microsoft.com/en-us/dotnet/standard/serialization/system-text-json/missing-members
+- Direct codebase analysis of `/workspace/Scripts/Autoloads/GameEvents.cs` (event bus with 15+ event delegates)
+- Direct codebase analysis of `/workspace/Scripts/Citizens/CitizenNode.cs` (visit tween architecture, timer patterns)
+- Direct codebase analysis of `/workspace/Scripts/Autoloads/SaveManager.cs` (save format versioning, frame-delay restore)
+- Direct codebase analysis of `/workspace/Scripts/Autoloads/HappinessManager.cs` (housing capacity tracking, event subscriptions)
+- Direct codebase analysis of `/workspace/Scripts/Build/BuildManager.cs` (room placement/demolish flow, PlacedRoom record)
+- Direct codebase analysis of `/workspace/Scripts/UI/FloatingText.cs` (2D Label, screen-space positioning)
+- Direct codebase analysis of `/workspace/Scripts/UI/SegmentTooltip.cs` (tooltip text composition)
+- Direct codebase analysis of `/workspace/Scripts/UI/CitizenInfoPanel.cs` (citizen panel structure)
+- Direct codebase analysis of `/workspace/Scripts/Data/RoomDefinition.cs` (BaseCapacity field, RoomCategory enum)
+- Direct codebase analysis of `/workspace/Scripts/Ring/SegmentGrid.cs` (flat index system, 24 total segments)
+- PRD analysis of `/workspace/docs/prd-housing.md` (design decisions, edge cases, open questions)
 
 ---
-*Pitfalls research for: Orbital Rings — v1.1 Happiness v2 (dual-value decay system migration)*
-*Researched: 2026-03-04*
+*Pitfalls research for: Orbital Rings v1.2 Housing System*
+*Researched: 2026-03-05*

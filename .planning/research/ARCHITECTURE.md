@@ -1,565 +1,866 @@
-# Architecture Research
+# Architecture Patterns
 
-**Domain:** Godot 4 C# cozy builder game — Happiness v2 integration into existing singleton architecture
-**Researched:** 2026-03-04
-**Confidence:** HIGH (analysis is based on direct reading of the existing codebase; no speculative API research required)
+**Domain:** Housing system integration into Godot 4 C# space station builder
+**Researched:** 2026-03-05
+**Confidence:** HIGH (based on direct codebase analysis of all 40+ source files, no external sources needed)
 
 ---
 
-## Standard Architecture
+## Executive Summary
 
-### System Overview — Current (v1.0)
+The housing system integrates into a well-established autoload singleton architecture with event-driven communication via typed C# delegates on a GameEvents signal bus. The existing codebase uses 7 autoloads in a strict initialization order; housing adds an 8th (HousingManager) that slots between HappinessManager and SaveManager. The core challenge is cleanly separating housing assignment (new concern) from housing capacity (existing concern in HappinessManager) while preserving the event-driven, decoupled communication pattern the codebase relies on.
+
+This document maps every integration point, identifies what is new versus modified, traces the data flows, and recommends a build order that respects dependency chains.
+
+---
+
+## System Overview -- Current (v1.1)
 
 ```
                           GameEvents (signal bus)
-                               |
-        ┌──────────────────────┼──────────────────────┐
-        |                      |                      |
-  WishFulfilled          HappinessChanged        BlueprintUnlocked
-        |                      |                      |
-        v                      v                      v
- HappinessManager  ──SetHappiness──>  EconomyManager   BuildPanel/HUD
-  float _happiness              float _currentHappiness
-  % thresholds                  multiplier formula
-        |
-  OnArrivalCheck
-        |
-  CitizenManager.SpawnCitizen
-        |
-  HappinessBar (UI)
-   reads HappinessManager.Happiness on init
-   subscribes to HappinessChanged (float)
+                              |
+        +----------+----------+----------+-----------+----------+
+        |          |          |          |           |          |
+  BuildManager  HappinessM   CitizenM   WishBoard   EconomyM  SaveM
+  (placement)  (capacity)   (spawning)  (wishes)    (credits)  (persist)
+  (demolish)   (arrivals)   (behavior)
+               (mood/tier)
 ```
 
-### System Overview — Target (v2)
+Housing capacity lives in HappinessManager as `_housingCapacity` and `_housingRoomCapacities`. Citizens have no concept of home -- they walk and visit rooms but never "live" anywhere.
+
+## System Overview -- Target (v1.2)
 
 ```
                           GameEvents (signal bus)
-                               |
-        ┌──────────────────────┼──────────────────────────────────────┐
-        |                      |                          |           |
-  WishFulfilled    LifetimeHappinessChanged    MoodChanged    MoodTierChanged
-        |                      |                  |              |
-        v                      v                  v              v
- HappinessManager     HappinessCounter (HUD)   EconomyManager  MoodDisplay (HUD)
-  int _lifetime                                  float _currentMood  FloatingText
-  float _mood                 (replaces HappinessChanged event)
-  float _baseline
-  MoodTier _tier
-  Timer _moodDecayTimer
-        |
-  OnArrivalCheck (tier-based)
-        |
-  CitizenManager.SpawnCitizen
+                              |
+        +------+------+------+------+------+------+------+
+        |      |      |      |      |      |      |      |
+  Build  Happi  HOUS   Citiz  Wish   Econ   Save   UI
+  Mgr    Mgr    MGR    Mgr    Board  Mgr    Mgr    (info,
+                (NEW)                               tooltip,
+  (room  (arri- (assign (home  (no    (no    (v3    pop
+  events) vals)  map)   timer) chg)   chg)   save)  display)
+               (capac)
+               (reassn)
 ```
 
-### Component Responsibilities
-
-| Component | Responsibility v1 | Responsibility v2 | Change |
-|-----------|-------------------|-------------------|--------|
-| `HappinessManager` | Owns `float _happiness` (0–1), wish-gain with diminishing returns, % unlock milestones, arrival probability | Owns `int _lifetimeHappiness` + `float _mood` + `float _baseline`, mood gain/decay, tier computation, wish-count unlock milestones, tier-based arrival probability | **Replace — full refactor** |
-| `GameEvents` | `event Action<float> HappinessChanged` | Add `event Action<int> LifetimeHappinessChanged`, `event Action<float, MoodTier> MoodChanged`, `event Action<MoodTier, MoodTier> MoodTierChanged`; keep or remove old event | **Extend** |
-| `EconomyManager` | `float _currentHappiness` drives `1 + (happiness × 0.3)` multiplier | `MoodTier _currentTier` drives lookup table multiplier | **Swap input type** |
-| `CitizenManager` | Called by `HappinessManager.OnArrivalCheck` — no direct change | No direct change — arrival is still driven by `HappinessManager.OnArrivalCheck` | **No change** |
-| `HappinessBar` (UI) | Subscribes to `HappinessChanged(float)`, displays bar + percentage | **Replace** with two widgets: counter `♥ 47` + tier label | **Replace** |
-| `SaveManager` / `SaveData` | `float Happiness`, `int CrossedMilestoneCount` | `int LifetimeHappiness`, `float Mood`, `int CrossedMilestoneCount`; version bump + migration | **Extend + migrate** |
-| `WishBoard` / `WishFulfilled` | No change — still emits `WishFulfilled(citizenName, wishType)` | No change | **No change** |
-| `BuildManager` | No change | No change | **No change** |
+HousingManager becomes the single owner of both capacity tracking AND citizen-to-room assignments. HappinessManager delegates capacity queries to HousingManager.
 
 ---
 
-## Recommended Project Structure
+## New Autoload: HousingManager
 
-No new files are required. All changes are to existing files:
+### Position in Autoload Order
 
 ```
-Scripts/
-├── Autoloads/
-│   ├── GameEvents.cs          # EXTEND: add 3 new events, keep or deprecate HappinessChanged
-│   ├── HappinessManager.cs    # REPLACE: refactor to dual-value system
-│   ├── EconomyManager.cs      # MODIFY: swap happiness float input for MoodTier
-│   └── SaveManager.cs         # MODIFY: SaveData version bump, new fields, migration logic
-├── UI/
-│   └── HappinessBar.cs        # REPLACE: rebuild as HappinessCounter + MoodDisplay
-└── Data/
-    └── (optional) MoodTier.cs # NEW enum if not inlined in HappinessManager
+project.godot autoload order:
+1. GameEvents
+2. EconomyManager
+3. BuildManager
+4. CitizenManager
+5. WishBoard
+6. HappinessManager
+7. HousingManager    <-- NEW
+8. SaveManager       <-- was 7th, now 8th
 ```
 
-The `MoodTier` enum is small enough to live in `HappinessManager.cs`. Extract to `Data/MoodTier.cs` only if `EconomyManager.cs` needs to reference it directly (to avoid circular dependency — both are in the `OrbitalRings.Autoloads` namespace so the enum can be `public` in the same namespace).
+**Rationale:** HousingManager needs BuildManager (to query room definitions via GetPlacedRoom), CitizenManager (to read citizen list for reassignment), and HappinessManager does not need HousingManager at init time -- it queries lazily during OnArrivalCheck. SaveManager must remain last because it reads from all other singletons during CollectGameState.
+
+### Component Boundaries
+
+| Component | Responsibility | Communicates With |
+|-----------|---------------|-------------------|
+| **HousingManager** (NEW) | Owns citizen-to-room assignment map. Handles assign/unassign/reassign logic. Tracks room capacities with size-scaled formula. | GameEvents (subscribe: RoomPlaced, RoomDemolished, CitizenArrived; emit: CitizenAssignedHome, CitizenUnhoused), BuildManager (read: GetPlacedRoom for room definitions) |
+| **HousingConfig** (NEW) | Resource holding tunable timing constants for return-home behavior | CitizenNode (reads config for home timer and rest duration intervals) |
+| **CitizenNode** (MODIFIED) | Gains home timer, return-home tween sequence, Zzz floater. New fields: _homeSegmentIndex, _homeTimer | GameEvents (subscribes to CitizenAssignedHome/CitizenUnhoused for self) |
+| **CitizenInfoPanel** (MODIFIED) | Gains "Home: Room Name (Location)" line | HousingManager (reads assignment for display), BuildManager (reads room definition for name) |
+| **SegmentInteraction** (MODIFIED) | Appends resident names to tooltip for housing rooms | HousingManager (reads residents for segment) |
+| **PopulationDisplay** (MODIFIED) | Shows count/capacity format (e.g., "5/7") | HousingManager (reads capacity), GameEvents (subscribes to RoomPlaced/RoomDemolished for updates) |
+| **SaveManager** (MODIFIED) | Serializes/deserializes housing assignments, save version v3 | HousingManager (reads/writes assignment state) |
+| **HappinessManager** (MODIFIED) | Removes housing capacity tracking. Queries HousingManager for arrival gating. | HousingManager (reads capacity via CalculateHousingCapacity) |
+| **GameEvents** (MODIFIED) | Gains CitizenAssignedHome and CitizenUnhoused events | All subscribers |
 
 ---
 
-## Architectural Patterns
+## Integration Points (Detailed)
 
-### Pattern 1: Enum-keyed lookup table for tier effects
+### 1. GameEvents -- New Events
 
-**What:** Define `MoodTier` as an enum (Quiet, Cozy, Lively, Vibrant, Radiant). Store tier thresholds, arrival scales, and economy multipliers in a static readonly array indexed by tier cast to int. Computing the active tier is a linear scan of the threshold array.
+Two new events for housing assignment state changes:
 
-**When to use:** Any time a float maps to one of N named states with associated data. Lookup tables are easier to tune than nested conditionals and make the spec values visible in code.
-
-**Trade-offs:** Tightly couples the data to the enum ordinal. Acceptable here because the tier ordering is fixed by design.
-
-**Example:**
 ```csharp
-public enum MoodTier { Quiet, Cozy, Lively, Vibrant, Radiant }
+// ---------------------------------------------------------------------------
+// Housing Events
+// ---------------------------------------------------------------------------
 
-private static readonly (float minMood, float arrivalScale, float economyMult)[] TierData =
-{
-    (0f,    0.0f, 1.0f),   // Quiet
-    (2.0f,  0.2f, 1.1f),   // Cozy
-    (5.0f,  0.4f, 1.2f),   // Lively
-    (10.0f, 0.6f, 1.3f),   // Vibrant
-    (18.0f, 0.8f, 1.4f),   // Radiant
-};
+/// <param name="citizenName">Name of the citizen assigned to a home.</param>
+/// <param name="flatSegmentIndex">Flat segment index of the home room's anchor.</param>
+public event Action<string, int> CitizenAssignedHome;
 
-private static MoodTier ComputeTier(float mood)
+/// <param name="citizenName">Name of the citizen who lost their home.</param>
+public event Action<string> CitizenUnhoused;
+
+public void EmitCitizenAssignedHome(string citizenName, int flatSegmentIndex)
+    => CitizenAssignedHome?.Invoke(citizenName, flatSegmentIndex);
+
+public void EmitCitizenUnhoused(string citizenName)
+    => CitizenUnhoused?.Invoke(citizenName);
+```
+
+**Why events, not direct calls:** The existing architecture is strictly event-driven. CitizenNode, CitizenInfoPanel, PopulationDisplay, and SaveManager all need to react to assignment changes without HousingManager knowing about them. This preserves the decoupled pattern.
+
+**Why not reuse CitizenEnteredRoom/CitizenExitedRoom:** Those are transient visit events (citizen walks into a room for a few seconds). Home assignment is a persistent state change -- semantically different.
+
+### 2. HousingManager -- Core Data Structures
+
+```csharp
+public partial class HousingManager : Node
 {
-    // Walk backwards so we return the highest tier whose threshold mood meets
-    for (int i = TierData.Length - 1; i >= 0; i--)
-        if (mood >= TierData[i].minMood) return (MoodTier)i;
-    return MoodTier.Quiet;
+    public static HousingManager Instance { get; private set; }
+    public static bool StateLoaded { get; set; }
+
+    // citizen name -> flat segment index of home room anchor
+    private readonly Dictionary<string, int> _assignments = new();
+
+    // flat segment index (anchor) -> list of citizen names assigned
+    private readonly Dictionary<int, List<string>> _roomResidents = new();
+
+    // flat segment index (anchor) -> effective capacity for that room
+    private readonly Dictionary<int, int> _roomCapacities = new();
+
+    // citizens waiting for housing, ordered oldest-first
+    private readonly List<string> _unhousedCitizens = new();
 }
 ```
 
-### Pattern 2: _Process-based mood decay (not a Timer)
+**Subscribed events:**
+- `RoomPlaced` -- When a Housing-category room is built, register capacity, attempt to assign unhoused citizens
+- `RoomDemolished` -- When a Housing-category room is demolished, displace all residents, attempt reassignment to other rooms
+- `CitizenArrived` -- When a new citizen arrives, attempt to assign them to housing
 
-**What:** Run mood decay each frame inside `_Process(double delta)` in `HappinessManager`. The formula `mood += (baseline - mood) * DecayRate * delta` is framerate-independent and requires no Timer node.
+**Key public API:**
 
-**When to use:** Smooth, continuous decay that must feel organic. The 60s arrival timer is a discrete check and fits a Timer; mood decay is continuous and fits `_Process`.
+| Method | Signature | Purpose |
+|--------|-----------|---------|
+| `GetHomeSegment` | `int GetHomeSegment(string citizenName)` | Returns flat segment index or -1 (unhoused) |
+| `GetResidents` | `IReadOnlyList<string> GetResidents(int anchorIndex)` | Returns citizens assigned to a room |
+| `CalculateHousingCapacity` | `int CalculateHousingCapacity()` | Sum of all housing rooms' effective capacity |
+| `RestoreAssignment` | `void RestoreAssignment(string citizenName, int anchorIndex)` | Restores from save data |
+| `ClearAssignments` | `void ClearAssignments()` | Clears all assignments (before load) |
+| `AssignAllUnhoused` | `void AssignAllUnhoused()` | Attempts to assign all unhoused citizens |
 
-**Trade-offs:** `HappinessManager._Process` fires every frame (at render rate, not physics rate). The calculation is O(1), so the cost is negligible. ProcessMode is already set to `Pausable` which is correct — mood should not decay while the game is paused.
+**Assignment algorithm (even-spread, lowest occupancy first):**
 
-**Example:**
 ```csharp
-public override void _Process(double delta)
+private int FindBestRoom()
 {
-    float f = (float)delta;
-    float baseline = BaselineFactor * Mathf.Sqrt(_lifetimeHappiness);
-    _mood += (baseline - _mood) * DecayRate * f;
-    _mood = Mathf.Max(_mood, 0f);
+    int bestAnchor = -1;
+    int bestOccupancy = int.MaxValue;
 
-    MoodTier newTier = ComputeTier(_mood);
-    if (newTier != _currentTier)
+    foreach (var (anchor, capacity) in _roomCapacities)
     {
-        var oldTier = _currentTier;
-        _currentTier = newTier;
-        GameEvents.Instance?.EmitMoodTierChanged(oldTier, newTier);
+        int occupancy = _roomResidents.TryGetValue(anchor, out var list) ? list.Count : 0;
+        if (occupancy < capacity && occupancy < bestOccupancy)
+        {
+            bestOccupancy = occupancy;
+            bestAnchor = anchor;
+        }
     }
 
-    // Emit mood change every frame for EconomyManager to read
-    // (or only on change -- see integration note below)
-    GameEvents.Instance?.EmitMoodChanged(_mood, _currentTier);
+    return bestAnchor; // -1 if no room has available capacity
 }
 ```
 
-**Integration note:** Emitting `MoodChanged` every frame is wasteful. Emit only when `_mood` changes by more than a small epsilon, or only when tier changes. `EconomyManager` needs the multiplier — it only cares about `MoodTier`, not the raw float. Emit `MoodTierChanged` on tier change and let EconomyManager subscribe to that instead. Store `_currentTier` on `HappinessManager` so consumers can poll it without events.
+Ties are broken by iteration order (Dictionary order in C# is insertion order for recent entries, effectively random). This matches the PRD's "ties broken randomly" requirement without extra logic.
 
-### Pattern 3: Additive events — preserve HappinessChanged for SaveManager compatibility
+**Size-scaled capacity (per PRD recommendation B):**
 
-**What:** Keep `HappinessChanged(float)` in `GameEvents` for the `SaveManager` debounce subscription. `SaveManager` subscribes to state-change events to trigger autosave — it does not care about the payload, only that something changed. Replacing `HappinessChanged` with a rename would require removing and re-adding SaveManager's subscription.
+```csharp
+// When a Housing room is placed:
+int effectiveCapacity = definition.BaseCapacity + (segmentCount - 1);
+```
 
-**When to use:** When changing an existing event would require updating all subscribers simultaneously (risky mid-milestone). Instead, add new events for new consumers and keep the old event for existing subscribers that just need a "something changed" signal.
+This must be computed from BuildManager.GetPlacedRoom() which returns the RoomDefinition and segment count. The RoomDefinition.BaseCapacity is the base for 1-segment rooms. Adding (segments - 1) gives larger rooms proportionally more capacity.
 
-**Trade-offs:** Two events for related data can cause confusion. The cleaner approach is to remove `HappinessChanged(float)` entirely and have SaveManager subscribe to `LifetimeHappinessChanged` and `MoodTierChanged` instead. This is a one-line change in SaveManager and is preferred — do the clean version.
+### 3. HappinessManager -- Capacity Responsibility Transfer
+
+**Fields to REMOVE from HappinessManager:**
+- `_housingCapacity` (int field)
+- `_housingRoomCapacities` (Dictionary<int, int>)
+- `InitializeHousingCapacity()` method
+- `CalculateHousingCapacity()` public property
+- `GetHousingCapacity()` save API method
+- Housing-specific logic in `OnRoomPlaced()` and `OnRoomDemolished()`
+
+**What REPLACES them:**
+
+```csharp
+// BEFORE (in HappinessManager.OnArrivalCheck):
+int currentPop = CitizenManager.Instance?.CitizenCount ?? 0;
+if (currentPop >= _housingCapacity) return;
+
+// AFTER:
+int currentPop = CitizenManager.Instance?.CitizenCount ?? 0;
+int capacity = HousingManager.Instance?.CalculateHousingCapacity() ?? 0;
+if (currentPop >= capacity) return;
+```
+
+**StarterCitizenCapacity removal:** Currently `_housingCapacity` starts at 5 to account for the 5 starter citizens who spawn before any rooms exist. With HousingManager, capacity starts at 0. The 5 starters still spawn unconditionally in `CitizenManager.SpawnStarterCitizens()` (which ignores capacity). The arrival gate purely checks actual room-derived capacity, which is correct -- no new citizens arrive until the player builds housing.
+
+**Event subscription cleanup:** HappinessManager currently subscribes to `RoomPlaced` and `RoomDemolished` purely for housing capacity tracking. If no other logic in those handlers remains after the transfer, the subscriptions can be removed entirely. Check: `OnRoomPlaced` only does housing capacity logic (confirmed by code reading). `OnRoomDemolished` only does housing capacity logic (confirmed). Both subscriptions can be fully removed.
+
+**Save/Load impact:** `HappinessManager.RestoreState()` currently receives `housingCapacity` as a parameter. Remove this parameter. `HappinessManager.GetHousingCapacity()` was used by SaveManager -- replace with `HousingManager.Instance.CalculateHousingCapacity()` in SaveManager. `SaveData.HousingCapacity` field can be removed (HousingManager computes capacity from placed rooms, which are already saved).
+
+### 4. CitizenNode -- Return-Home Behavior
+
+**New fields:**
+
+```csharp
+private int _homeSegmentIndex = -1;      // flat index of home room (-1 = unhoused)
+private Timer _homeTimer;                 // periodic return-home cycle
+private bool _isReturningHome;            // distinguishes home visits from regular visits
+```
+
+**Behavior cycle:**
+
+```
+Home Timer fires (90-150s, configurable via HousingConfig)
+    |
+    v
+Guards (any YES -> skip, reset timer):
+  - _isVisiting? (mid-visit, don't interrupt)
+  - _isReturningHome? (shouldn't happen, but guard)
+  - _homeSegmentIndex == -1? (unhoused, no home to return to)
+  - Has active wish with nearby matching room? (wish priority > home)
+    |
+    v  All guards pass
+_isReturningHome = true
+    |
+    v  StartReturnHome():
+  1. Walk angularly to home segment mid-angle
+  2. Drift radially to room edge
+  3. Spawn "Zzz" FloatingText at citizen position
+  4. Fade out
+  5. Emit CitizenEnteredRoom (for work bonus tracking consistency)
+  6. Pause wish timer (_wishTimer.Stop())
+  7. Wait 8-15 seconds (configurable via HousingConfig)
+  8. Emit CitizenExitedRoom
+  9. Fade in
+  10. Drift back to walkway
+  11. Resume wish timer (_wishTimer.Start())
+  12. _isReturningHome = false
+```
+
+**Key design decisions:**
+
+1. **Reuse _activeTween:** Return-home and regular visits are mutually exclusive (guards prevent overlap). Using the same `_activeTween` field is correct and matches the kill-before-create pattern.
+
+2. **Wish priority rule:** The simplest implementation checks if the citizen has an active wish AND a matching room exists nearby. If yes, skip the home return. This avoids complex priority queuing.
+
+3. **Zzz floater:** Use FloatingText (same as arrival text and credit text). Smaller font size (14 vs 18), lighter color (soft lavender/gray), positioned at the citizen's world position projected to screen space. Alternative: Sprite3D badge like wish badges. Recommendation: FloatingText is simpler, already proven, and matches the "Zzz is subtle" requirement.
+
+4. **Wish timer pause during rest:** `_wishTimer.Stop()` before the rest interval, `_wishTimer.Start()` with remaining time after. Actually, since the wish timer is one-shot and re-armed on timeout, simply stopping it during rest and restarting with a fresh interval after is simpler and avoids tracking remaining time.
+
+**Event subscriptions (new on CitizenNode):**
+
+```csharp
+protected override void SubscribeEvents()
+{
+    base.SubscribeEvents();  // existing WishNudgeRequested subscription
+    if (GameEvents.Instance != null)
+    {
+        GameEvents.Instance.CitizenAssignedHome += OnCitizenAssignedHome;
+        GameEvents.Instance.CitizenUnhoused += OnCitizenUnhoused;
+    }
+}
+
+protected override void UnsubscribeEvents()
+{
+    base.UnsubscribeEvents();
+    if (GameEvents.Instance != null)
+    {
+        GameEvents.Instance.CitizenAssignedHome -= OnCitizenAssignedHome;
+        GameEvents.Instance.CitizenUnhoused -= OnCitizenUnhoused;
+    }
+}
+
+private void OnCitizenAssignedHome(string citizenName, int flatSegmentIndex)
+{
+    if (_data.CitizenName != citizenName) return;
+    _homeSegmentIndex = flatSegmentIndex;
+    // Start home timer if not already running
+    if (_homeTimer != null && _homeTimer.IsStopped())
+    {
+        _homeTimer.WaitTime = HomeTimerMin + GD.Randf() * (HomeTimerMax - HomeTimerMin);
+        _homeTimer.Start();
+    }
+}
+
+private void OnCitizenUnhoused(string citizenName)
+{
+    if (_data.CitizenName != citizenName) return;
+    _homeSegmentIndex = -1;
+    _homeTimer?.Stop();
+}
+```
+
+**Filter pattern:** Each CitizenNode filters events by its own name. This is identical to the existing `OnWishNudgeRequested` pattern where every CitizenNode receives the event but only the named citizen acts on it. With ~50 citizens max, the string comparison overhead is negligible.
+
+### 5. CitizenInfoPanel -- Home Display
+
+Add a `_homeLabel` between `_nameLabel` and `_categoryLabel` in the VBoxContainer:
+
+```csharp
+// In _Ready(), after _nameLabel:
+_homeLabel = new Label
+{
+    MouseFilter = MouseFilterEnum.Ignore
+};
+_homeLabel.AddThemeFontSizeOverride("font_size", 13);
+vbox.AddChild(_homeLabel);
+
+// In ShowForCitizen():
+int homeSegment = HousingManager.Instance?.GetHomeSegment(citizen.Data.CitizenName) ?? -1;
+if (homeSegment >= 0)
+{
+    var roomInfo = BuildManager.Instance?.GetPlacedRoom(homeSegment);
+    string roomName = roomInfo?.Definition.RoomName ?? "Unknown";
+    var (row, pos) = SegmentGrid.FromIndex(homeSegment);
+    string location = $"{(row == SegmentRow.Outer ? "Outer" : "Inner")} {pos + 1}";
+    _homeLabel.Text = $"Home: {roomName} ({location})";
+    _homeLabel.AddThemeColorOverride("font_color", new Color(0.75f, 0.85f, 0.75f));
+}
+else
+{
+    _homeLabel.Text = "Home: \u2014"; // em dash
+    _homeLabel.AddThemeColorOverride("font_color", new Color(0.65f, 0.63f, 0.60f));
+}
+```
+
+### 6. SegmentInteraction -- Tooltip Resident List
+
+**Current:** `SegmentInteraction.UpdateHover()` builds a label from `SegmentGrid.GetLabel()` and passes it to `_tooltip.Show()`.
+
+**After:** Append resident names when hovering a housing room:
+
+```csharp
+// In UpdateHover(), after building the base label:
+string label = _ringVisual.Grid.GetLabel(row, segIndex);
+
+// Append resident info for housing rooms
+var roomInfo = BuildManager.Instance?.GetPlacedRoom(flatIndex);
+if (roomInfo?.Definition.Category == RoomDefinition.RoomCategory.Housing)
+{
+    int anchorIndex = roomInfo.Value.AnchorIndex;
+    var residents = HousingManager.Instance?.GetResidents(anchorIndex);
+    if (residents != null && residents.Count > 0)
+    {
+        label += "\n  " + string.Join(", ", residents);
+    }
+}
+
+_tooltip?.Show(label, _lastMousePos);
+```
+
+### 7. PopulationDisplay -- Count/Capacity Format
+
+**Current:** Shows just citizen count (e.g., "5").
+
+**After:** Shows count/capacity (e.g., "5/7"):
+
+```csharp
+private void UpdateDisplay()
+{
+    int count = CitizenManager.Instance?.CitizenCount ?? 0;
+    int capacity = HousingManager.Instance?.CalculateHousingCapacity() ?? 0;
+    _countLabel.Text = $"{count}/{capacity}";
+}
+```
+
+Add subscriptions to `RoomPlaced` and `RoomDemolished` events (for capacity changes) in addition to existing `CitizenArrived` subscription.
+
+### 8. SaveManager -- Housing Persistence
+
+**Save format version bump to 3.**
+
+**SavedCitizen addition (recommended over separate dictionary):**
+
+```csharp
+public class SavedCitizen
+{
+    // ... existing fields ...
+    public int? HomeSegmentIndex { get; set; }  // null = unhoused
+}
+```
+
+**Why nullable int:** When deserializing a v2 save, `HomeSegmentIndex` is absent from JSON and defaults to `null` in C#. This correctly represents "unhoused" for legacy saves. Using plain `int` would default to 0, which is a valid segment index -- a subtle but critical bug.
+
+**CollectGameState changes:**
+
+```csharp
+// In the citizen serialization loop:
+HomeSegmentIndex = HousingManager.Instance?.GetHomeSegment(citizenData.CitizenName)
+```
+
+Note: `GetHomeSegment` returns -1 for unhoused. Save as -1, restore interprets -1 as unhoused.
+
+Actually, given the nullable approach: if `GetHomeSegment` returns -1, store `null` in the save. If >= 0, store the value. This keeps the nullable semantics clean:
+
+```csharp
+int home = HousingManager.Instance?.GetHomeSegment(citizenData.CitizenName) ?? -1;
+HomeSegmentIndex = home >= 0 ? home : null;
+```
+
+**ApplySceneState changes:**
+
+```csharp
+// After restoring citizens, restore housing assignments:
+if (HousingManager.Instance != null)
+{
+    HousingManager.Instance.ClearAssignments();
+
+    foreach (var citizen in data.Citizens)
+    {
+        if (citizen.HomeSegmentIndex.HasValue && citizen.HomeSegmentIndex.Value >= 0)
+        {
+            HousingManager.Instance.RestoreAssignment(
+                citizen.Name, citizen.HomeSegmentIndex.Value);
+        }
+    }
+
+    // Attempt fresh assignment for any still-unhoused citizens
+    HousingManager.Instance.AssignAllUnhoused();
+}
+```
+
+**Version-gated behavior:**
+- v1/v2 loads: `HomeSegmentIndex` is null for all citizens. All start unhoused. `AssignAllUnhoused()` runs and assigns them based on placed rooms.
+- v3 loads: Assignments restored from save data. Any gaps filled by `AssignAllUnhoused()`.
+
+**SaveData.HousingCapacity removal:** This field was used by HappinessManager.RestoreState(). Since HousingManager now computes capacity from placed rooms (which are already saved and restored), the field is redundant. Keep it in SaveData for v2 backward compatibility (C# will silently ignore it when deserializing v3 saves that omit it, and v2 saves that include it won't cause errors). Just stop writing it in new saves.
+
+**StateLoaded flag for HousingManager:**
+
+```csharp
+// In SaveManager.ApplyState():
+HousingManager.StateLoaded = true;  // prevents _Ready from scanning rooms
+```
+
+HousingManager._Ready() uses this to skip `InitializeFromPlacedRooms()` when loading from save, since ApplySceneState will restore assignments explicitly.
+
+**SaveManager autosave subscriptions:** Add `CitizenAssignedHome` and `CitizenUnhoused` to the debounce triggers in SaveManager:
+
+```csharp
+private Action<string, int> _onCitizenAssignedHome;
+private Action<string> _onCitizenUnhoused;
+
+_onCitizenAssignedHome = (_, _) => OnAnyStateChanged();
+_onCitizenUnhoused = _ => OnAnyStateChanged();
+
+GameEvents.Instance.CitizenAssignedHome += _onCitizenAssignedHome;
+GameEvents.Instance.CitizenUnhoused += _onCitizenUnhoused;
+```
 
 ---
 
 ## Data Flow
 
-### Wish Fulfillment Flow (v2)
+### Flow 1: New Citizen Arrives
 
 ```
-WishBoard.OnRoomPlaced detects wish fulfilled
-    ↓
-GameEvents.EmitWishFulfilled(citizenName, wishType)
-    ↓
-HappinessManager.OnWishFulfilled(citizenName, wishType)
-    ├── _lifetimeHappiness += 1
-    ├── _mood += MoodGainPerWish (3.0)
-    ├── _mood clamped (no explicit cap — naturally bounded by decay rate)
-    ├── GameEvents.EmitLifetimeHappinessChanged(_lifetimeHappiness)
-    │       ↓
-    │   HUD counter "♥ N" ticks up with pulse animation
-    └── CheckUnlockMilestones()  [now keyed to _lifetimeHappiness int thresholds]
-            ↓ (if milestone crossed)
-        GameEvents.EmitBlueprintUnlocked(roomId)
+HappinessManager.OnArrivalCheck()
+    |
+    v  pop < capacity? (queries HousingManager.CalculateHousingCapacity)
+    |
+CitizenManager.SpawnCitizen()
+    |
+    v  emits CitizenArrived(name)
+GameEvents
+    |
+    +---> HousingManager.OnCitizenArrived(name)
+    |       |
+    |       v  FindBestRoom() -- room with fewest occupants + available capacity
+    |       |
+    |       v  _assignments[name] = anchorIndex
+    |       |  _roomResidents[anchorIndex].Add(name)
+    |       |
+    |       v  emits CitizenAssignedHome(name, anchorIndex)
+    |             |
+    |             +---> CitizenNode.OnCitizenAssignedHome() -- sets _homeSegmentIndex, starts home timer
+    |             +---> SaveManager -- triggers debounced autosave
+    |
+    +---> PopulationDisplay -- updates count
+    +---> SaveManager -- triggers debounced autosave
 ```
 
-### Mood Decay Flow (v2 — per frame)
+### Flow 2: Housing Room Built
 
 ```
-HappinessManager._Process(delta)
-    ├── baseline = BaselineFactor * sqrt(_lifetimeHappiness)
-    ├── _mood += (baseline - _mood) * DecayRate * delta
-    ├── _mood = Max(_mood, 0)
-    └── newTier = ComputeTier(_mood)
-            ↓ (if tier changed)
-        GameEvents.EmitMoodTierChanged(oldTier, newTier)
-            ↓
-            ├── EconomyManager.OnMoodTierChanged(newTier) → stores _currentTier
-            └── HUD MoodDisplay.OnMoodTierChanged(oldTier, newTier)
-                    └── update label text + color + spawn floating text
+BuildManager confirms placement
+    |
+    v  emits RoomPlaced(roomId, anchorIndex)
+GameEvents
+    |
+    +---> HousingManager.OnRoomPlaced(roomId, anchorIndex)
+    |       |
+    |       v  is Housing category? query BuildManager.GetPlacedRoom()
+    |       |
+    |       v  YES: compute effective capacity = BaseCapacity + (segmentCount - 1)
+    |       |       _roomCapacities[anchorIndex] = effectiveCapacity
+    |       |       _roomResidents[anchorIndex] = new List<string>()
+    |       |
+    |       v  attempt to assign unhoused citizens (oldest first from _unhousedCitizens)
+    |       |  for each assigned: emit CitizenAssignedHome(name, anchorIndex)
+    |       |
+    +---> WishBoard.OnRoomPlaced() (existing, unchanged)
+    +---> PopulationDisplay -- updates capacity display
+    +---> SaveManager -- triggers debounced autosave
 ```
 
-### Arrival Check Flow (v2 — unchanged structure, changed probability)
+### Flow 3: Housing Room Demolished
 
 ```
-HappinessManager._arrivalTimer.Timeout (every 60s)
-    ↓
-int currentPop = CitizenManager.Instance.CitizenCount
-if currentPop >= _housingCapacity: return
-    ↓
-float arrivalScale = TierData[(int)_currentTier].arrivalScale
-if _currentTier == MoodTier.Quiet: return  // 0.0 arrival scale = no arrivals
-    ↓
-float chance = arrivalScale * ArrivalProbabilityBase
-if GD.Randf() < chance:
-    CitizenManager.Instance.SpawnCitizen()
-    SpawnArrivalText(...)
+BuildManager confirms demolition
+    |
+    v  emits RoomDemolished(anchorIndex)
+GameEvents
+    |
+    +---> HousingManager.OnRoomDemolished(anchorIndex)
+    |       |
+    |       v  is this a tracked housing room? _roomCapacities.ContainsKey(anchorIndex)?
+    |       |
+    |       v  YES: get all residents from _roomResidents[anchorIndex]
+    |       |       for each resident:
+    |       |           _assignments.Remove(name)
+    |       |           emit CitizenUnhoused(name) -> CitizenNode stops home timer
+    |       |
+    |       v  remove room tracking: _roomCapacities.Remove, _roomResidents.Remove
+    |       |
+    |       v  attempt reassignment of displaced citizens to other rooms with capacity
+    |       |  for each successfully reassigned: emit CitizenAssignedHome(name, newAnchor)
+    |       |  remaining citizens stay in _unhousedCitizens list
+    |
+    +---> WishBoard.OnRoomDemolished() (existing, unchanged)
+    +---> PopulationDisplay -- updates capacity display
+    +---> SaveManager -- triggers debounced autosave
 ```
 
-Note: `ArrivalProbabilityBase` replaces `ArrivalProbabilityScale`. At Quiet tier, arrival scale is 0.0, so the early return replaces the old `if (_happiness <= 0f) return` guard.
-
-### Economy Multiplier Flow (v2)
+### Flow 4: Citizen Returns Home
 
 ```
-v1: EconomyManager._currentHappiness = happiness (float)
-    multiplier = 1 + (happiness * (HappinessMultiplierCap - 1.0f))
-
-v2: EconomyManager._currentTier = tier (MoodTier enum)
-    multiplier = TierData[(int)_currentTier].economyMult (lookup, not formula)
-
-SetHappiness(float) → replace with SetMoodTier(MoodTier)
+CitizenNode._homeTimer fires
+    |
+    v  Guards:
+    |    _isVisiting? -> skip, reset timer
+    |    _isReturningHome? -> skip (shouldn't happen)
+    |    _homeSegmentIndex == -1? -> skip (unhoused)
+    |    active wish + nearby matching room? -> skip (wish priority)
+    |
+    v  All guards pass
+_isReturningHome = true
+_activeTween?.Kill()
+    |
+    v  StartReturnHome() tween sequence:
+        Phase 0: Walk to home segment angle (angular tween)
+        Phase 1: Drift to room edge (radial tween)
+        Phase 2: Spawn Zzz FloatingText
+        Phase 3: Fade out + hide + emit CitizenEnteredRoom
+        Phase 4: _wishTimer.Stop() -- pause wish generation during rest
+        Phase 5: Wait 8-15 seconds
+        Phase 6: Show + fade in + emit CitizenExitedRoom
+        Phase 7: Drift back to walkway
+        Phase 8: _wishTimer.Start() -- resume wish generation
+                 _isReturningHome = false
+                 _activeTween = null
+                 Reset home timer with new random interval
 ```
 
-The `SetHappiness` method on EconomyManager is called only from HappinessManager (in `OnWishFulfilled` and `RestoreState`). Replacing it with `SetMoodTier(MoodTier tier)` is a contained change. `GetIncomeBreakdown()` currently returns `happinessMult` as a float — it can continue to do so (just read from the tier lookup table).
+### Flow 5: Save/Load Round Trip
+
+```
+SAVE (SaveManager.CollectGameState):
+  for each citizen in CitizenManager.Citizens:
+      savedCitizen.HomeSegmentIndex = HousingManager.GetHomeSegment(name)
+                                       (-1 stored as null)
+  data.Version = 3
+
+LOAD (SaveManager.ApplyState):
+  HousingManager.StateLoaded = true
+  (scene transition occurs)
+
+LOAD (SaveManager.ApplySceneState, 2 frames later):
+  1. Restore rooms via BuildManager.RestorePlacedRoom()
+  2. Restore citizens via CitizenManager.SpawnCitizenFromSave()
+  3. Restore housing:
+     a. HousingManager.ClearAssignments()
+     b. HousingManager.InitializeRoomCapacities()  -- scans placed rooms
+     c. For each citizen with HomeSegmentIndex:
+          HousingManager.RestoreAssignment(name, segment)
+     d. HousingManager.AssignAllUnhoused()  -- fills gaps
+```
 
 ---
 
-## Events: New, Modified, Removed
+## Patterns to Follow
 
-### Remove
+### Pattern 1: Autoload Singleton with Static Instance
 
-| Event | Reason |
-|-------|--------|
-| `HappinessChanged(float)` | Replaced by `LifetimeHappinessChanged` + `MoodChanged`. SaveManager subscription moves to new events. HappinessBar is replaced entirely. |
-
-### Add
-
-| Event | Signature | Who Emits | Who Subscribes |
-|-------|-----------|-----------|----------------|
-| `LifetimeHappinessChanged` | `Action<int> newCount` | `HappinessManager.OnWishFulfilled` | `HUD counter widget`, `SaveManager` |
-| `MoodChanged` | `Action<float> newMood` | `HappinessManager._Process` (on significant change only) | `SaveManager` (debounce trigger only) |
-| `MoodTierChanged` | `Action<MoodTier, MoodTier> oldTier, newTier` | `HappinessManager._Process` | `EconomyManager`, `HUD mood display widget` |
-
-### Keep Unchanged
-
-| Event | Reason |
-|-------|--------|
-| `WishFulfilled(string, string)` | Still the trigger; HappinessManager subscribes as before |
-| `BlueprintUnlocked(string)` | Still emitted by HappinessManager when milestones pass; BuildPanel subscribes as before |
-| All other events | Unaffected by this milestone |
-
----
-
-## SaveManager: Serialization Changes
-
-### SaveData POCO — changes required
+Every autoload follows the Instance singleton pattern. HousingManager must do the same.
 
 ```csharp
-// v1 fields to remove/replace:
-public float Happiness { get; set; }           // REMOVE
-
-// v2 fields to add:
-public int LifetimeHappiness { get; set; }     // ADD
-public float Mood { get; set; }                // ADD
-
-// Unchanged:
-public int Version { get; set; } = 1;          // BUMP to 2
-public int CrossedMilestoneCount { get; set; } // KEEP (semantics unchanged — still milestone index)
-public int HousingCapacity { get; set; }       // KEEP
-public List<string> UnlockedRooms { get; set; } // KEEP
-// ... all other fields unchanged
-```
-
-### CollectGameState — changes required
-
-```csharp
-// Replace:
-Happiness = HappinessManager.Instance?.Happiness ?? 0f,
-
-// With:
-LifetimeHappiness = HappinessManager.Instance?.LifetimeHappiness ?? 0,
-Mood = HappinessManager.Instance?.Mood ?? 0f,
-```
-
-### ApplyState — changes required
-
-```csharp
-// Replace call to RestoreState:
-HappinessManager.Instance?.RestoreState(
-    data.Happiness,
-    new HashSet<string>(data.UnlockedRooms),
-    data.CrossedMilestoneCount,
-    data.HousingCapacity);
-
-// With:
-HappinessManager.Instance?.RestoreState(
-    data.LifetimeHappiness,
-    data.Mood,
-    new HashSet<string>(data.UnlockedRooms),
-    data.CrossedMilestoneCount,
-    data.HousingCapacity);
-```
-
-### HappinessManager.RestoreState — signature change
-
-```csharp
-// v1:
-public void RestoreState(float happiness, HashSet<string> unlockedRooms,
-    int milestoneCount, int housingCapacity)
-
-// v2:
-public void RestoreState(int lifetimeHappiness, float mood,
-    HashSet<string> unlockedRooms, int milestoneCount, int housingCapacity)
-```
-
-Inside `RestoreState`, after setting state, call `EconomyManager.Instance?.SetMoodTier(ComputeTier(mood))` (replaces `SetHappiness`) and emit `LifetimeHappinessChanged` + `MoodTierChanged` to sync UI.
-
-### SaveManager event subscriptions — changes required
-
-`SaveManager._onHappinessChanged` subscribes to the old `HappinessChanged` event. Replace with subscriptions to `LifetimeHappinessChanged` and `MoodChanged` (both just call `OnAnyStateChanged()` — the payload is irrelevant to SaveManager).
-
-```csharp
-// Remove:
-private Action<float> _onHappinessChanged;
-GameEvents.Instance.HappinessChanged += _onHappinessChanged;
-GameEvents.Instance.HappinessChanged -= _onHappinessChanged;
-
-// Add:
-private Action<int> _onLifetimeHappinessChanged;
-private Action<float> _onMoodChanged;
-_onLifetimeHappinessChanged = _ => OnAnyStateChanged();
-_onMoodChanged = _ => OnAnyStateChanged();
-GameEvents.Instance.LifetimeHappinessChanged += _onLifetimeHappinessChanged;
-GameEvents.Instance.MoodChanged += _onMoodChanged;
-// (and unsubscribe in _ExitTree / UnsubscribeEvents)
-```
-
-### v1 Save Migration
-
-Migration runs inside `SaveManager.Load()` (or a dedicated `MigrateV1ToV2(SaveData)` helper called from `Load()`). The `Version` field gates which path is taken.
-
-```csharp
-public SaveData Load()
+public partial class HousingManager : Node
 {
-    // ... read and deserialize as before ...
-    if (data.Version == 1)
-        data = MigrateV1ToV2(data);
-    return data;
-}
+    public static HousingManager Instance { get; private set; }
+    public static bool StateLoaded { get; set; }
 
-private static SaveData MigrateV1ToV2(SaveData v1)
-{
-    // Invert the diminishing-returns formula to estimate wish count
-    // v1 formula: gain = 0.08 / (1 + happiness); sum of gains ≈ happiness
-    // Approximation from design spec: wishes ≈ (happiness / HappinessGainBase) * (1 + happiness)
-    const float HappinessGainBase = 0.08f;
-    float h = v1.Happiness;
-    int estimatedWishes = Mathf.RoundToInt((h / HappinessGainBase) * (1f + h));
+    public override void _Ready()
+    {
+        Instance = this;
+        if (GameEvents.Instance != null)
+        {
+            GameEvents.Instance.RoomPlaced += OnRoomPlaced;
+            GameEvents.Instance.RoomDemolished += OnRoomDemolished;
+            GameEvents.Instance.CitizenArrived += OnCitizenArrived;
+        }
+        if (!StateLoaded)
+            InitializeFromPlacedRooms();
+    }
 
-    float baseline = Mathf.Sqrt(estimatedWishes); // BaselineFactor = 1.0
-    float initialMood = baseline;                  // Start at baseline, not above it
-
-    v1.LifetimeHappiness = estimatedWishes;
-    v1.Mood = initialMood;
-    v1.Version = 2;
-    return v1;  // v1 fields (Happiness) remain in the object but are ignored by v2 logic
+    public override void _ExitTree()
+    {
+        if (GameEvents.Instance != null)
+        {
+            GameEvents.Instance.RoomPlaced -= OnRoomPlaced;
+            GameEvents.Instance.RoomDemolished -= OnRoomDemolished;
+            GameEvents.Instance.CitizenArrived -= OnCitizenArrived;
+        }
+    }
 }
 ```
 
-The old `Happiness` field is left in `SaveData` as a nullable or simply ignored — `System.Text.Json` will silently skip unrecognized fields on the v2 class if `Happiness` is removed from the POCO (or include it as an ignored migration-only field).
+Note: Extends `Node` directly (like HappinessManager, EconomyManager, BuildManager), NOT `SafeNode`. Autoloads manage their own subscription in `_Ready`/`_ExitTree` because they have different lifecycle needs than scene nodes. SafeNode uses `_EnterTree`/`_ExitTree` symmetry designed for scene nodes that may be re-parented.
 
-**Cleaner approach:** Keep `Happiness` in `SaveData` as a migration-only property with `[JsonIgnore]` after migration is complete, or simply remove it and rely on `JsonSerializer`'s default behavior of ignoring unknown fields during deserialization of a v1 save file into the v2 class (where `LifetimeHappiness` and `Mood` default to 0, then migration fills them in).
+### Pattern 2: Config Resource with Fallback Loading
 
-Recommended: add `[System.Text.Json.Serialization.JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]` to nothing — just remove `Happiness` from the POCO. On v1 save load, `LifetimeHappiness` and `Mood` will be 0; `Version` will be 1; the migration branch runs. The old `Happiness` key in the JSON is ignored by the deserializer.
+```csharp
+[GlobalClass]
+public partial class HousingConfig : Resource
+{
+    [ExportGroup("Return Home")]
+    [Export] public float HomeTimerMin { get; set; } = 90.0f;
+    [Export] public float HomeTimerMax { get; set; } = 150.0f;
+    [Export] public float RestDurationMin { get; set; } = 8.0f;
+    [Export] public float RestDurationMax { get; set; } = 15.0f;
+}
+```
+
+Loaded with the same fallback pattern as HappinessConfig and EconomyConfig:
+
+```csharp
+if (Config == null)
+    Config = ResourceLoader.Load<HousingConfig>("res://Resources/Housing/default_housing.tres");
+if (Config == null)
+{
+    GD.PushWarning("HousingManager: No HousingConfig found. Using code defaults.");
+    Config = new HousingConfig();
+}
+```
+
+### Pattern 3: Event-Driven Communication via GameEvents
+
+All cross-system notifications go through GameEvents. No direct method calls for state-change notifications between singletons.
+
+### Pattern 4: Kill-Before-Create Tween
+
+Return-home tween must follow the same `_activeTween?.Kill()` pattern already used for visits. Since visits and home returns are mutually exclusive (guards prevent overlap), they share the same `_activeTween` field safely.
+
+### Pattern 5: Null-Safe Singleton Access
+
+Always `?.` when accessing singletons:
+
+```csharp
+int capacity = HousingManager.Instance?.CalculateHousingCapacity() ?? 0;
+GameEvents.Instance?.EmitCitizenAssignedHome(name, segment);
+```
+
+### Pattern 6: StateLoaded Guard for Save/Load
+
+```csharp
+public override void _Ready()
+{
+    Instance = this;
+    // ...event subscriptions...
+    if (!StateLoaded)
+        InitializeFromPlacedRooms();
+}
+```
 
 ---
 
-## EconomyManager: Integration Change
+## Anti-Patterns to Avoid
 
-### What changes
+### Anti-Pattern 1: Dual Ownership of Housing Capacity
 
-`_currentHappiness` (float) becomes `_currentTier` (MoodTier). The `SetHappiness(float)` method is replaced by `SetMoodTier(MoodTier)`. Income calculation reads from the tier lookup table instead of a formula.
+**What:** Both HappinessManager and HousingManager tracking housing capacity independently.
+**Why bad:** State desynchronization. Two sources of truth for the same concept. Already a risk because HappinessManager currently owns capacity.
+**Instead:** HousingManager is the single owner. HappinessManager queries it. Remove ALL capacity tracking from HappinessManager.
 
-```csharp
-// Remove:
-private float _currentHappiness;
-public void SetHappiness(float happiness) { _currentHappiness = Mathf.Clamp(happiness, 0f, 1f); }
+### Anti-Pattern 2: CitizenNode Polling HousingManager in _Process
 
-// Add:
-private MoodTier _currentTier = MoodTier.Quiet;
-public void SetMoodTier(MoodTier tier) { _currentTier = tier; }
+**What:** CitizenNode checking HousingManager every frame to see if its home changed.
+**Why bad:** O(N) queries per frame. Wasteful when assignments change rarely (only on room build/demolish).
+**Instead:** Use events. CitizenNode subscribes to CitizenAssignedHome/CitizenUnhoused and filters by name. Same pattern as WishNudgeRequested.
 
-// Replace income formula:
-// v1: float happinessMult = 1.0f + (_currentHappiness * (Config.HappinessMultiplierCap - 1.0f));
-// v2: float happinessMult = HappinessManager.TierData[(int)_currentTier].economyMult;
-//     (or expose a static helper on HappinessManager: HappinessManager.GetEconomyMultiplier(_currentTier))
-```
+### Anti-Pattern 3: Storing Home Data on CitizenData Resource
 
-EconomyManager does not need to subscribe to any event. HappinessManager calls `EconomyManager.Instance?.SetMoodTier(newTier)` directly when the tier changes (same pattern as the existing `SetHappiness` direct call from `RestoreState` and `OnWishFulfilled`). Alternatively, EconomyManager subscribes to `MoodTierChanged` — either works; the direct call is simpler and matches the existing pattern.
+**What:** Adding HomeSegmentIndex to the CitizenData Resource class.
+**Why bad:** CitizenData is identity + appearance (name, body, colors). Home assignment is runtime state that changes dynamically. Mixing concerns.
+**Instead:** _homeSegmentIndex lives on CitizenNode as a private field. Authoritative mapping lives in HousingManager's dictionaries.
 
-### GetIncomeBreakdown — update for HUD
+### Anti-Pattern 4: Direct Singleton Method Calls for Notifications
 
-`GetIncomeBreakdown()` returns `happinessMult` as a float. After the change it returns the tier multiplier value. No signature change required — the return type is still `float`.
+**What:** `BuildManager` calling `HousingManager.Instance.OnRoomBuilt()` directly.
+**Why bad:** Breaks the event-driven architecture. Creates tight coupling. Every other system uses events for cross-system communication.
+**Instead:** BuildManager emits RoomPlaced/RoomDemolished events. HousingManager subscribes independently. This is how all existing singletons communicate.
+
+### Anti-Pattern 5: Using Regular Int for HomeSegmentIndex in SaveData
+
+**What:** `public int HomeSegmentIndex { get; set; }` in SavedCitizen.
+**Why bad:** C# default for int is 0, which is a valid segment index (Outer 0). When deserializing a v2 save that lacks this field, all citizens would appear to live at Outer 0.
+**Instead:** Use `int?` (nullable). Absent JSON fields deserialize to null, which correctly represents "unhoused" for legacy saves.
 
 ---
 
-## HUD: Component Replacement
+## New vs Modified Files Summary
 
-### HappinessBar.cs — full replacement
+### New Files (2)
 
-`HappinessBar.cs` is a `MarginContainer` that builds a fill bar and subscribes to `HappinessChanged(float)`. The entire widget is obsolete. Replace it with two separate widgets, or one combined widget:
+| File | Type | Purpose | Estimated LOC |
+|------|------|---------|---------------|
+| `Scripts/Autoloads/HousingManager.cs` | Autoload singleton | Assignment map, capacity tracking, assign/unassign/reassign | ~180 |
+| `Scripts/Data/HousingConfig.cs` | Resource | Tunable timing constants for return-home behavior | ~30 |
 
-**Option A — Two widgets (recommended for clean separation):**
-- `HappinessCounter.cs` — subscribes to `LifetimeHappinessChanged(int)`, displays `♥ 47` with pulse on increment
-- `MoodDisplay.cs` — subscribes to `MoodTierChanged`, displays tier name with tier color, spawns floating text on tier change
+### Modified Files (8)
 
-**Option B — One widget:**
-- `HappinessHUD.cs` — handles both events in one class
+| File | Change Scope | What Changes |
+|------|-------------|-------------|
+| `Scripts/Autoloads/GameEvents.cs` | Small | Add 2 events + 2 emit methods (~10 LOC) |
+| `Scripts/Citizens/CitizenNode.cs` | Medium | Add _homeSegmentIndex, _homeTimer, StartReturnHome(), Zzz floater, event subscriptions (~80 LOC) |
+| `Scripts/UI/CitizenInfoPanel.cs` | Small | Add _homeLabel, display home room name and location (~15 LOC) |
+| `Scripts/Ring/SegmentInteraction.cs` | Small | Append resident names to tooltip label (~10 LOC) |
+| `Scripts/UI/PopulationDisplay.cs` | Small | Show count/capacity format, subscribe to room events (~15 LOC) |
+| `Scripts/Autoloads/SaveManager.cs` | Medium | Serialize/deserialize housing assignments, version bump, new autosave triggers (~30 LOC) |
+| `Scripts/Autoloads/HappinessManager.cs` | Medium | Remove capacity tracking fields/methods, query HousingManager instead (~-50 LOC net removal) |
+| `project.godot` | Tiny | Add HousingManager autoload entry (~1 line) |
 
-Option A matches the existing pattern (CreditHUD, PopulationDisplay are separate widgets). Use Option A.
+### Untouched Files
 
-Both widgets initialize from `HappinessManager.Instance` in `_Ready()` the same way `HappinessBar` reads `HappinessManager.Instance.Happiness` today.
-
-```csharp
-// HappinessCounter._Ready() initialization:
-int initial = HappinessManager.Instance?.LifetimeHappiness ?? 0;
-UpdateCounter(initial);
-
-// MoodDisplay._Ready() initialization:
-MoodTier initial = HappinessManager.Instance?.CurrentTier ?? MoodTier.Quiet;
-UpdateDisplay(initial);
-```
+| File | Why Untouched |
+|------|--------------|
+| `BuildManager.cs` | Emits same events. HousingManager subscribes to them. No changes. |
+| `EconomyManager.cs` | Housing has no economy integration beyond existing room costs. |
+| `WishBoard.cs` | Wish system is orthogonal to housing. |
+| `CitizenManager.cs` | Spawning and tracking unchanged. HousingManager subscribes to CitizenArrived. |
+| `MoodSystem.cs` | Internal to HappinessManager. No housing dependency. |
+| `RoomDefinition.cs` | BaseCapacity already exists. No changes needed. |
+| `CitizenData.cs` | Identity data only. Home is runtime state. |
+| `FloatingText.cs` | Reused as-is for Zzz floater. |
 
 ---
 
 ## Suggested Build Order
 
-Dependencies determine order. The HappinessManager refactor is the source of truth — all consumers update after it.
+Phases ordered by dependency chain. Each phase produces testable, independently verifiable results.
+
+### Phase 1: Foundation (GameEvents + HousingConfig + SaveData)
+
+**Files:** GameEvents.cs (2 new events), HousingConfig.cs (new resource), SaveManager.cs (SavedCitizen.HomeSegmentIndex field)
+**Why first:** Pure data definitions with zero behavior. Everything else depends on them.
+**Verifiable:** Project compiles. HousingConfig .tres can be created in Inspector.
+**Dependencies:** None.
+
+### Phase 2: HousingManager Core
+
+**Files:** HousingManager.cs (new autoload), project.godot (autoload entry)
+**Why second:** Core business logic must exist before anything consumes it. Assignment algorithm, capacity tracking, event handling.
+**Verifiable:** Build a housing room -> HousingManager logs assignment. Demolish -> logs unhousing. New citizen arrives -> gets assigned.
+**Dependencies:** Phase 1 (events exist).
+
+### Phase 3: Capacity Transfer from HappinessManager
+
+**Files:** HappinessManager.cs (remove capacity fields/methods, query HousingManager)
+**Why third:** Must happen after HousingManager exists. Removes duplicate state.
+**Verifiable:** Arrival gate uses HousingManager capacity. No regression in arrival behavior. No compile errors from removed HappinessManager methods.
+**Dependencies:** Phase 2 (HousingManager provides capacity API).
+
+### Phase 4: Return-Home Behavior on CitizenNode
+
+**Files:** CitizenNode.cs (home timer, return-home tween, Zzz floater, event subscriptions)
+**Why fourth:** The largest and most visible feature. Depends on HousingManager for assignment events and home segment lookup.
+**Verifiable:** Citizens visibly return to home rooms. Zzz floater appears. Wish timer pauses during rest. Unhoused citizens don't attempt home returns.
+**Dependencies:** Phase 2 (assignments exist), Phase 1 (events for CitizenAssignedHome/Unhoused).
+
+### Phase 5: UI Updates
+
+**Files:** CitizenInfoPanel.cs, SegmentInteraction.cs (tooltip), PopulationDisplay.cs
+**Why fifth:** Pure consumers of HousingManager state. No downstream impact.
+**Verifiable:** Click citizen -> see home room in info panel. Hover housing room -> see resident names. Population HUD shows count/capacity.
+**Dependencies:** Phase 2 (HousingManager provides query APIs).
+
+### Phase 6: Save/Load Integration
+
+**Files:** SaveManager.cs (serialize/deserialize assignments, version bump, autosave triggers)
+**Why last:** Must serialize all housing state, which means all features must be complete. Save version bump to v3. Backward compatibility with v2 saves.
+**Verifiable:** Save -> quit -> reload: housing assignments persist. Load v2 save: citizens start unhoused, get auto-assigned.
+**Dependencies:** All previous phases.
+
+### Phase Ordering Rationale
 
 ```
-Step 1 — HappinessManager refactor (no consumers yet, but defines the contract)
-  - Add MoodTier enum
-  - Replace float _happiness with int _lifetimeHappiness + float _mood
-  - Add _Process decay loop
-  - Replace % milestone thresholds with wish-count thresholds
-  - Replace arrival probability formula with tier lookup
-  - Update RestoreState signature
-  - Compile guard: keep SetHappiness stub returning no-op until EconomyManager is updated
-    (prevents compile errors while Step 2 is incomplete)
-
-Step 2 — GameEvents event changes (depends on: MoodTier enum from Step 1)
-  - Add LifetimeHappinessChanged(int)
-  - Add MoodChanged(float)
-  - Add MoodTierChanged(MoodTier, MoodTier)
-  - Remove HappinessChanged(float) — or keep as no-op until all subscribers are updated
-    Recommended: remove immediately and let the compiler surface every subscriber.
-    There are exactly 3 subscribers: HappinessBar, SaveManager, and HappinessManager emits it.
-    All are updated in this milestone.
-
-Step 3 — EconomyManager consumer update (depends on: Step 1 MoodTier, Step 2 events)
-  - Replace _currentHappiness with _currentTier
-  - Replace SetHappiness with SetMoodTier
-  - Update CalculateTickIncome to use tier lookup
-  - Update GetIncomeBreakdown to return tier multiplier
-
-Step 4 — SaveManager / SaveData migration (depends on: Step 1 new API)
-  - Bump SaveData.Version to 2
-  - Add LifetimeHappiness and Mood fields
-  - Remove (or ignore) Happiness field
-  - Update CollectGameState to read new fields
-  - Update ApplyState to pass new fields
-  - Add MigrateV1ToV2 logic
-  - Update event subscriptions (HappinessChanged → LifetimeHappinessChanged + MoodChanged)
-
-Step 5 — HUD replacement (depends on: Step 2 events, Step 1 public API)
-  - Delete or gut HappinessBar.cs
-  - Create HappinessCounter.cs (subscribes to LifetimeHappinessChanged)
-  - Create MoodDisplay.cs (subscribes to MoodTierChanged, spawns tier-change floating text)
-  - Wire both into the existing HUD scene (QuickTestScene.tscn) in place of HappinessBar
-
-Step 6 — Integration smoke test
-  - Fresh game: mood starts Quiet, rises to Cozy after first wish, decays back toward baseline
-  - Blueprint unlock fires at wish 4 and wish 12
-  - Economy multiplier changes at each tier boundary
-  - HUD counter increments on each wish, tier label updates
-  - Save/load: both values persist and restore correctly
-  - v1 migration: load an old save.json — LifetimeHappiness and Mood are estimated,
-    session continues without errors
+Phase 1 (Foundation) --> no deps
+    |
+    v
+Phase 2 (HousingManager) --> depends on Phase 1
+    |
+    +---> Phase 3 (Capacity Transfer) --> depends on Phase 2
+    |
+    +---> Phase 4 (Return-Home) --> depends on Phase 2
+    |
+    +---> Phase 5 (UI) --> depends on Phase 2
+    |
+    v
+Phase 6 (Save/Load) --> depends on all above
 ```
 
-**Why this order:**
-
-Steps 1 and 2 are done together or sequentially because Step 2 depends on the `MoodTier` enum that lives in Step 1. Steps 3, 4, and 5 have no dependencies on each other after Step 2 is complete — they can be done in any order, but Step 3 (EconomyManager) is the smallest change and validates the new API first. Step 4 (SaveManager) is the riskiest change (data migration) and benefits from doing last among consumers so the API it calls is stable.
-
-The HUD (Step 5) is last because it is purely a consumer with no downstream impact — a broken HUD does not break the game loop, making it the safest place for any iteration.
+Phases 3, 4, and 5 are independent of each other after Phase 2 and could theoretically be done in any order. The recommended sequence (3 -> 4 -> 5) puts the riskiest change (capacity transfer) first to catch integration issues early, then the largest feature (return-home), then the simplest changes (UI).
 
 ---
 
-## Anti-Patterns
+## Scalability Considerations
 
-### Anti-Pattern 1: Emitting MoodChanged every frame from _Process
+| Concern | At 10 citizens | At 50 citizens | At 200 citizens |
+|---------|---------------|----------------|-----------------|
+| Assignment lookup | Dictionary O(1) | Dictionary O(1) | Dictionary O(1) |
+| FindBestRoom (on arrival) | Scan ~2-4 rooms, instant | Scan ~5-10 rooms, instant | Scan ~10-20 rooms, instant |
+| Reassignment on demolish | Displace ~2-4, reassign O(rooms) | Displace ~4-6, O(rooms) | Displace ~6-8, O(rooms) |
+| Home timer instances | 10 Godot Timers | 50 Timers, negligible | 200 Timers, Godot handles fine |
+| Event filtering (name check) | 10 string compares | 50 string compares | 200 string compares, ~0.01ms |
+| Save file size | ~100 bytes extra | ~500 bytes extra | ~2KB extra |
 
-**What people do:** Call `GameEvents.Instance?.EmitMoodChanged(_mood, _currentTier)` every frame inside `_Process`.
-**Why it's wrong:** SaveManager subscribes to state-change events to trigger its debounce timer. If `MoodChanged` fires every frame, the autosave debounce restarts every frame and the game never saves at all.
-**Do this instead:** `MoodChanged` is emitted only on tier change (`MoodTierChanged`), or when mood changes by more than an epsilon (e.g., 0.1 units). SaveManager subscribes to `MoodTierChanged` and `LifetimeHappinessChanged` only — these fire infrequently and are the correct autosave triggers.
-
-### Anti-Pattern 2: Storing mood tier on EconomyManager directly
-
-**What people do:** EconomyManager subscribes to `MoodTierChanged` and caches the tier internally.
-**Why it's wrong:** Not wrong per se, but creates a second copy of truth. If HappinessManager is the single owner of tier state, calling `EconomyManager.SetMoodTier()` directly from HappinessManager (same as the existing `SetHappiness` pattern) is simpler and avoids the EconomyManager subscription and unsubscription boilerplate.
-**Do this instead:** Follow the existing pattern. HappinessManager calls `EconomyManager.Instance?.SetMoodTier(newTier)` directly when the tier changes inside `_Process`. EconomyManager does not subscribe to any events.
-
-### Anti-Pattern 3: v1 save migration inside SaveData POCO constructor
-
-**What people do:** Add migration logic to `SaveData`'s constructor or a property getter to auto-convert old fields.
-**Why it's wrong:** SaveData is a plain C# serialization POCO. Logic in POCOs makes them hard to test and violates the single-responsibility principle.
-**Do this instead:** Migration is a static method on SaveManager: `private static SaveData MigrateV1ToV2(SaveData v1)`. It is pure (no side effects), takes old data, returns new data. Called from `Load()` before the data is consumed.
-
-### Anti-Pattern 4: Removing the CrossedMilestoneCount semantics
-
-**What people do:** Since milestones are now keyed to wish counts rather than percentages, assume `CrossedMilestoneCount` needs to change and redesign it.
-**Why it's wrong:** `CrossedMilestoneCount` is an index into the `UnlockMilestones` array, not a percentage. The semantics are "how many milestone entries have been processed," which is equally valid for wish-count thresholds. The field name, type, and SaveData serialization are all unchanged.
-**Do this instead:** Keep `CrossedMilestoneCount` as-is. Only change the `UnlockMilestones` array content: replace `(float threshold, string[] rooms)` tuples with `(int wishCount, string[] rooms)` tuples. The milestone-checking loop (`while (_crossedMilestoneCount < UnlockMilestones.Length)`) is structurally identical.
-
----
-
-## Integration Points Summary
-
-| Singleton | Reads From HappinessManager | Writes To HappinessManager | Change Required |
-|-----------|----------------------------|---------------------------|-----------------|
-| `GameEvents` | — | — | Add 3 events, remove 1 |
-| `EconomyManager` | `_currentTier` (via `SetMoodTier`) | — | Swap `SetHappiness` → `SetMoodTier` |
-| `CitizenManager` | Called by `HappinessManager.OnArrivalCheck` | — | None |
-| `WishBoard` | — | Emits `WishFulfilled` (trigger) | None |
-| `BuildManager` | `IsRoomUnlocked` (unchanged API) | — | None |
-| `SaveManager` | `LifetimeHappiness`, `Mood` (via `CollectGameState`) | `RestoreState(int, float, ...)` | Signature + fields + migration |
-| `HappinessBar` (UI) | Subscribes `HappinessChanged` | — | Delete; replace with 2 new widgets |
+No performance concerns at the expected scale of a single ring (max ~50-100 citizens).
 
 ---
 
 ## Sources
 
-- `/workspace/Scripts/Autoloads/HappinessManager.cs` — direct code analysis, HIGH confidence
-- `/workspace/Scripts/Autoloads/GameEvents.cs` — direct code analysis, HIGH confidence
-- `/workspace/Scripts/Autoloads/SaveManager.cs` — direct code analysis, HIGH confidence
-- `/workspace/Scripts/Autoloads/EconomyManager.cs` — direct code analysis, HIGH confidence
-- `/workspace/Scripts/Citizens/CitizenManager.cs` — direct code analysis, HIGH confidence
-- `/workspace/Scripts/UI/HappinessBar.cs` — direct code analysis, HIGH confidence
-- `/workspace/.planning/design/happiness-v2.md` — design spec, HIGH confidence
-- `/workspace/.planning/PROJECT.md` — project context, HIGH confidence
+- Direct codebase analysis of all source files (HIGH confidence -- primary source)
+- PRD at `docs/prd-housing.md` (HIGH confidence -- project design document)
+- `project.godot` autoload configuration (HIGH confidence -- runtime config)
+- `.planning/PROJECT.md` project context (HIGH confidence -- project decisions log)
+- Existing v1.1 architecture patterns (7 working autoloads, typed C# events, Config resources)
 
 ---
-*Architecture research for: Orbital Rings v1.1 — Happiness v2 integration*
-*Researched: 2026-03-04*
+
+*Architecture research for: Orbital Rings v1.2 -- Housing System Integration*
+*Researched: 2026-03-05*
