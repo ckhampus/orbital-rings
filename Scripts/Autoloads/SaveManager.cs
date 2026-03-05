@@ -5,6 +5,7 @@ using System.Text.Json;
 using Godot;
 using OrbitalRings.Build;
 using OrbitalRings.Citizens;
+using OrbitalRings.Data;
 
 namespace OrbitalRings.Autoloads;
 
@@ -117,7 +118,8 @@ public partial class SaveManager : Node
     private Action<int> _onRoomDemolished;
     private Action<string, string> _onWishFulfilled;
     private Action<string> _onCitizenArrived;
-    private Action<float> _onHappinessChanged;
+    private Action<MoodTier, MoodTier> _onMoodTierChanged;
+    private Action<int> _onWishCountChanged;
     private Action<int> _onCreditsChanged;
     private Action<string> _onBlueprintUnlocked;
 
@@ -144,7 +146,8 @@ public partial class SaveManager : Node
         _onRoomDemolished = _ => OnAnyStateChanged();
         _onWishFulfilled = (_, _) => OnAnyStateChanged();
         _onCitizenArrived = _ => OnAnyStateChanged();
-        _onHappinessChanged = _ => OnAnyStateChanged();
+        _onMoodTierChanged = (_, _) => OnAnyStateChanged();
+        _onWishCountChanged = _ => OnAnyStateChanged();
         _onCreditsChanged = _ => OnAnyStateChanged();
         _onBlueprintUnlocked = _ => OnAnyStateChanged();
 
@@ -187,7 +190,8 @@ public partial class SaveManager : Node
         GameEvents.Instance.RoomDemolished += _onRoomDemolished;
         GameEvents.Instance.WishFulfilled += _onWishFulfilled;
         GameEvents.Instance.CitizenArrived += _onCitizenArrived;
-        GameEvents.Instance.HappinessChanged += _onHappinessChanged;
+        GameEvents.Instance.MoodTierChanged += _onMoodTierChanged;
+        GameEvents.Instance.WishCountChanged += _onWishCountChanged;
         GameEvents.Instance.CreditsChanged += _onCreditsChanged;
         GameEvents.Instance.BlueprintUnlocked += _onBlueprintUnlocked;
     }
@@ -200,7 +204,8 @@ public partial class SaveManager : Node
         GameEvents.Instance.RoomDemolished -= _onRoomDemolished;
         GameEvents.Instance.WishFulfilled -= _onWishFulfilled;
         GameEvents.Instance.CitizenArrived -= _onCitizenArrived;
-        GameEvents.Instance.HappinessChanged -= _onHappinessChanged;
+        GameEvents.Instance.MoodTierChanged -= _onMoodTierChanged;
+        GameEvents.Instance.WishCountChanged -= _onWishCountChanged;
         GameEvents.Instance.CreditsChanged -= _onCreditsChanged;
         GameEvents.Instance.BlueprintUnlocked -= _onBlueprintUnlocked;
     }
