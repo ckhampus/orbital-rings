@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: Happiness v2
-status: shipped
-stopped_at: Milestone v1.1 complete
-last_updated: "2026-03-05T22:50:00Z"
-last_activity: 2026-03-05 -- Shipped v1.1 Happiness v2
+milestone: v1.2
+milestone_name: Housing
+status: active
+stopped_at: Defining requirements
+last_updated: "2026-03-05T23:00:00Z"
+last_activity: 2026-03-05 -- Milestone v1.2 started
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 7
-  completed_plans: 7
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -21,12 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** The wish-driven building loop: citizens express wishes, the player builds rooms to fulfill them, happiness rises, new citizens arrive, new wishes emerge.
-**Current focus:** Planning next milestone
+**Current focus:** v1.2 Housing — give citizens personal homes
 
 ## Current Position
 
-Milestone: v1.1 Happiness v2 — SHIPPED
-Last activity: 2026-03-05 — Shipped v1.1
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-05 — Milestone v1.2 started
 
 ## Performance Metrics
 
@@ -40,6 +42,13 @@ Last activity: 2026-03-05 — Shipped v1.1
 ### Decisions
 
 All v1.0 and v1.1 decisions logged in PROJECT.md Key Decisions table with outcomes.
+
+v1.2 design decisions (from PRD):
+- Size-scaled housing capacity (base + segments - 1)
+- New HousingManager autoload (not extending HappinessManager)
+- Room tooltip shows residents
+- Zzz visual reuses FloatingText (smaller/lighter)
+- HousingConfig resource for tunable timing
 
 ### Pending Todos
 
@@ -61,6 +70,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-05T22:50:00Z
-Stopped at: Shipped v1.1 milestone
-Next: /gsd:new-milestone
+Last session: 2026-03-05T23:00:00Z
+Stopped at: Defining requirements for v1.2
+Next: Complete requirements → roadmap

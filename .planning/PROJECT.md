@@ -33,10 +33,15 @@ The wish-driven building loop: citizens express wishes, the player builds rooms 
 
 ### Active
 
-- [ ] Tier change notification (floating text on mood tier transition)
-- [ ] Save migration from v1 single happiness float to v2 dual values
-- [ ] Additional blueprint unlock milestones at wish counts 30, 50, 100
-- [ ] Cosmetic unlocks tied to lifetime happiness milestones
+- [ ] Citizens assigned to housing rooms with automatic home assignment
+- [ ] Size-scaled housing capacity (base + segments - 1)
+- [ ] Return-home behavior with Zzz floater (90–150s cycle)
+- [ ] Citizen info panel shows home room and location
+- [ ] Room tooltip shows current residents
+- [ ] New HousingManager autoload singleton
+- [ ] HousingConfig resource for tunable timing constants
+- [ ] Unhoused citizens handled gracefully (no penalty, no home cycle)
+- [ ] Save/load housing assignments
 
 ### Out of Scope
 
@@ -50,6 +55,14 @@ The wish-driven building loop: citizens express wishes, the player builds rooms 
 - Mobile/console — PC only with keyboard + mouse
 - Tutorial/guided opening — citizens' wishes serve as implicit tutorial (validated in v1.0)
 - Raw mood float in player UI — optimization anxiety is anti-cozy (hide numeric values)
+- Housing quality tiers or upgrades — no management burden, cozy philosophy
+- Player-managed room assignments — fully automatic, no micromanagement
+- Citizen preferences or roommate compatibility — deferred complexity
+- Room interior customization — placeholder interiors sufficient
+- Tier change notification — deferred from v1.1, not in v1.2 scope
+- Save migration v1→v2 — deferred from v1.1, not in v1.2 scope
+- Additional blueprint unlocks (30, 50, 100) — deferred, not in v1.2 scope
+- Cosmetic unlocks tied to lifetime milestones — deferred, not in v1.2 scope
 
 ## Context
 
@@ -65,7 +78,7 @@ v1.1 replaced the single happiness float with dual-value system (MoodSystem POCO
 - **Engine**: Godot 4 with C# — all gameplay logic in C#, using Godot's 3D rendering pipeline
 - **Platform**: PC (keyboard + mouse), distributed via itch.io
 - **No fail state**: The game must never punish the player — wishes linger, nothing bad happens from ignoring them
-- **Architecture**: 7 Autoload singletons with event-driven communication via GameEvents signal bus
+- **Architecture**: 7 Autoload singletons with event-driven communication via GameEvents signal bus (8 after HousingManager)
 
 ## Key Decisions
 
@@ -89,9 +102,21 @@ v1.1 replaced the single happiness float with dual-value system (MoodSystem POCO
 | MoodHUD replaces HappinessBar entirely | Clean break, no dual-display confusion | ✓ Good — deprecated code fully removed, no lingering shims |
 | Per-tier config fields (not formula) | Designer-tunable per-tier values in Inspector | ✓ Good — arrival/income per tier visible and adjustable without code changes |
 
-## Current State
+## Current Milestone: v1.2 Housing
 
-v1.1 shipped. Planning next milestone.
+**Goal:** Give each citizen a home room they visibly return to, making housing feel personal and alive.
+
+**Target features:**
+- Automatic home assignment (citizen → housing room) with even-spread algorithm
+- Size-scaled capacity (base + segments - 1)
+- Return-home behavior cycle with Zzz floater
+- Citizen info panel shows home location
+- Room tooltip shows residents
+- HousingManager autoload + HousingConfig resource
+- Graceful unhoused handling (no penalty)
+- Save/load housing assignments
+
+**Design:** `docs/prd-housing.md`
 
 ---
-*Last updated: 2026-03-05 after v1.1 milestone completed*
+*Last updated: 2026-03-05 after v1.2 milestone started*
