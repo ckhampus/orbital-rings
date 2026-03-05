@@ -76,6 +76,7 @@ None.
 | 1 | Sometimes citizen walk into a segment where there isn't a room | 2026-03-03 | 6a53319 | [1-sometimes-citizen-walk-into-a-segment-wh](./quick/1-sometimes-citizen-walk-into-a-segment-wh/) |
 | 2 | Bigger hitbox for citizens (ClickProximityThreshold 0.4 to 0.8) | 2026-03-03 | 09f0948 | [2-i-want-a-bigger-hitbox-for-citizens-it-i](./quick/2-i-want-a-bigger-hitbox-for-citizens-it-i/) |
 | 3 | Camera tilt adjustment (W/S keys + middle-mouse, 20-60 deg) | 2026-03-03 | efa59ad | [3-i-want-to-be-able-adjust-the-tilt-of-the](./quick/3-i-want-to-be-able-adjust-the-tilt-of-the/) |
+| 4 | Remove mute button, keep M keyboard shortcut | 2026-03-05 | 70f0ed0 | [4-remove-the-mute-button-but-keep-the-keyb](./quick/4-remove-the-mute-button-but-keep-the-keyb/) |
 | Phase 10-happiness-core-and-mood-tiers P01 | 2 | 2 tasks | 4 files |
 | Phase 10-happiness-core-and-mood-tiers P02 | 2 | 2 tasks | 2 files |
 | Phase 11-economy-and-arrival-tier-integration P01 | 2 | 2 tasks | 3 files |
