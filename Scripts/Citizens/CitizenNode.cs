@@ -153,6 +153,13 @@ public partial class CitizenNode : Node3D
     internal void SetDirection(float dir) => _direction = dir;
 
     /// <summary>
+    /// Updates the segment grid reference. Called by CitizenManager when the
+    /// grid is discovered after citizens were spawned (title screen flow:
+    /// citizens spawn during _Ready before Ring exists, grid found later in _Process).
+    /// </summary>
+    internal void SetGrid(SegmentGrid grid) => _grid = grid;
+
+    /// <summary>
     /// Restores a citizen's active wish from save data. Looks up the template
     /// from WishBoard, sets internal state, creates the badge, and notifies
     /// WishBoard for tracking.
