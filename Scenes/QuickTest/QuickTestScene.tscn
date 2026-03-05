@@ -85,5 +85,5 @@ script = ExtResource("9_ambientdrone")
 [node name="WishCelebration" type="Node" parent="."]
 script = ExtResource("10_wishcelebration")
 
-[node name="MuteToggle" type="Button" parent="HUDLayer"]
+[node name="MuteToggle" type="Node" parent="."]
 script = ExtResource("11_mutetoggle")
