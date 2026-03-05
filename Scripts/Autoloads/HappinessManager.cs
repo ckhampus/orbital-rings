@@ -239,11 +239,11 @@ public partial class HappinessManager : Node
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Called when any citizen's wish is fulfilled. Increments lifetime wish count,
-    /// applies flat mood gain via MoodSystem, fires tier-change event if tier changed,
-    /// updates economy multiplier, and checks unlock milestones.
-    /// </summary>
-    private void OnWishFulfilled(string citizenName, string wishType)
+	/// Called when any citizen's wish is fulfilled. Increments lifetime wish count,
+	/// applies flat mood gain via MoodSystem, fires tier-change event if tier changed,
+	/// updates economy multiplier, and checks unlock milestones.
+	/// </summary>
+	private void OnWishFulfilled(string citizenName, string wishType)
     {
         _lifetimeHappiness++;
         GameEvents.Instance?.EmitWishCountChanged(_lifetimeHappiness);
@@ -332,12 +332,12 @@ public partial class HappinessManager : Node
     /// </summary>
     private float ArrivalProbabilityForTier(MoodTier tier) => tier switch
     {
-        MoodTier.Quiet   => Config.ArrivalProbabilityQuiet,
-        MoodTier.Cozy    => Config.ArrivalProbabilityCozy,
-        MoodTier.Lively  => Config.ArrivalProbabilityLively,
+        MoodTier.Quiet => Config.ArrivalProbabilityQuiet,
+        MoodTier.Cozy => Config.ArrivalProbabilityCozy,
+        MoodTier.Lively => Config.ArrivalProbabilityLively,
         MoodTier.Vibrant => Config.ArrivalProbabilityVibrant,
         MoodTier.Radiant => Config.ArrivalProbabilityRadiant,
-        _                => Config.ArrivalProbabilityQuiet,
+        _ => Config.ArrivalProbabilityQuiet,
     };
 
     /// <summary>

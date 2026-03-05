@@ -88,13 +88,13 @@ public partial class HappinessConfig : Resource
     /// Default 0.15 — approximately 7 minute average wait between arrivals.
     /// Timer interval stays fixed at 60s; only this probability changes with tier.
     /// </summary>
-    [Export] public float ArrivalProbabilityQuiet   { get; set; } = 0.15f;
+    [Export] public float ArrivalProbabilityQuiet { get; set; } = 0.15f;
 
     /// <summary>Arrival probability at Cozy tier. Default 0.25 — ~4 min avg wait.</summary>
-    [Export] public float ArrivalProbabilityCozy    { get; set; } = 0.25f;
+    [Export] public float ArrivalProbabilityCozy { get; set; } = 0.25f;
 
     /// <summary>Arrival probability at Lively tier. Default 0.40 — ~2.5 min avg wait.</summary>
-    [Export] public float ArrivalProbabilityLively  { get; set; } = 0.40f;
+    [Export] public float ArrivalProbabilityLively { get; set; } = 0.40f;
 
     /// <summary>Arrival probability at Vibrant tier. Default 0.60 — ~1.7 min avg wait.</summary>
     [Export] public float ArrivalProbabilityVibrant { get; set; } = 0.60f;

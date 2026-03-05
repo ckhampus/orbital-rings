@@ -307,12 +307,12 @@ public partial class EconomyManager : Node
 
     private float IncomeMultiplierForTier(MoodTier tier) => tier switch
     {
-        MoodTier.Quiet   => Config.IncomeMultQuiet,
-        MoodTier.Cozy    => Config.IncomeMultCozy,
-        MoodTier.Lively  => Config.IncomeMultLively,
+        MoodTier.Quiet => Config.IncomeMultQuiet,
+        MoodTier.Cozy => Config.IncomeMultCozy,
+        MoodTier.Lively => Config.IncomeMultLively,
         MoodTier.Vibrant => Config.IncomeMultVibrant,
         MoodTier.Radiant => Config.IncomeMultRadiant,
-        _                => Config.IncomeMultQuiet,
+        _ => Config.IncomeMultQuiet,
     };
 
     // -------------------------------------------------------------------------
