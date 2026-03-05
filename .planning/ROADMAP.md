@@ -85,10 +85,10 @@ Plans:
   1. The HUD displays a lifetime wish counter as a heart-number that pulses on each wish fulfilled
   2. The HUD displays the current mood tier name in a color that matches the tier
   3. The old single-bar happiness display is gone — replaced entirely by the new widgets
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 13-01: TBD
+- [ ] 13-01-PLAN.md — MoodHUD widget (wish counter + tier label), scene swap, deprecated code cleanup
 
 ## Progress
 
@@ -110,8 +110,8 @@ Note: Phases 11 and 12 both depend only on Phase 10 and could execute in either 
 | 10. Happiness Core and Mood Tiers | 2/2 | Complete    | 2026-03-04 | - |
 | 11. Economy and Arrival Tier Integration | 3/3 | Complete    | 2026-03-04 | - |
 | 12. Save Format | 1/1 | Complete    | 2026-03-05 | - |
-| 13. HUD Replacement | v1.1 | 0/? | Not started | - |
+| 13. HUD Replacement | v1.1 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-03-02*
-*Last updated: 2026-03-05 after Phase 12 planned (1 plan)*
+*Last updated: 2026-03-05 after Phase 13 planned (1 plan)*
