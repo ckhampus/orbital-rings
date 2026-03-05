@@ -184,14 +184,8 @@ public partial class GameEvents : Node
     /// <param name="newBalance">Updated credit balance after the change.</param>
     public event Action<int> CreditsChanged;
 
-    /// <param name="newHappiness">Updated station happiness value (0.0 - 1.0+).</param>
-    public event Action<float> HappinessChanged;
-
     public void EmitCreditsChanged(int newBalance)
       => CreditsChanged?.Invoke(newBalance);
-
-    public void EmitHappinessChanged(float newHappiness)
-      => HappinessChanged?.Invoke(newHappiness);
 
     /// <param name="amount">Credits earned from this income tick.</param>
     public event Action<int> IncomeTicked;

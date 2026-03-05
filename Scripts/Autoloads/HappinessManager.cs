@@ -112,12 +112,6 @@ public partial class HappinessManager : Node
     /// <summary>Current mood baseline (0.0–BaselineCap). Rises with lifetime wish count.</summary>
     public float MoodBaseline => _moodSystem?.Baseline ?? 0f;
 
-    /// <summary>
-    /// Deprecated shim kept for HappinessBar until Phase 13 removes it.
-    /// SaveManager uses Mood/MoodBaseline/LifetimeWishes directly as of Phase 12.
-    /// </summary>
-    public float Happiness => _moodSystem?.Mood ?? 0f;
-
     /// <summary>Current mood tier with hysteresis applied.</summary>
     public MoodTier CurrentTier => _moodSystem?.CurrentTier ?? MoodTier.Quiet;
 
@@ -166,7 +160,6 @@ public partial class HappinessManager : Node
         _housingCapacity = housingCapacity;
 
         EconomyManager.Instance?.SetMoodTier(_lastReportedTier);
-        // Do NOT call EmitHappinessChanged — HappinessBar will be replaced in Phase 13
     }
 
     // -------------------------------------------------------------------------
