@@ -1,5 +1,25 @@
 # Milestones
 
+## v1.1 Happiness v2 (Shipped: 2026-03-05)
+
+**Phases:** 4 | **Plans:** 7 | **Tasks:** 14
+**Lines of code:** 8,331 C# | **Timeline:** 2 days (2026-03-04 to 2026-03-05)
+**Git range:** `feat(10-01)` to `feat(13-01)` | **Requirements:** 12/12 satisfied
+
+**Delivered:** Replaced the single happiness percentage with a dual-value system (Lifetime Happiness + Station Mood) so the core loop stays alive indefinitely — mature stations rest at higher baselines while mood dynamically fluctuates with player activity.
+
+**Key accomplishments:**
+1. Dual-value happiness: Lifetime Happiness (integer, never decreases) + Station Mood (float with exponential decay toward rising baseline)
+2. Five mood tiers (Quiet/Cozy/Lively/Vibrant/Radiant) with hysteresis preventing rapid oscillation near boundaries
+3. Tier-driven economy: income multiplier (1.0x–1.4x) and arrival probability keyed to discrete tiers instead of float
+4. Save format v2 with version-gated backward compatibility (v1 saves load safely with defaults)
+5. MoodHUD widget with pulse-animated wish counter and tier-colored mood label
+6. Full deprecation cleanup: HappinessBar, HappinessChanged event, SetHappiness API, float-space economy all removed
+
+**Archive:** `.planning/milestones/v1.1-ROADMAP.md` | `.planning/milestones/v1.1-REQUIREMENTS.md`
+
+---
+
 ## v1.0 MVP (Shipped: 2026-03-04)
 
 **Phases:** 9 | **Plans:** 25 | **Commits:** 161

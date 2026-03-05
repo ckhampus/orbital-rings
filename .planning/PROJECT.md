@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A cozy space station builder where players construct a modular orbital ring one room at a time. The ring is a flat donut divided into 24 segments (12 outer, 12 inner) where rooms attract citizens who express wishes via speech bubbles. Fulfilling wishes raises happiness, which drives citizen arrivals and blueprint unlocks. There is no fail state — the station always grows. Built in Godot 4 with C#, targeting PC (itch.io). v1.0 shipped with a complete build-wish-grow loop on a single ring.
+A cozy space station builder where players construct a modular orbital ring one room at a time. The ring is a flat donut divided into 24 segments (12 outer, 12 inner) where rooms attract citizens who express wishes via speech bubbles. Fulfilling wishes grows lifetime happiness (permanent progress) and raises station mood (dynamic feel), with five mood tiers driving citizen arrivals and economy. There is no fail state — the station always grows. Built in Godot 4 with C#, targeting PC (itch.io). v1.1 shipped with the complete dual-value happiness system.
 
 ## Core Value
 
@@ -24,16 +24,19 @@ The wish-driven building loop: citizens express wishes, the player builds rooms 
 - ✓ Save/load with debounced autosave — v1.0
 - ✓ Ambient audio and wish celebration feedback — v1.0
 - ✓ Title screen with New Station / Continue — v1.0
+- ✓ Dual-value happiness: Lifetime Happiness (wish counter) + Station Mood (fluctuating float with decay) — v1.1
+- ✓ Blueprint unlocks keyed to wish counts (4, 12) instead of percentage thresholds — v1.1
+- ✓ Five mood tiers (Quiet/Cozy/Lively/Vibrant/Radiant) with hysteresis — v1.1
+- ✓ Tier-driven citizen arrivals and economy income multiplier (1.0x–1.4x) — v1.1
+- ✓ HUD shows lifetime wish counter and mood tier label with tier-colored text — v1.1
+- ✓ Save format v2 with version-gated backward compatibility — v1.1
 
 ### Active
 
-- [ ] Replace single happiness percentage with Lifetime Happiness (wish counter) + Station Mood (fluctuating float)
-- [ ] Blueprint unlocks keyed to wish counts (4, 12) instead of percentage thresholds
-- [ ] Mood gain on wish fulfillment, gentle decay toward rising baseline
-- [ ] Five mood tiers (Quiet/Cozy/Lively/Vibrant/Radiant) driving citizen arrivals and economy multiplier
-- [ ] HUD shows lifetime wish counter (♥ 47) and mood tier label with tier-colored text
 - [ ] Tier change notification (floating text on mood tier transition)
 - [ ] Save migration from v1 single happiness float to v2 dual values
+- [ ] Additional blueprint unlock milestones at wish counts 30, 50, 100
+- [ ] Cosmetic unlocks tied to lifetime happiness milestones
 
 ### Out of Scope
 
@@ -46,14 +49,16 @@ The wish-driven building loop: citizens express wishes, the player builds rooms 
 - Adjacency bonuses — adds min-max pressure, breaks "build what feels right" ethos
 - Mobile/console — PC only with keyboard + mouse
 - Tutorial/guided opening — citizens' wishes serve as implicit tutorial (validated in v1.0)
+- Raw mood float in player UI — optimization anxiety is anti-cozy (hide numeric values)
 
 ## Context
 
-Shipped v1.0 with 8,058 LOC C# across 9 phases (25 plans) in 3 days.
+Shipped v1.1 with 8,331 LOC C# across 13 phases (32 plans) in 5 days.
 Tech stack: Godot 4.4, C#, .NET 8, procedural mesh/audio generation.
 Architecture: 7 Autoload singletons (GameEvents, EconomyManager, BuildManager, CitizenManager, WishBoard, HappinessManager, SaveManager) coordinated via typed C# event delegates.
 Art style: Soft 3D with pastel palette, rounded capsule citizens, warm segment colors.
-Full design document at `IDEA.md` covers multi-ring expansion, proc gen interiors, citizen personalities, day/night cycle — all deferred past v1.0.
+Full design document at `IDEA.md` covers multi-ring expansion, proc gen interiors, citizen personalities, day/night cycle — all deferred.
+v1.1 replaced the single happiness float with dual-value system (MoodSystem POCO + HappinessManager refactor) and tier-space economy. HappinessBar UI fully replaced by MoodHUD. Save format versioned at v2.
 
 ## Constraints
 
@@ -77,16 +82,16 @@ Full design document at `IDEA.md` covers multi-ring expansion, proc gen interior
 | Spreadsheet-first economy | Calibrate numbers before coding to avoid rework | ✓ Good — sqrt scaling + 1.3x happiness cap created balanced progression |
 | Procedural audio (no .wav assets) | Zero external asset dependencies | ✓ Good — placement chime + wish celebration chime feel distinct and satisfying |
 | Debounced autosave on state events | Prevents rapid-fire saves during batch operations | ✓ Good — save/load works reliably with 0.5s debounce |
+| MoodSystem as POCO (not Node) | Testable in isolation, HappinessManager owns lifecycle | ✓ Good — clean separation, exponential decay + hysteresis encapsulated |
+| Tier-space economy (not float-space) | Discrete MoodTier enum eliminates floating-point edge cases in economy | ✓ Good — switch expressions are readable, no float comparison bugs |
+| Hysteresis on tier demotion | Prevents rapid oscillation near boundaries | ✓ Good — width=0.05 eliminates tier chatter completely |
+| Save format versioning (v1/v2) | Version-gated restore path keeps old saves loadable | ✓ Good — C# default values (0/0f) handle v1 deserialization safely |
+| MoodHUD replaces HappinessBar entirely | Clean break, no dual-display confusion | ✓ Good — deprecated code fully removed, no lingering shims |
+| Per-tier config fields (not formula) | Designer-tunable per-tier values in Inspector | ✓ Good — arrival/income per tier visible and adjustable without code changes |
 
-## Current Milestone: v1.1 Happiness v2
+## Current State
 
-**Goal:** Replace the single happiness percentage with a dual-value system (Lifetime Happiness + Station Mood) so the core loop stays alive indefinitely.
-
-**Target features:**
-- Lifetime Happiness wish counter driving blueprint unlocks
-- Station Mood with gain/decay and tier-based arrivals/economy
-- Updated HUD with counter + tier label
-- v1 save migration
+v1.1 shipped. Planning next milestone.
 
 ---
-*Last updated: 2026-03-04 after v1.1 milestone started*
+*Last updated: 2026-03-05 after v1.1 milestone completed*

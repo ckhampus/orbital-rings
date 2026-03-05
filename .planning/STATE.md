@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Happiness v2
-status: completed
-stopped_at: Completed 13-01-PLAN.md
-last_updated: "2026-03-05T21:37:18Z"
-last_activity: 2026-03-05 -- Completed quick task 5: Remove orphaned HappinessMultiplierCap
+status: shipped
+stopped_at: Milestone v1.1 complete
+last_updated: "2026-03-05T22:50:00Z"
+last_activity: 2026-03-05 -- Shipped v1.1 Happiness v2
 progress:
   total_phases: 4
   completed_phases: 4
@@ -18,48 +18,28 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-04)
+See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** The wish-driven building loop: citizens express wishes, the player builds rooms to fulfill them, happiness rises, new citizens arrive, new wishes emerge.
-**Current focus:** v1.1 Happiness v2 -- Complete
+**Current focus:** Planning next milestone
 
 ## Current Position
 
-Phase: 13 of 13 (HUD Replacement)
-Plan: 1 of 1
-Status: Complete
-Last activity: 2026-03-05 -- Completed quick task 5: Remove orphaned HappinessMultiplierCap
-
-Progress: [##########] 100%
+Milestone: v1.1 Happiness v2 — SHIPPED
+Last activity: 2026-03-05 — Shipped v1.1
 
 ## Performance Metrics
 
-**Velocity (from v1.0):**
-- Total plans completed: 25
-- Average duration: 3.2 min
-- Total execution time: ~1.3 hours
+**Velocity (cumulative):**
+- v1.0: 9 phases, 25 plans, ~3.2 min avg, 3 days
+- v1.1: 4 phases, 7 plans, ~2 min avg, 2 days
+- Total: 13 phases, 32 plans
 
 ## Accumulated Context
 
 ### Decisions
 
-All v1.0 decisions logged in PROJECT.md Key Decisions table with outcomes.
-- [Phase 10-01]: MoodTier values 0-4 enable arithmetic tier promotion/demotion without casting
-- [Phase 10-01]: HappinessChanged (Phase 3) preserved in GameEvents; MoodTierChanged is additive
-- [Phase 10-01]: HysteresisWidth=0.05 prevents rapid tier flickering near boundaries
-- [Phase 10-02]: MathF.Clamp unavailable in Godot build env; Math.Clamp used for float clamping in MoodSystem
-- [Phase 10-02]: HappinessChanged not emitted in new OnWishFulfilled; HappinessBar replaced in Phase 13 (intentional transition)
-- [Phase 10-02]: Old saves: happiness float maps to initial mood with _lifetimeHappiness=0; milestone guards preserve unlock state
-- [Phase 11-01]: Economy domain now operates in tier-space (discrete MoodTier enum) not float-space; _currentTierMultiplier default 1.0f (Quiet) is safe startup state
-- [Phase 11-01]: SetHappiness(float) removed in Plan 01 (not 03) because _currentHappiness no longer exists; HappinessMultiplierCap retained until Plan 03 cleanup
-- [Phase 11-02]: Quiet tier always yields 0.15 arrival probability — Mood <= 0f guard removed; arrival path no longer depends on mood float
-- [Phase 11-02]: Timer interval stays fixed at 60s; only probability changes with tier (locked decision from CONTEXT.md)
-- [Phase 11-03]: SetMoodTier called only inside tier-change blocks in all three HappinessManager paths (_Process, OnWishFulfilled, RestoreState) — no redundant EconomyManager notifications
-- [Phase 11-03]: RestoreState passes _lastReportedTier (set from _moodSystem.CurrentTier on previous line) rather than raw happiness float — correct tier-space value for save/load
-- [Phase 12]: Happiness shim retained (deprecated) for HappinessBar until Phase 13 removes it
-- [Phase 12]: SaveData v2 fields use C# default values (0/0f) for safe v1 deserialization; Version=2 set explicitly in CollectGameState
-- [Phase 13-01]: Tier color palette uses warm spectrum (grey-blue to gold) matching existing HUD aesthetic
-- [Phase 13-01]: GetValueOrDefault fallback to WarmWhite ensures graceful degradation for unknown tiers
+All v1.0 and v1.1 decisions logged in PROJECT.md Key Decisions table with outcomes.
 
 ### Pending Todos
 
@@ -78,16 +58,9 @@ None.
 | 3 | Camera tilt adjustment (W/S keys + middle-mouse, 20-60 deg) | 2026-03-03 | efa59ad | [3-i-want-to-be-able-adjust-the-tilt-of-the](./quick/3-i-want-to-be-able-adjust-the-tilt-of-the/) |
 | 4 | Remove mute button, keep M keyboard shortcut | 2026-03-05 | 70f0ed0 | [4-remove-the-mute-button-but-keep-the-keyb](./quick/4-remove-the-mute-button-but-keep-the-keyb/) |
 | 5 | Remove orphaned HappinessMultiplierCap from EconomyConfig | 2026-03-05 | b67d991 | [5-remove-the-orphaned-happinessmultiplierc](./quick/5-remove-the-orphaned-happinessmultiplierc/) |
-| Phase 10-happiness-core-and-mood-tiers P01 | 2 | 2 tasks | 4 files |
-| Phase 10-happiness-core-and-mood-tiers P02 | 2 | 2 tasks | 2 files |
-| Phase 11-economy-and-arrival-tier-integration P01 | 2 | 2 tasks | 3 files |
-| Phase 11-economy-and-arrival-tier-integration P02 | 2 | 2 tasks | 3 files |
-| Phase 11-economy-and-arrival-tier-integration P03 | 81 | 1 tasks | 1 files |
-| Phase 12 P01 | 3min | 2 tasks | 2 files |
-| Phase 13-hud-replacement P01 | 2min | 2 tasks | 4 files |
 
 ## Session Continuity
 
-Last session: 2026-03-05T21:37:18Z
-Stopped at: Completed quick task 5
-Next: v1.1 milestone complete
+Last session: 2026-03-05T22:50:00Z
+Stopped at: Shipped v1.1 milestone
+Next: /gsd:new-milestone
