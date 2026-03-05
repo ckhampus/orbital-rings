@@ -29,7 +29,7 @@ Requirements for the Happiness v2 milestone. Each maps to roadmap phases.
 
 ### Save Format
 
-- [ ] **SAVE-01**: Save format stores lifetime happiness and mood values (fresh saves only, no v1 migration)
+- [x] **SAVE-01**: Save format stores lifetime happiness and mood values (fresh saves only, no v1 migration)
 
 ## Future Requirements
 
@@ -84,7 +84,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TIER-04 | Phase 10 | Complete |
 | HUD-01 | Phase 13 | Pending |
 | HUD-02 | Phase 13 | Pending |
-| SAVE-01 | Phase 12 | Pending |
+| SAVE-01 | Phase 12 | Complete |
 
 **Coverage:**
 - v1.1 requirements: 12 total

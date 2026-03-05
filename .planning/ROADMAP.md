@@ -28,7 +28,7 @@
 
 - [x] **Phase 10: Happiness Core and Mood Tiers** — Refactor HappinessManager with dual-value state, mood decay, rising baseline, tier system with hysteresis, and wish-count blueprint unlocks (completed 2026-03-04)
 - [x] **Phase 11: Economy and Arrival Tier Integration** — Wire citizen arrivals and income multiplier to the new mood tier API (completed 2026-03-04)
-- [ ] **Phase 12: Save Format** — Store lifetime happiness and mood values in save data
+- [x] **Phase 12: Save Format** — Store lifetime happiness and mood values in save data (completed 2026-03-05)
 - [ ] **Phase 13: HUD Replacement** — Replace HappinessBar with lifetime wish counter and mood tier display
 
 ## Phase Details
@@ -109,7 +109,7 @@ Note: Phases 11 and 12 both depend only on Phase 10 and could execute in either 
 | 9. Wire Work Bonus and Tech Debt Cleanup | v1.0 | 2/2 | Complete | 2026-03-04 |
 | 10. Happiness Core and Mood Tiers | 2/2 | Complete    | 2026-03-04 | - |
 | 11. Economy and Arrival Tier Integration | 3/3 | Complete    | 2026-03-04 | - |
-| 12. Save Format | v1.1 | 0/1 | Planned | - |
+| 12. Save Format | 1/1 | Complete   | 2026-03-05 | - |
 | 13. HUD Replacement | v1.1 | 0/? | Not started | - |
 
 ---

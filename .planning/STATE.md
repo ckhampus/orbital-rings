@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Happiness v2
 status: planning
-stopped_at: Phase 12 context gathered
-last_updated: "2026-03-05T19:27:04.124Z"
+stopped_at: Completed 12-01-PLAN.md
+last_updated: "2026-03-05T19:53:28.458Z"
 last_activity: 2026-03-04 — Roadmap created for v1.1 (4 phases, 12 requirements)
 progress:
   total_phases: 4
-  completed_phases: 2
-  total_plans: 5
-  completed_plans: 5
+  completed_phases: 3
+  total_plans: 6
+  completed_plans: 6
   percent: 0
 ---
 
@@ -56,6 +56,8 @@ All v1.0 decisions logged in PROJECT.md Key Decisions table with outcomes.
 - [Phase 11-02]: Timer interval stays fixed at 60s; only probability changes with tier (locked decision from CONTEXT.md)
 - [Phase 11-03]: SetMoodTier called only inside tier-change blocks in all three HappinessManager paths (_Process, OnWishFulfilled, RestoreState) — no redundant EconomyManager notifications
 - [Phase 11-03]: RestoreState passes _lastReportedTier (set from _moodSystem.CurrentTier on previous line) rather than raw happiness float — correct tier-space value for save/load
+- [Phase 12]: Happiness shim retained (deprecated) for HappinessBar until Phase 13 removes it
+- [Phase 12]: SaveData v2 fields use C# default values (0/0f) for safe v1 deserialization; Version=2 set explicitly in CollectGameState
 
 ### Pending Todos
 
@@ -77,9 +79,10 @@ None.
 | Phase 11-economy-and-arrival-tier-integration P01 | 2 | 2 tasks | 3 files |
 | Phase 11-economy-and-arrival-tier-integration P02 | 2 | 2 tasks | 3 files |
 | Phase 11-economy-and-arrival-tier-integration P03 | 81 | 1 tasks | 1 files |
+| Phase 12 P01 | 3min | 2 tasks | 2 files |
 
 ## Session Continuity
 
-Last session: 2026-03-05T19:27:04.119Z
-Stopped at: Phase 12 context gathered
+Last session: 2026-03-05T19:53:28.455Z
+Stopped at: Completed 12-01-PLAN.md
 Next: Plan Phase 10 (Happiness Core and Mood Tiers)
