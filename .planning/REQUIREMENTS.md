@@ -24,8 +24,8 @@ Requirements for the Happiness v2 milestone. Each maps to roadmap phases.
 
 ### HUD
 
-- [ ] **HUD-01**: HUD displays lifetime wish counter as "♥ N" with pulse animation on increment
-- [ ] **HUD-02**: HUD displays current mood tier name with tier-colored text
+- [x] **HUD-01**: HUD displays lifetime wish counter as "♥ N" with pulse animation on increment
+- [x] **HUD-02**: HUD displays current mood tier name with tier-colored text
 
 ### Save Format
 
@@ -82,8 +82,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TIER-02 | Phase 11 | Complete |
 | TIER-03 | Phase 11 | Complete |
 | TIER-04 | Phase 10 | Complete |
-| HUD-01 | Phase 13 | Pending |
-| HUD-02 | Phase 13 | Pending |
+| HUD-01 | Phase 13 | Complete |
+| HUD-02 | Phase 13 | Complete |
 | SAVE-01 | Phase 12 | Complete |
 
 **Coverage:**
