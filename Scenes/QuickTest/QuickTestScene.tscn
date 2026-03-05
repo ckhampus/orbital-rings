@@ -6,7 +6,7 @@
 [ext_resource type="Script" uid="uid://c61pt15u8658w" path="res://Scripts/UI/SegmentTooltip.cs" id="4_tooltip"]
 [ext_resource type="Script" uid="uid://b7lncsr0fml0j" path="res://Scripts/UI/CreditHUD.cs" id="5_credithud"]
 [ext_resource type="Script" path="res://Scripts/Build/BuildPanel.cs" id="6_buildpanel"]
-[ext_resource type="Script" path="res://Scripts/UI/HappinessBar.cs" id="7_happinessbar"]
+[ext_resource type="Script" path="res://Scripts/UI/MoodHUD.cs" id="7_moodhud"]
 [ext_resource type="Script" path="res://Scripts/UI/PopulationDisplay.cs" id="8_populationdisplay"]
 [ext_resource type="Script" path="res://Scripts/Audio/AmbientDrone.cs" id="9_ambientdrone"]
 [ext_resource type="Script" path="res://Scripts/Audio/WishCelebration.cs" id="10_wishcelebration"]
@@ -52,14 +52,14 @@ offset_bottom = 50.0
 grow_horizontal = 0
 script = ExtResource("8_populationdisplay")
 
-[node name="HappinessBar" type="MarginContainer" parent="HUDLayer"]
+[node name="MoodHUD" type="MarginContainer" parent="HUDLayer"]
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
 offset_left = -200.0
 offset_bottom = 50.0
 grow_horizontal = 0
-script = ExtResource("7_happinessbar")
+script = ExtResource("7_moodhud")
 
 [node name="BuildUILayer" type="CanvasLayer" parent="."]
 layer = 8
