@@ -17,14 +17,14 @@ Requirements for the Housing milestone. Each maps to roadmap phases.
 
 ### Return-Home Behavior
 
-- [ ] **BEHV-01**: Housed citizens periodically return to their home room (90–150s cycle)
-- [ ] **BEHV-02**: Home rest lasts 8–15s with a "Zzz" FloatingText indicator
+- [ ] **BEHV-01**: Housed citizens periodically return to their home room (90-150s cycle)
+- [ ] **BEHV-02**: Home rest lasts 8-15s with a "Zzz" FloatingText indicator
 - [ ] **BEHV-03**: Citizen wish timer pauses during home rest
 - [ ] **BEHV-04**: Home return is lower priority than active wish fulfillment
 
 ### UI & Feedback
 
-- [ ] **UI-01**: CitizenInfoPanel shows home room name and location (or "—" if unhoused)
+- [ ] **UI-01**: CitizenInfoPanel shows home room name and location (or "--" if unhoused)
 - [ ] **UI-02**: Housing room tooltip shows current resident names
 - [ ] **UI-03**: PopulationDisplay shows count/capacity format (e.g., "5/7")
 
@@ -71,29 +71,34 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| HOME-01 | — | Pending |
-| HOME-02 | — | Pending |
-| HOME-03 | — | Pending |
-| HOME-04 | — | Pending |
-| HOME-05 | — | Pending |
-| BEHV-01 | — | Pending |
-| BEHV-02 | — | Pending |
-| BEHV-03 | — | Pending |
-| BEHV-04 | — | Pending |
-| UI-01 | — | Pending |
-| UI-02 | — | Pending |
-| UI-03 | — | Pending |
-| INFR-01 | — | Pending |
-| INFR-02 | — | Pending |
-| INFR-03 | — | Pending |
-| INFR-04 | — | Pending |
-| INFR-05 | — | Pending |
+| HOME-01 | Phase 15 | Pending |
+| HOME-02 | Phase 15 | Pending |
+| HOME-03 | Phase 15 | Pending |
+| HOME-04 | Phase 15 | Pending |
+| HOME-05 | Phase 15 | Pending |
+| BEHV-01 | Phase 17 | Pending |
+| BEHV-02 | Phase 17 | Pending |
+| BEHV-03 | Phase 17 | Pending |
+| BEHV-04 | Phase 17 | Pending |
+| UI-01 | Phase 18 | Pending |
+| UI-02 | Phase 18 | Pending |
+| UI-03 | Phase 18 | Pending |
+| INFR-01 | Phase 14, Phase 15 | Pending |
+| INFR-02 | Phase 14 | Pending |
+| INFR-03 | Phase 16 | Pending |
+| INFR-04 | Phase 19 | Pending |
+| INFR-05 | Phase 14, Phase 19 | Pending |
 
 **Coverage:**
 - v1.2 requirements: 17 total
-- Mapped to phases: 0
-- Unmapped: 17 ⚠️
+- Mapped to phases: 17
+- Unmapped: 0
+
+**Coverage notes:**
+- INFR-01 (HousingManager) spans Phase 14 (skeleton/autoload registration) and Phase 15 (full implementation). Primary delivery is Phase 15.
+- INFR-05 (save format v3) spans Phase 14 (schema definition on SavedCitizen) and Phase 19 (serialization/deserialization wiring). Primary delivery is Phase 19.
+- All other requirements map to exactly one phase.
 
 ---
 *Requirements defined: 2026-03-05*
-*Last updated: 2026-03-05 after initial definition*
+*Last updated: 2026-03-05 after roadmap creation (traceability populated)*

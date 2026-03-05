@@ -3,11 +3,11 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Housing
 status: active
-stopped_at: Defining requirements
-last_updated: "2026-03-05T23:00:00Z"
-last_activity: 2026-03-05 -- Milestone v1.2 started
+stopped_at: Roadmap created, ready to plan Phase 14
+last_updated: "2026-03-05T23:30:00Z"
+last_activity: 2026-03-05 -- v1.2 roadmap created (6 phases, 17 requirements)
 progress:
-  total_phases: 0
+  total_phases: 6
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -21,14 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** The wish-driven building loop: citizens express wishes, the player builds rooms to fulfill them, happiness rises, new citizens arrive, new wishes emerge.
-**Current focus:** v1.2 Housing — give citizens personal homes
+**Current focus:** v1.2 Housing -- Phase 14 (Housing Foundation)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-03-05 — Milestone v1.2 started
+Phase: 14 of 19 (Housing Foundation) -- first phase of v1.2
+Plan: --
+Status: Ready to plan
+Last activity: 2026-03-05 -- v1.2 roadmap created
+
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
@@ -43,12 +45,13 @@ Last activity: 2026-03-05 — Milestone v1.2 started
 
 All v1.0 and v1.1 decisions logged in PROJECT.md Key Decisions table with outcomes.
 
-v1.2 design decisions (from PRD):
+v1.2 design decisions (from PRD and research):
 - Size-scaled housing capacity (base + segments - 1)
-- New HousingManager autoload (not extending HappinessManager)
-- Room tooltip shows residents
-- Zzz visual reuses FloatingText (smaller/lighter)
-- HousingConfig resource for tunable timing
+- New HousingManager autoload (8th singleton, not extending HappinessManager)
+- Full capacity transfer from HappinessManager to HousingManager (single source of truth)
+- Zzz visual reuses FloatingText (smaller/lighter) -- spike in Phase 17 to validate
+- HousingConfig resource for tunable timing constants
+- Save format v3 with nullable int? HomeSegmentIndex (not int)
 
 ### Pending Todos
 
@@ -56,7 +59,7 @@ None.
 
 ### Blockers/Concerns
 
-None.
+- Phase 17: Zzz visual may need FloatingText vs Label3D spike (research flag)
 
 ### Quick Tasks Completed
 
@@ -70,6 +73,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-05T23:00:00Z
-Stopped at: Defining requirements for v1.2
-Next: Complete requirements → roadmap
+Last session: 2026-03-05T23:30:00Z
+Stopped at: v1.2 roadmap created with 6 phases (14-19)
+Next: `/gsd:plan-phase 14`
