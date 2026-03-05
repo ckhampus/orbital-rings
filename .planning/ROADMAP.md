@@ -110,7 +110,7 @@ Note: Phases 11 and 12 both depend only on Phase 10 and could execute in either 
 | 10. Happiness Core and Mood Tiers | 2/2 | Complete    | 2026-03-04 | - |
 | 11. Economy and Arrival Tier Integration | 3/3 | Complete    | 2026-03-04 | - |
 | 12. Save Format | 1/1 | Complete    | 2026-03-05 | - |
-| 13. HUD Replacement | 1/1 | Complete   | 2026-03-05 | - |
+| 13. HUD Replacement | 1/1 | Complete    | 2026-03-05 | - |
 
 ---
 *Roadmap created: 2026-03-02*
