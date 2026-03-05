@@ -72,10 +72,10 @@ Plans:
   1. Saving and loading preserves the lifetime happiness count exactly
   2. Saving and loading preserves mood and baseline values so the station resumes at the correct tier
   3. A fresh new game starts with zero lifetime happiness and Quiet mood tier
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 12-01: TBD
+- [ ] 12-01-PLAN.md — SaveData v2 fields, version-gated restore, autosave event rewiring, dead shim cleanup
 
 ### Phase 13: HUD Replacement
 **Goal**: Players can see their permanent progress and current station mood at a glance without opening any menu
@@ -109,9 +109,9 @@ Note: Phases 11 and 12 both depend only on Phase 10 and could execute in either 
 | 9. Wire Work Bonus and Tech Debt Cleanup | v1.0 | 2/2 | Complete | 2026-03-04 |
 | 10. Happiness Core and Mood Tiers | 2/2 | Complete    | 2026-03-04 | - |
 | 11. Economy and Arrival Tier Integration | 3/3 | Complete    | 2026-03-04 | - |
-| 12. Save Format | v1.1 | 0/? | Not started | - |
+| 12. Save Format | v1.1 | 0/1 | Planned | - |
 | 13. HUD Replacement | v1.1 | 0/? | Not started | - |
 
 ---
 *Roadmap created: 2026-03-02*
-*Last updated: 2026-03-04 after Phase 11 planned (3 plans)*
+*Last updated: 2026-03-05 after Phase 12 planned (1 plan)*
