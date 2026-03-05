@@ -109,9 +109,12 @@ public partial class HappinessManager : Node
     /// <summary>Current station mood (0.0–1.0). Fluctuates with activity and decay.</summary>
     public float Mood => _moodSystem?.Mood ?? 0f;
 
+    /// <summary>Current mood baseline (0.0–BaselineCap). Rises with lifetime wish count.</summary>
+    public float MoodBaseline => _moodSystem?.Baseline ?? 0f;
+
     /// <summary>
-    /// Compatibility shim for SaveManager and EconomyManager until Phase 12/11 update them.
-    /// Returns current mood float (same 0-1 range as old happiness).
+    /// Deprecated shim kept for HappinessBar until Phase 13 removes it.
+    /// SaveManager uses Mood/MoodBaseline/LifetimeWishes directly as of Phase 12.
     /// </summary>
     public float Happiness => _moodSystem?.Mood ?? 0f;
 
@@ -145,14 +148,14 @@ public partial class HappinessManager : Node
 
     /// <summary>
     /// Restores all happiness/progression state from save data.
-    /// Signature preserved for SaveManager backward compatibility (Phase 12 will expand it).
-    /// happiness float from old save treated as mood — _lifetimeHappiness starts at 0 for old saves.
+    /// v2 saves pass all three happiness values; v1 backward-compat passes
+    /// (0, oldHappiness, 0f) so mood starts from the old float and lifetime/baseline reset.
     /// </summary>
-    public void RestoreState(float happiness, HashSet<string> unlockedRooms, int milestoneCount, int housingCapacity)
+    public void RestoreState(int lifetimeHappiness, float mood, float moodBaseline,
+        HashSet<string> unlockedRooms, int milestoneCount, int housingCapacity)
     {
-        // happiness float from old save → treat as mood for backward compat
-        _lifetimeHappiness = 0;  // old saves have no lifetime counter; start at 0
-        _moodSystem?.RestoreState(happiness, 0f);
+        _lifetimeHappiness = lifetimeHappiness;
+        _moodSystem?.RestoreState(mood, moodBaseline);
         _lastReportedTier = _moodSystem?.CurrentTier ?? MoodTier.Quiet;
 
         _unlockedRooms.Clear();

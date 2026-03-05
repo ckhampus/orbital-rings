@@ -23,6 +23,12 @@ public class SaveData
     public float Happiness { get; set; }
     public int CrossedMilestoneCount { get; set; }
     public int HousingCapacity { get; set; }
+
+    // v2 fields (default to 0/0f when deserializing v1 saves)
+    public int LifetimeHappiness { get; set; }
+    public float Mood { get; set; }
+    public float MoodBaseline { get; set; }
+
     public List<string> UnlockedRooms { get; set; } = new();
     public List<SavedRoom> PlacedRooms { get; set; } = new();
     public List<SavedCitizen> Citizens { get; set; } = new();
@@ -261,10 +267,14 @@ public partial class SaveManager : Node
     {
         var data = new SaveData
         {
+            Version = 2,
             Credits = EconomyManager.Instance?.Credits ?? 0,
-            Happiness = HappinessManager.Instance?.Happiness ?? 0f,
+            Happiness = 0f, // v1 field: write 0 in v2 saves
             CrossedMilestoneCount = HappinessManager.Instance?.GetCrossedMilestoneCount() ?? 0,
             HousingCapacity = HappinessManager.Instance?.GetHousingCapacity() ?? 5,
+            LifetimeHappiness = HappinessManager.Instance?.LifetimeWishes ?? 0,
+            Mood = HappinessManager.Instance?.Mood ?? 0f,
+            MoodBaseline = HappinessManager.Instance?.MoodBaseline ?? 0f,
             UnlockedRooms = HappinessManager.Instance?.GetUnlockedRoomIds().ToList() ?? new List<string>()
         };
 
@@ -370,12 +380,28 @@ public partial class SaveManager : Node
         // Restore economy
         EconomyManager.Instance?.RestoreCredits(data.Credits);
 
-        // Restore happiness/progression
-        HappinessManager.Instance?.RestoreState(
-            data.Happiness,
-            new HashSet<string>(data.UnlockedRooms),
-            data.CrossedMilestoneCount,
-            data.HousingCapacity);
+        // Restore happiness/progression (version-gated)
+        if (data.Version >= 2)
+        {
+            HappinessManager.Instance?.RestoreState(
+                data.LifetimeHappiness,
+                data.Mood,
+                data.MoodBaseline,
+                new HashSet<string>(data.UnlockedRooms),
+                data.CrossedMilestoneCount,
+                data.HousingCapacity);
+        }
+        else
+        {
+            // v1 backward-compat: happiness float as mood, no lifetime/baseline
+            HappinessManager.Instance?.RestoreState(
+                0,
+                data.Happiness,
+                0f,
+                new HashSet<string>(data.UnlockedRooms),
+                data.CrossedMilestoneCount,
+                data.HousingCapacity);
+        }
 
         // Store for scene-dependent restoration after scene loads
         PendingLoad = data;
