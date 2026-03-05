@@ -5,7 +5,7 @@ milestone_name: Happiness v2
 status: completed
 stopped_at: Completed 13-01-PLAN.md
 last_updated: "2026-03-05T20:49:37.114Z"
-last_activity: 2026-03-05 -- Phase 13-01 HUD Replacement executed
+last_activity: 2026-03-05 -- Completed quick task 4: Remove the mute button, but keep the keyboard shortcut
 progress:
   total_phases: 4
   completed_phases: 4
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 Phase: 13 of 13 (HUD Replacement)
 Plan: 1 of 1
 Status: Complete
-Last activity: 2026-03-05 -- Phase 13-01 HUD Replacement executed
+Last activity: 2026-03-05 -- Completed quick task 4: Remove the mute button, but keep the keyboard shortcut
 
 Progress: [##########] 100%
 
