@@ -23,12 +23,6 @@ public partial class EconomyConfig : Resource
     /// <summary>Credits per worker per tick. Kept modest to avoid runaway.</summary>
     [Export] public float WorkBonusMultiplier { get; set; } = 1.25f;
 
-    /// <summary>
-    /// Maximum happiness multiplier on income. Formula: 1.0 + (happiness * (cap - 1.0)).
-    /// Capped at 1.3 to keep feedback loop bounded (30% bonus at perfect happiness).
-    /// </summary>
-    [Export] public float HappinessMultiplierCap { get; set; } = 1.3f;
-
     /// <summary>Seconds between income ticks.</summary>
     [Export] public float IncomeTickInterval { get; set; } = 5.5f;
 
@@ -38,13 +32,13 @@ public partial class EconomyConfig : Resource
     /// Income multiplier at Quiet tier. Default 1.0 (no bonus).
     /// Applies to all income: base station + citizen passive + work bonus.
     /// </summary>
-    [Export] public float IncomeMultQuiet   { get; set; } = 1.0f;
+    [Export] public float IncomeMultQuiet { get; set; } = 1.0f;
 
     /// <summary>Income multiplier at Cozy tier. Default 1.1 (10% bonus).</summary>
-    [Export] public float IncomeMultCozy    { get; set; } = 1.1f;
+    [Export] public float IncomeMultCozy { get; set; } = 1.1f;
 
     /// <summary>Income multiplier at Lively tier. Default 1.2 (20% bonus).</summary>
-    [Export] public float IncomeMultLively  { get; set; } = 1.2f;
+    [Export] public float IncomeMultLively { get; set; } = 1.2f;
 
     /// <summary>Income multiplier at Vibrant tier. Default 1.3 (30% bonus).</summary>
     [Export] public float IncomeMultVibrant { get; set; } = 1.3f;
