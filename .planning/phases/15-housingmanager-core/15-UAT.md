@@ -1,5 +1,5 @@
 ---
-status: complete
+status: diagnosed
 phase: 15-housingmanager-core
 source: [15-01-SUMMARY.md, 15-02-SUMMARY.md]
 started: 2026-03-06T10:10:00Z
@@ -61,5 +61,14 @@ skipped: 0
   reason: "User reported: All citizens get 'Stale home reference' on load — RestoreFromSave cannot find rooms in _housingRoomCapacities. All 7 citizens become unhoused despite having valid saved home indices (segments 4, 19, 9)."
   severity: major
   test: 7
-  artifacts: []
-  missing: []
+  root_cause: "_housingRoomCapacities is empty when RestoreFromSave runs. Two population paths are both disabled: (1) InitializeExistingRooms skipped because StateLoaded=true, (2) OnRoomPlaced never fires because BuildManager.RestorePlacedRoom does not emit RoomPlaced event. Fix: call InitializeExistingRooms() at the start of RestoreFromSave to scan already-restored rooms."
+  artifacts:
+    - path: "Scripts/Autoloads/HousingManager.cs"
+      issue: "RestoreFromSave checks _housingRoomCapacities but no code populates it during save restoration"
+    - path: "Scripts/Build/BuildManager.cs"
+      issue: "RestorePlacedRoom (lines 311-337) does not emit RoomPlaced event unlike interactive placement (line 456)"
+    - path: "Scripts/Autoloads/SaveManager.cs"
+      issue: "Sets StateLoaded=true before scene load, then calls RestoreFromSave with empty capacity dict"
+  missing:
+    - "Call InitializeExistingRooms() at the start of RestoreFromSave to populate _housingRoomCapacities from already-restored BuildManager rooms"
+  debug_session: ".planning/debug/stale-home-reference-on-load.md"
