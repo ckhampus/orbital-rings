@@ -136,7 +136,7 @@ Note: Phases 16, 17, and 18 depend only on Phase 15 (not each other) but are seq
 | 12. Save Format | v1.1 | 1/1 | Complete | 2026-03-05 |
 | 13. HUD Replacement | v1.1 | 1/1 | Complete | 2026-03-05 |
 | 14. Housing Foundation | v1.2 | 1/1 | Complete | 2026-03-06 |
-| 15. HousingManager Core | 2/2 | Complete   | 2026-03-06 | - |
+| 15. HousingManager Core | 2/2 | Complete    | 2026-03-06 | - |
 | 16. Capacity Transfer | v1.2 | 0/TBD | Not started | - |
 | 17. Return-Home Behavior | v1.2 | 0/TBD | Not started | - |
 | 18. Housing UI | v1.2 | 0/TBD | Not started | - |
