@@ -1,13 +1,13 @@
+using System;
 using Godot;
 using OrbitalRings.Autoloads;
-using OrbitalRings.Citizens;
 
 namespace OrbitalRings.UI;
 
 /// <summary>
-/// Citizen icon and population count display for the HUD.
-/// Shows a smiley icon + current citizen count, with a brief scale-up
-/// "tick" animation on each new citizen arrival.
+/// Housing capacity display for the HUD.
+/// Shows a smiley icon + "housed/capacity" count (e.g. "5/7"), with a brief
+/// scale-up "tick" animation on citizen arrival and room placement/demolition.
 ///
 /// Builds all child nodes programmatically in _Ready(), following the CreditHUD pattern.
 /// Anchored top-right in HUDLayer (CanvasLayer layer 5) via QuickTestScene.tscn.
@@ -39,6 +39,8 @@ public partial class PopulationDisplay : MarginContainer
     // -------------------------------------------------------------------------
 
     private Tween _activeTween;
+    private Action<string, int> _onRoomPlaced;
+    private Action<int> _onRoomDemolished;
 
     // -------------------------------------------------------------------------
     // Lifecycle
@@ -67,15 +69,19 @@ public partial class PopulationDisplay : MarginContainer
         _countLabel.MouseFilter = MouseFilterEnum.Ignore;
         _hbox.AddChild(_countLabel);
 
-        // Subscribe to citizen arrival events
+        // Subscribe to citizen arrival and room change events
         if (GameEvents.Instance != null)
         {
             GameEvents.Instance.CitizenArrived += OnCitizenArrived;
+
+            _onRoomPlaced = (_, _) => { UpdateDisplay(); PlayTickAnimation(); };
+            _onRoomDemolished = (_) => { UpdateDisplay(); PlayTickAnimation(); };
+            GameEvents.Instance.RoomPlaced += _onRoomPlaced;
+            GameEvents.Instance.RoomDemolished += _onRoomDemolished;
         }
 
-        // Initialize count from current state
-        int initialCount = CitizenManager.Instance?.CitizenCount ?? 0;
-        _countLabel.Text = initialCount.ToString();
+        // Initialize housed/capacity display from current state
+        UpdateDisplay();
     }
 
     public override void _ExitTree()
@@ -83,6 +89,10 @@ public partial class PopulationDisplay : MarginContainer
         if (GameEvents.Instance != null)
         {
             GameEvents.Instance.CitizenArrived -= OnCitizenArrived;
+            if (_onRoomPlaced != null)
+                GameEvents.Instance.RoomPlaced -= _onRoomPlaced;
+            if (_onRoomDemolished != null)
+                GameEvents.Instance.RoomDemolished -= _onRoomDemolished;
         }
     }
 
@@ -91,19 +101,33 @@ public partial class PopulationDisplay : MarginContainer
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Updates the count label and plays a brief scale-up "tick" animation
-    /// when a new citizen arrives.
+    /// Updates the housed/capacity display and plays tick animation
+    /// when a new citizen arrives (which may change housed count).
     /// </summary>
     private void OnCitizenArrived(string citizenName)
     {
-        // Update count from CitizenManager (authoritative source)
-        int count = CitizenManager.Instance?.CitizenCount ?? 0;
-        _countLabel.Text = count.ToString();
+        UpdateDisplay();
+        PlayTickAnimation();
+    }
 
-        // Kill-before-create pattern for the tick animation
+    /// <summary>
+    /// Updates the count label text to show "housed/capacity" format
+    /// from HousingManager (the authoritative source for housing state).
+    /// </summary>
+    private void UpdateDisplay()
+    {
+        int housed = HousingManager.Instance?.TotalHoused ?? 0;
+        int capacity = HousingManager.Instance?.TotalCapacity ?? 0;
+        _countLabel.Text = $"{housed}/{capacity}";
+    }
+
+    /// <summary>
+    /// Plays a brief scale-up "tick" animation on the count label
+    /// for a satisfying visual response to state changes.
+    /// </summary>
+    private void PlayTickAnimation()
+    {
         _activeTween?.Kill();
-
-        // Brief scale-up animation on the count label for a satisfying "tick" feel
         _activeTween = _countLabel.CreateTween();
         _countLabel.Scale = new Vector2(1.2f, 1.2f);
         _activeTween.TweenProperty(_countLabel, "scale", new Vector2(1.0f, 1.0f), 0.3f)
