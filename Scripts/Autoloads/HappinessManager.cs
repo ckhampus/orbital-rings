@@ -21,73 +21,73 @@ namespace OrbitalRings.Autoloads;
 /// </summary>
 public partial class HappinessManager : Node
 {
-	/// <summary>
-	/// Singleton instance. Set in _Ready(). Guaranteed non-null after Autoloads initialize.
-	/// </summary>
-	public static HappinessManager Instance { get; private set; }
+    /// <summary>
+    /// Singleton instance. Set in _Ready(). Guaranteed non-null after Autoloads initialize.
+    /// </summary>
+    public static HappinessManager Instance { get; private set; }
 
-	// -------------------------------------------------------------------------
-	// Constants
-	// -------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
+    // Constants
+    // -------------------------------------------------------------------------
 
-	/// <summary>Interval in seconds between citizen arrival probability checks.</summary>
-	private const float ArrivalCheckInterval = 60.0f;
+    /// <summary>Interval in seconds between citizen arrival probability checks.</summary>
+    private const float ArrivalCheckInterval = 60.0f;
 
-	/// <summary>
-	/// Minimum housing capacity accounting for the 5 starter citizens
-	/// who bypass the housing check at game start.
-	/// </summary>
-	private const int StarterCitizenCapacity = 5;
+    /// <summary>
+    /// Minimum housing capacity accounting for the 5 starter citizens
+    /// who bypass the housing check at game start.
+    /// </summary>
+    private const int StarterCitizenCapacity = 5;
 
-	// -------------------------------------------------------------------------
-	// Unlock milestones
-	// -------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
+    // Unlock milestones
+    // -------------------------------------------------------------------------
 
-	/// <summary>
-	/// Blueprint unlock thresholds: (lifetime wish count, room IDs to unlock).
-	/// Fired at exactly 4 and 12 lifetime wishes. Locked decision from CONTEXT.md.
-	/// </summary>
-	private static readonly (int wishCount, string[] rooms)[] UnlockMilestones =
-	{
-		(4,  new[] { "sky_loft", "craft_lab" }),
-		(12, new[] { "star_lounge", "comm_relay" }),
-	};
+    /// <summary>
+    /// Blueprint unlock thresholds: (lifetime wish count, room IDs to unlock).
+    /// Fired at exactly 4 and 12 lifetime wishes. Locked decision from CONTEXT.md.
+    /// </summary>
+    private static readonly (int wishCount, string[] rooms)[] UnlockMilestones =
+    {
+        (4,  new[] { "sky_loft", "craft_lab" }),
+        (12, new[] { "star_lounge", "comm_relay" }),
+    };
 
-	// -------------------------------------------------------------------------
-	// State
-	// -------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
+    // State
+    // -------------------------------------------------------------------------
 
-	private int _lifetimeHappiness;
-	private MoodSystem _moodSystem;
-	private MoodTier _lastReportedTier = MoodTier.Quiet;
+    private int _lifetimeHappiness;
+    private MoodSystem _moodSystem;
+    private MoodTier _lastReportedTier = MoodTier.Quiet;
 
-	/// <summary>HappinessConfig resource — set via Inspector or loaded from default path in _Ready.</summary>
-	[Export] public HappinessConfig Config { get; set; }
+    /// <summary>HappinessConfig resource — set via Inspector or loaded from default path in _Ready.</summary>
+    [Export] public HappinessConfig Config { get; set; }
 
-	private Timer _arrivalTimer;
-	private readonly HashSet<string> _unlockedRooms = new()
-	{
-		"bunk_pod", "air_recycler", "workshop",
-		"reading_nook", "storage_bay", "garden_nook"
-	};
+    private Timer _arrivalTimer;
+    private readonly HashSet<string> _unlockedRooms = new()
+    {
+        "bunk_pod", "air_recycler", "workshop",
+        "reading_nook", "storage_bay", "garden_nook"
+    };
 
-	/// <summary>
-	/// Tracks how many milestones have been crossed (0, 1, or 2).
-	/// Avoids re-checking already-triggered milestones.
-	/// </summary>
-	private int _crossedMilestoneCount;
+    /// <summary>
+    /// Tracks how many milestones have been crossed (0, 1, or 2).
+    /// Avoids re-checking already-triggered milestones.
+    /// </summary>
+    private int _crossedMilestoneCount;
 
-	/// <summary>
-	/// CanvasLayer for displaying arrival floating text from this Autoload.
-	/// Created in _Ready() since Autoloads aren't in the scene tree's UI layer.
-	/// </summary>
-	private CanvasLayer _arrivalCanvasLayer;
+    /// <summary>
+    /// CanvasLayer for displaying arrival floating text from this Autoload.
+    /// Created in _Ready() since Autoloads aren't in the scene tree's UI layer.
+    /// </summary>
+    private CanvasLayer _arrivalCanvasLayer;
 
-	// -------------------------------------------------------------------------
-	// Public API
-	// -------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
+    // Public API
+    // -------------------------------------------------------------------------
 
-	/// <summary>Total wishes fulfilled across the station's lifetime. Monotonically increasing.</summary>
+    /// <summary>Total wishes fulfilled across the station's lifetime. Monotonically increasing.</summary>
     public int LifetimeWishes => _lifetimeHappiness;
 
     /// <summary>Current station mood (0.0–1.0). Fluctuates with activity and decay.</summary>
@@ -209,114 +209,114 @@ public partial class HappinessManager : Node
 	/// updates economy multiplier, and checks unlock milestones.
 	/// </summary>
 	private void OnWishFulfilled(string citizenName, string wishType)
-	{
-		_lifetimeHappiness++;
-		GameEvents.Instance?.EmitWishCountChanged(_lifetimeHappiness);
+    {
+        _lifetimeHappiness++;
+        GameEvents.Instance?.EmitWishCountChanged(_lifetimeHappiness);
 
-		var previousTier = _lastReportedTier;
-		var newTier = _moodSystem.OnWishFulfilled();
+        var previousTier = _lastReportedTier;
+        var newTier = _moodSystem.OnWishFulfilled();
 
-		if (newTier != previousTier)
-		{
-			_lastReportedTier = newTier;
-			GameEvents.Instance?.EmitMoodTierChanged(newTier, previousTier);
-			EconomyManager.Instance?.SetMoodTier(newTier);
-		}
+        if (newTier != previousTier)
+        {
+            _lastReportedTier = newTier;
+            GameEvents.Instance?.EmitMoodTierChanged(newTier, previousTier);
+            EconomyManager.Instance?.SetMoodTier(newTier);
+        }
 
-		CheckUnlockMilestones();
-	}
+        CheckUnlockMilestones();
+    }
 
-	// -------------------------------------------------------------------------
-	// Unlock milestones
-	// -------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
+    // Unlock milestones
+    // -------------------------------------------------------------------------
 
-	/// <summary>
-	/// Checks if lifetime wish count has crossed any new unlock thresholds.
-	/// Iterates from the last crossed milestone to avoid re-triggering.
-	/// </summary>
-	private void CheckUnlockMilestones()
-	{
-		while (_crossedMilestoneCount < UnlockMilestones.Length)
-		{
-			var (wishCount, rooms) = UnlockMilestones[_crossedMilestoneCount];
-			if (_lifetimeHappiness < wishCount) break;
+    /// <summary>
+    /// Checks if lifetime wish count has crossed any new unlock thresholds.
+    /// Iterates from the last crossed milestone to avoid re-triggering.
+    /// </summary>
+    private void CheckUnlockMilestones()
+    {
+        while (_crossedMilestoneCount < UnlockMilestones.Length)
+        {
+            var (wishCount, rooms) = UnlockMilestones[_crossedMilestoneCount];
+            if (_lifetimeHappiness < wishCount) break;
 
-			// Milestone crossed -- unlock rooms
-			foreach (var roomId in rooms)
-			{
-				_unlockedRooms.Add(roomId);
-				GameEvents.Instance?.EmitBlueprintUnlocked(roomId);
-			}
+            // Milestone crossed -- unlock rooms
+            foreach (var roomId in rooms)
+            {
+                _unlockedRooms.Add(roomId);
+                GameEvents.Instance?.EmitBlueprintUnlocked(roomId);
+            }
 
-			_crossedMilestoneCount++;
-		}
-	}
+            _crossedMilestoneCount++;
+        }
+    }
 
-	// -------------------------------------------------------------------------
-	// Citizen arrival check
-	// -------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
+    // Citizen arrival check
+    // -------------------------------------------------------------------------
 
-	/// <summary>
-	/// Periodic check (~60s): roll a probability based on the current mood tier.
-	/// If successful and population is below housing capacity, spawn a citizen
-	/// with fade-in animation and floating arrival text.
-	/// Quiet tier always gives 0.15 probability — no early-return guard needed.
-	/// </summary>
-	private void OnArrivalCheck()
-	{
-		int currentPop = CitizenManager.Instance?.CitizenCount ?? 0;
-		if (currentPop >= StarterCitizenCapacity + (HousingManager.Instance?.TotalCapacity ?? 0)) return;
+    /// <summary>
+    /// Periodic check (~60s): roll a probability based on the current mood tier.
+    /// If successful and population is below housing capacity, spawn a citizen
+    /// with fade-in animation and floating arrival text.
+    /// Quiet tier always gives 0.15 probability — no early-return guard needed.
+    /// </summary>
+    private void OnArrivalCheck()
+    {
+        int currentPop = CitizenManager.Instance?.CitizenCount ?? 0;
+        if (currentPop >= StarterCitizenCapacity + (HousingManager.Instance?.TotalCapacity ?? 0)) return;
 
-		float chance = ArrivalProbabilityForTier(_lastReportedTier);
-		if (GD.Randf() < chance)
-		{
-			var citizen = CitizenManager.Instance?.SpawnCitizen();
-			if (citizen != null)
-			{
-				// Fade-in animation (locked decision: "new citizen capsule fades in on walkway")
-				citizen.SetMeshTransparencyMode(true);
-				citizen.SetMeshAlpha(0f);
-				var fadeTween = citizen.CreateTween();
-				fadeTween.TweenMethod(
-					Callable.From((float alpha) => citizen.SetMeshAlpha(alpha)),
-					0.0f, 1.0f, 0.5f
-				).SetEase(Tween.EaseType.Out);
-				fadeTween.TweenCallback(Callable.From(() => citizen.SetMeshTransparencyMode(false)));
+        float chance = ArrivalProbabilityForTier(_lastReportedTier);
+        if (GD.Randf() < chance)
+        {
+            var citizen = CitizenManager.Instance?.SpawnCitizen();
+            if (citizen != null)
+            {
+                // Fade-in animation (locked decision: "new citizen capsule fades in on walkway")
+                citizen.SetMeshTransparencyMode(true);
+                citizen.SetMeshAlpha(0f);
+                var fadeTween = citizen.CreateTween();
+                fadeTween.TweenMethod(
+                    Callable.From((float alpha) => citizen.SetMeshAlpha(alpha)),
+                    0.0f, 1.0f, 0.5f
+                ).SetEase(Tween.EaseType.Out);
+                fadeTween.TweenCallback(Callable.From(() => citizen.SetMeshTransparencyMode(false)));
 
-				// Floating arrival text
-				string name = citizen.Data?.CitizenName ?? "A citizen";
-				SpawnArrivalText($"{name} has arrived!");
-			}
-		}
-	}
+                // Floating arrival text
+                string name = citizen.Data?.CitizenName ?? "A citizen";
+                SpawnArrivalText($"{name} has arrived!");
+            }
+        }
+    }
 
-	/// <summary>
-	/// Maps the current mood tier to the configured arrival probability.
-	/// Probability is used once per 60s timer tick — only the value changes with tier,
-	/// not the timer interval (locked decision from CONTEXT.md).
-	/// </summary>
-	private float ArrivalProbabilityForTier(MoodTier tier) => tier switch
-	{
-		MoodTier.Quiet => Config.ArrivalProbabilityQuiet,
-		MoodTier.Cozy => Config.ArrivalProbabilityCozy,
-		MoodTier.Lively => Config.ArrivalProbabilityLively,
-		MoodTier.Vibrant => Config.ArrivalProbabilityVibrant,
-		MoodTier.Radiant => Config.ArrivalProbabilityRadiant,
-		_ => Config.ArrivalProbabilityQuiet,
-	};
+    /// <summary>
+    /// Maps the current mood tier to the configured arrival probability.
+    /// Probability is used once per 60s timer tick — only the value changes with tier,
+    /// not the timer interval (locked decision from CONTEXT.md).
+    /// </summary>
+    private float ArrivalProbabilityForTier(MoodTier tier) => tier switch
+    {
+        MoodTier.Quiet => Config.ArrivalProbabilityQuiet,
+        MoodTier.Cozy => Config.ArrivalProbabilityCozy,
+        MoodTier.Lively => Config.ArrivalProbabilityLively,
+        MoodTier.Vibrant => Config.ArrivalProbabilityVibrant,
+        MoodTier.Radiant => Config.ArrivalProbabilityRadiant,
+        _ => Config.ArrivalProbabilityQuiet,
+    };
 
-	/// <summary>
-	/// Spawns a floating "Name has arrived!" text at screen center using
-	/// the reusable FloatingText class. Warm mint color for arrival fanfare.
-	/// </summary>
-	private void SpawnArrivalText(string message)
-	{
-		var floater = new FloatingText();
-		_arrivalCanvasLayer.AddChild(floater);
+    /// <summary>
+    /// Spawns a floating "Name has arrived!" text at screen center using
+    /// the reusable FloatingText class. Warm mint color for arrival fanfare.
+    /// </summary>
+    private void SpawnArrivalText(string message)
+    {
+        var floater = new FloatingText();
+        _arrivalCanvasLayer.AddChild(floater);
 
-		var viewport = GetViewport().GetVisibleRect().Size;
-		Vector2 center = new Vector2(viewport.X / 2 - 80, viewport.Y / 2 - 60);
-		floater.Setup(message, new Color(0.6f, 0.9f, 0.7f), center);
-	}
+        var viewport = GetViewport().GetVisibleRect().Size;
+        Vector2 center = new Vector2(viewport.X / 2 - 80, viewport.Y / 2 - 60);
+        floater.Setup(message, new Color(0.6f, 0.9f, 0.7f), center);
+    }
 
 }

@@ -5,12 +5,12 @@
 [ext_resource type="PackedScene" uid="uid://bswc7inj8s2ht" path="res://Scenes/Ring/Ring.tscn" id="3_ring"]
 [ext_resource type="Script" uid="uid://c61pt15u8658w" path="res://Scripts/UI/SegmentTooltip.cs" id="4_tooltip"]
 [ext_resource type="Script" uid="uid://b7lncsr0fml0j" path="res://Scripts/UI/CreditHUD.cs" id="5_credithud"]
-[ext_resource type="Script" path="res://Scripts/Build/BuildPanel.cs" id="6_buildpanel"]
-[ext_resource type="Script" path="res://Scripts/UI/MoodHUD.cs" id="7_moodhud"]
-[ext_resource type="Script" path="res://Scripts/UI/PopulationDisplay.cs" id="8_populationdisplay"]
-[ext_resource type="Script" path="res://Scripts/Audio/AmbientDrone.cs" id="9_ambientdrone"]
-[ext_resource type="Script" path="res://Scripts/Audio/WishCelebration.cs" id="10_wishcelebration"]
-[ext_resource type="Script" path="res://Scripts/UI/MuteToggle.cs" id="11_mutetoggle"]
+[ext_resource type="Script" uid="uid://dfqy5idyfvh7t" path="res://Scripts/Build/BuildPanel.cs" id="6_buildpanel"]
+[ext_resource type="Script" uid="uid://ckrfl6vbd84u7" path="res://Scripts/UI/MoodHUD.cs" id="7_moodhud"]
+[ext_resource type="Script" uid="uid://dkio8xoc8i4pl" path="res://Scripts/UI/PopulationDisplay.cs" id="8_populationdisplay"]
+[ext_resource type="Script" uid="uid://cds8mammupx8n" path="res://Scripts/Audio/AmbientDrone.cs" id="9_ambientdrone"]
+[ext_resource type="Script" uid="uid://bgwvj1ip0munn" path="res://Scripts/Audio/WishCelebration.cs" id="10_wishcelebration"]
+[ext_resource type="Script" uid="uid://bxxttphraqblk" path="res://Scripts/UI/MuteToggle.cs" id="11_mutetoggle"]
 
 [node name="QuickTestScene" type="Node3D" unique_id=884004654]
 
@@ -43,7 +43,7 @@ offset_bottom = 50.0
 grow_horizontal = 0
 script = ExtResource("5_credithud")
 
-[node name="PopulationDisplay" type="MarginContainer" parent="HUDLayer"]
+[node name="PopulationDisplay" type="MarginContainer" parent="HUDLayer" unique_id=1939765449]
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
@@ -52,7 +52,7 @@ offset_bottom = 50.0
 grow_horizontal = 0
 script = ExtResource("8_populationdisplay")
 
-[node name="MoodHUD" type="MarginContainer" parent="HUDLayer"]
+[node name="MoodHUD" type="MarginContainer" parent="HUDLayer" unique_id=171664487]
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
@@ -61,11 +61,11 @@ offset_bottom = 50.0
 grow_horizontal = 0
 script = ExtResource("7_moodhud")
 
-[node name="BuildUILayer" type="CanvasLayer" parent="."]
+[node name="BuildUILayer" type="CanvasLayer" parent="." unique_id=487987922]
 layer = 8
 
-[node name="BuildPanel" type="PanelContainer" parent="BuildUILayer"]
-anchors_preset = 7
+[node name="BuildPanel" type="PanelContainer" parent="BuildUILayer" unique_id=1756241137]
+anchors_preset = 12
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -79,11 +79,11 @@ layer = 10
 [node name="SegmentTooltip" type="PanelContainer" parent="TooltipLayer" unique_id=1285651752]
 script = ExtResource("4_tooltip")
 
-[node name="AmbientDrone" type="Node" parent="."]
+[node name="AmbientDrone" type="Node" parent="." unique_id=272987684]
 script = ExtResource("9_ambientdrone")
 
-[node name="WishCelebration" type="Node" parent="."]
+[node name="WishCelebration" type="Node" parent="." unique_id=1963006149]
 script = ExtResource("10_wishcelebration")
 
-[node name="MuteToggle" type="Node" parent="."]
+[node name="MuteToggle" type="Node" parent="." unique_id=1651926971]
 script = ExtResource("11_mutetoggle")

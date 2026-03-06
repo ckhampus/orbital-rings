@@ -11,3 +11,6 @@ Fight entropy. Leave the codebase better than you found it.
 When working with Godot APIs, use Context7 to look up the official
 Godot docs before making assumptions about engine behavior or API
 signatures.
+
+Before committing, always run `dotnet format` to ensure consistent
+code style.
