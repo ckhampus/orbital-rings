@@ -119,7 +119,9 @@ Plans:
   1. After saving and reloading, every citizen retains their home room assignment and resumes the home-return cycle
   2. Loading a v2 save (pre-housing) results in all citizens starting as unhoused, then being assigned homes from scratch as if they just arrived
   3. If a saved assignment references a demolished room (stale data), the citizen is marked unhoused and reassigned automatically on load
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 19-01-PLAN.md — Audit and verify all three save/load code paths, fix gaps, commit verification
 
 ## Progress
 
@@ -147,8 +149,8 @@ Note: Phases 16, 17, and 18 depend only on Phase 15 (not each other) but are seq
 | 16. Capacity Transfer | v1.2 | 1/1 | Complete | 2026-03-06 |
 | 17. Return-Home Behavior | v1.2 | 1/1 | Complete | 2026-03-06 |
 | 18. Housing UI | v1.2 | Complete    | 2026-03-06 | 2026-03-06 |
-| 19. Save/Load Integration | v1.2 | 0/TBD | Not started | - |
+| 19. Save/Load Integration | v1.2 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-03-02*
-*Last updated: 2026-03-06 after Phase 18-01 complete*
+*Last updated: 2026-03-06 after Phase 19 planning*
