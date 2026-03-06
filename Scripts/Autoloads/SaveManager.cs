@@ -128,6 +128,8 @@ public partial class SaveManager : Node
     private Action<int> _onWishCountChanged;
     private Action<int> _onCreditsChanged;
     private Action<string> _onBlueprintUnlocked;
+    private Action<string, int> _onCitizenAssignedHome;
+    private Action<string> _onCitizenUnhoused;
 
     // -------------------------------------------------------------------------
     // Lifecycle
@@ -156,6 +158,8 @@ public partial class SaveManager : Node
         _onWishCountChanged = _ => OnAnyStateChanged();
         _onCreditsChanged = _ => OnAnyStateChanged();
         _onBlueprintUnlocked = _ => OnAnyStateChanged();
+        _onCitizenAssignedHome = (_, _) => OnAnyStateChanged();
+        _onCitizenUnhoused = _ => OnAnyStateChanged();
 
         // Subscribe to all state-change events
         SubscribeEvents();
@@ -200,6 +204,8 @@ public partial class SaveManager : Node
         GameEvents.Instance.WishCountChanged += _onWishCountChanged;
         GameEvents.Instance.CreditsChanged += _onCreditsChanged;
         GameEvents.Instance.BlueprintUnlocked += _onBlueprintUnlocked;
+        GameEvents.Instance.CitizenAssignedHome += _onCitizenAssignedHome;
+        GameEvents.Instance.CitizenUnhoused += _onCitizenUnhoused;
     }
 
     private void UnsubscribeEvents()
@@ -214,6 +220,8 @@ public partial class SaveManager : Node
         GameEvents.Instance.WishCountChanged -= _onWishCountChanged;
         GameEvents.Instance.CreditsChanged -= _onCreditsChanged;
         GameEvents.Instance.BlueprintUnlocked -= _onBlueprintUnlocked;
+        GameEvents.Instance.CitizenAssignedHome -= _onCitizenAssignedHome;
+        GameEvents.Instance.CitizenUnhoused -= _onCitizenUnhoused;
     }
 
     // -------------------------------------------------------------------------
@@ -325,7 +333,8 @@ public partial class SaveManager : Node
                     SecondaryB = citizenData.SecondaryColor.B,
                     WalkwayAngle = citizen.CurrentAngle,
                     Direction = citizen.Direction,
-                    CurrentWishId = citizen.CurrentWish?.WishId
+                    CurrentWishId = citizen.CurrentWish?.WishId,
+                    HomeSegmentIndex = HousingManager.Instance?.GetHomeForCitizen(citizenData.CitizenName)
                 });
             }
         }
@@ -387,6 +396,7 @@ public partial class SaveManager : Node
         CitizenManager.StateLoaded = true;
         HappinessManager.StateLoaded = true;
         EconomyManager.StateLoaded = true;
+        HousingManager.StateLoaded = true;
 
         // Restore economy
         EconomyManager.Instance?.RestoreCredits(data.Credits);
@@ -452,6 +462,15 @@ public partial class SaveManager : Node
                     citizen.WalkwayAngle, citizen.Direction,
                     citizen.CurrentWishId);
             }
+        }
+
+        // Restore housing assignments (must come after rooms AND citizens are restored)
+        if (HousingManager.Instance != null)
+        {
+            var assignments = data.Citizens
+                .Select(c => (c.Name, c.HomeSegmentIndex))
+                .ToList();
+            HousingManager.Instance.RestoreFromSave(assignments);
         }
 
         // Restore wish board tracking
