@@ -117,12 +117,9 @@ public partial class PopulationDisplay : MarginContainer
     /// </summary>
     private void UpdateDisplay()
     {
-        int housed = HousingManager.Instance?.TotalHoused ?? 0;
-        int capacity = HousingManager.Instance?.TotalCapacity ?? 0;
         int total = CitizenManager.Instance?.CitizenCount ?? 0;
-
-        // Show citizen count before any housing is built, housed/capacity once housing exists
-        _countLabel.Text = capacity > 0 ? $"{housed}/{capacity}" : $"{total}";
+        int capacity = HousingManager.Instance?.TotalCapacity ?? 0;
+        _countLabel.Text = $"{total}/{capacity}";
     }
 
     /// <summary>
