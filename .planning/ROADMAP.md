@@ -39,7 +39,7 @@
 
 - [x] **Phase 14: Housing Foundation** - Event signatures, config resource, and save schema for the housing system (completed 2026-03-06)
 - [x] **Phase 15: HousingManager Core** - Assignment engine with even-spread algorithm, capacity tracking, and lifecycle events (UAT gap closure in progress) (completed 2026-03-06)
-- [ ] **Phase 16: Capacity Transfer** - Single source of truth for housing capacity in HousingManager, removing stale ownership from HappinessManager
+- [x] **Phase 16: Capacity Transfer** - Single source of truth for housing capacity in HousingManager, removing stale ownership from HappinessManager (completed 2026-03-06)
 - [ ] **Phase 17: Return-Home Behavior** - Citizens periodically walk home, rest with Zzz indicator, and resume their routines
 - [ ] **Phase 18: Housing UI** - Info panel, room tooltip, and population display show housing state to the player
 - [ ] **Phase 19: Save/Load Integration** - Housing assignments persist across sessions with backward-compatible v3 save format
@@ -82,7 +82,7 @@ Plans:
   1. HappinessManager no longer tracks housing capacity or subscribes to room placement/demolish events for capacity purposes
   2. Citizen arrival gating queries HousingManager for current capacity (not HappinessManager)
   3. Building or demolishing housing rooms updates capacity in one place only, with no desynchronization between systems
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 Plans:
 - [ ] 16-01-PLAN.md — Remove capacity tracking from HappinessManager, redirect arrival gating to HousingManager, clean up SaveManager/TitleScreen
 
@@ -140,7 +140,7 @@ Note: Phases 16, 17, and 18 depend only on Phase 15 (not each other) but are seq
 | 13. HUD Replacement | v1.1 | 1/1 | Complete | 2026-03-05 |
 | 14. Housing Foundation | v1.2 | 1/1 | Complete | 2026-03-06 |
 | 15. HousingManager Core | v1.2 | 3/3 | Complete | 2026-03-06 |
-| 16. Capacity Transfer | v1.2 | 0/1 | Not started | - |
+| 16. Capacity Transfer | 1/1 | Complete   | 2026-03-06 | - |
 | 17. Return-Home Behavior | v1.2 | 0/TBD | Not started | - |
 | 18. Housing UI | v1.2 | 0/TBD | Not started | - |
 | 19. Save/Load Integration | v1.2 | 0/TBD | Not started | - |

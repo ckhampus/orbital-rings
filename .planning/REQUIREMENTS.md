@@ -32,7 +32,7 @@ Requirements for the Housing milestone. Each maps to roadmap phases.
 
 - [x] **INFR-01**: New HousingManager autoload singleton owns citizen-to-room mapping
 - [x] **INFR-02**: HousingConfig resource with Inspector-tunable timing constants
-- [ ] **INFR-03**: Housing capacity tracking transferred from HappinessManager to HousingManager
+- [x] **INFR-03**: Housing capacity tracking transferred from HappinessManager to HousingManager
 - [ ] **INFR-04**: Save/load housing assignments with backward compatibility (v2 saves load as unhoused)
 - [x] **INFR-05**: Save format bumped to v3 with nullable HomeSegmentIndex
 
@@ -85,7 +85,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UI-03 | Phase 18 | Pending |
 | INFR-01 | Phase 14, Phase 15 | Complete |
 | INFR-02 | Phase 14 | Complete |
-| INFR-03 | Phase 16 | Pending |
+| INFR-03 | Phase 16 | Complete |
 | INFR-04 | Phase 19 | Pending |
 | INFR-05 | Phase 14, Phase 19 | Complete |
 

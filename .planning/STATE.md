@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Housing
 status: completed
-stopped_at: Phase 16 context gathered
-last_updated: "2026-03-06T13:33:03.478Z"
-last_activity: "2026-03-06 -- Phase 15-03 gap closure: stale home reference on load fixed"
+stopped_at: Completed 16-01-PLAN.md
+last_updated: "2026-03-06T13:51:21Z"
+last_activity: "2026-03-06 -- Phase 16-01 capacity transfer: HousingManager single source of truth"
 progress:
   total_phases: 6
-  completed_phases: 2
-  total_plans: 4
-  completed_plans: 4
+  completed_phases: 3
+  total_plans: 5
+  completed_plans: 5
   percent: 100
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** The wish-driven building loop: citizens express wishes, the player builds rooms to fulfill them, happiness rises, new citizens arrive, new wishes emerge.
-**Current focus:** v1.2 Housing -- Phase 15 complete, Phase 16 next (Capacity Transfer)
+**Current focus:** v1.2 Housing -- Phase 16 complete, Phase 17 next (Sleep Cycle)
 
 ## Current Position
 
-Phase: 15 of 19 (HousingManager Core) -- second phase of v1.2
-Plan: 3 of 3 (complete)
-Status: Phase 15 complete (including gap closure), Phase 16 next
-Last activity: 2026-03-06 -- Phase 15-03 gap closure: stale home reference on load fixed
+Phase: 16 of 19 (Capacity Transfer) -- third phase of v1.2
+Plan: 1 of 1 (complete)
+Status: Phase 16 complete, Phase 17 next
+Last activity: 2026-03-06 -- Phase 16-01 capacity transfer: HousingManager single source of truth
 
 Progress: [██████████] 100%
 
@@ -60,6 +60,9 @@ v1.2 design decisions (from PRD and research):
 - [Phase 15-01]: FindCitizenNode iterates Citizens list (O(n) acceptable for small counts)
 - [Phase 15-02]: HousingManager.StateLoaded set in ApplyState alongside other autoload flags (prevents double-initialization on load)
 - [Phase 15-03]: InitializeExistingRooms called at start of RestoreFromSave to populate capacities before ContainsKey check (fixes stale home reference on load)
+- [Phase 16-01]: Arrival gating: StarterCitizenCapacity + HousingManager.Instance.TotalCapacity (null-safe with ?? 0)
+- [Phase 16-01]: HousingCapacity removed from SaveData (no version bump -- System.Text.Json ignores unknown properties)
+- [Phase 16-01]: StateLoaded removed from HappinessManager (only guarded deleted InitializeHousingCapacity)
 
 ### Pending Todos
 
@@ -82,9 +85,10 @@ None.
 | Phase 15 P01 | 3min | 2 tasks | 3 files |
 | Phase 15 P02 | 1min | 1 tasks | 1 files |
 | Phase 15 P03 | 1min | 1 tasks | 1 files |
+| Phase 16 P01 | 4min | 2 tasks | 4 files |
 
 ## Session Continuity
 
-Last session: 2026-03-06T13:33:03.473Z
-Stopped at: Phase 16 context gathered
-Next: Phase 16 (Capacity Transfer from HappinessManager to HousingManager)
+Last session: 2026-03-06T13:51:21Z
+Stopped at: Completed 16-01-PLAN.md
+Next: Phase 17 (Sleep Cycle)
