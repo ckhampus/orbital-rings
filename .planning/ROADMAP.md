@@ -72,7 +72,7 @@ Plans:
 Plans:
 - [x] 15-01-PLAN.md — BuildManager API extension, CitizenNode home property, full HousingManager assignment engine
 - [x] 15-02-PLAN.md — SaveManager housing persistence and autosave event wiring
-- [ ] 15-03-PLAN.md — Fix stale home references on save/load (UAT gap closure)
+- [x] 15-03-PLAN.md — Fix stale home references on save/load (UAT gap closure)
 
 ### Phase 16: Capacity Transfer
 **Goal**: HousingManager is the single source of truth for housing capacity, with HappinessManager's stale capacity fields fully removed
