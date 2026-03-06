@@ -37,7 +37,7 @@
 
 **Milestone Goal:** Give each citizen a home room they visibly return to, making housing feel personal and alive.
 
-- [ ] **Phase 14: Housing Foundation** - Event signatures, config resource, and save schema for the housing system
+- [x] **Phase 14: Housing Foundation** - Event signatures, config resource, and save schema for the housing system (completed 2026-03-06)
 - [ ] **Phase 15: HousingManager Core** - Assignment engine with even-spread algorithm, capacity tracking, and lifecycle events
 - [ ] **Phase 16: Capacity Transfer** - Single source of truth for housing capacity in HousingManager, removing stale ownership from HappinessManager
 - [ ] **Phase 17: Return-Home Behavior** - Citizens periodically walk home, rest with Zzz indicator, and resume their routines
@@ -54,7 +54,7 @@
   1. HousingConfig resource can be created in the Godot Inspector with tunable timing fields (HomeTimerMin, HomeTimerMax, RestDurationMin, RestDurationMax)
   2. GameEvents has CitizenAssignedHome and CitizenUnhoused event signatures that compile and can be subscribed to
   3. SavedCitizen has a nullable HomeSegmentIndex field that serializes to null (not 0) when unset
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 Plans:
 - [ ] 14-01-PLAN.md — HousingConfig resource, HousingManager skeleton, housing events, save schema v3
 
@@ -132,7 +132,7 @@ Note: Phases 16, 17, and 18 depend only on Phase 15 (not each other) but are seq
 | 11. Economy and Arrival Tier Integration | v1.1 | 3/3 | Complete | 2026-03-04 |
 | 12. Save Format | v1.1 | 1/1 | Complete | 2026-03-05 |
 | 13. HUD Replacement | v1.1 | 1/1 | Complete | 2026-03-05 |
-| 14. Housing Foundation | v1.2 | 0/1 | Not started | - |
+| 14. Housing Foundation | 1/1 | Complete   | 2026-03-06 | - |
 | 15. HousingManager Core | v1.2 | 0/TBD | Not started | - |
 | 16. Capacity Transfer | v1.2 | 0/TBD | Not started | - |
 | 17. Return-Home Behavior | v1.2 | 0/TBD | Not started | - |
