@@ -630,6 +630,10 @@ public partial class CitizenNode : Node3D
 
         // Emit event for WishBoard tracking
         GameEvents.Instance?.EmitWishGenerated(_data.CitizenName, template.WishId);
+
+        // If walking to home when wish generates, abort home return (BEHV-04)
+        if (_walkingToHome)
+            AbortHomeReturn();
     }
 
     /// <summary>
@@ -789,13 +793,164 @@ public partial class CitizenNode : Node3D
     }
 
     /// <summary>
-    /// Begins the full home return tween sequence: walk to home segment, drift,
-    /// fade out, rest with Zzz indicator, fade in, drift back.
-    /// Implemented in Task 2.
+    /// Begins the full home return tween sequence: walk angularly to home segment,
+    /// drift radially to room edge, fade out, rest with Zzz indicator (fade in,
+    /// bob, fade out), fade citizen back in, drift back to walkway.
+    /// Follows the same 8-phase structure as StartVisit().
     /// </summary>
     private void StartHomeReturn()
     {
-        // Full implementation added in Task 2
+        _isAtHome = true;
+        _walkingToHome = true;
+
+        _activeTween?.Kill();
+
+        int homeSegment = HomeSegmentIndex!.Value;
+        var (homeRow, homePos) = SegmentGrid.FromIndex(homeSegment);
+
+        float targetRadius = homeRow == SegmentRow.Outer ? OuterDriftRadius : InnerDriftRadius;
+        float restDuration = _housingConfig.RestDurationMin
+            + GD.Randf() * (_housingConfig.RestDurationMax - _housingConfig.RestDurationMin);
+        float currentRadius = WalkwayRadius;
+        float currentAngle = _currentAngle;
+        float targetAngle = SegmentGrid.GetStartAngle(homePos) + SegmentGrid.SegmentArc * 0.5f;
+        string citizenName = _data.CitizenName;
+
+        // Hide wish badge for entire home rest cycle (locked decision)
+        if (_wishBadge != null)
+            _wishBadge.Visible = false;
+
+        // Compute shortest angular path (handle Tau wraparound)
+        float rawDelta = targetAngle - currentAngle;
+        if (rawDelta > Mathf.Pi) rawDelta -= Mathf.Tau;
+        if (rawDelta < -Mathf.Pi) rawDelta += Mathf.Tau;
+        float shortestDelta = rawDelta;
+
+        float walkDuration = Mathf.Abs(shortestDelta) / _speed;
+        walkDuration = Mathf.Max(walkDuration, 0.1f);
+
+        SetMeshTransparencyMode(true);
+
+        var tween = CreateTween();
+        _activeTween = tween;
+
+        // Compute Zzz world position: above home segment center
+        float segCenterAngle = targetAngle;
+        float zzzX = Mathf.Cos(segCenterAngle) * targetRadius;
+        float zzzZ = Mathf.Sin(segCenterAngle) * targetRadius;
+        float zzzY = SegmentGrid.RingHeight / 2f + 0.4f; // Above the room
+
+        // Phase 0: Walk angularly along walkway to home segment
+        tween.TweenMethod(
+            Callable.From((float t) =>
+            {
+                float a = currentAngle + shortestDelta * t;
+                if (a < 0) a += Mathf.Tau;
+                if (a >= Mathf.Tau) a -= Mathf.Tau;
+                SetRadialPosition(a, WalkwayRadius, includeBob: true);
+            }),
+            0.0f, 1.0f, walkDuration
+        );
+
+        // Update angle after walk
+        tween.TweenCallback(Callable.From(() =>
+        {
+            _currentAngle = targetAngle;
+            _walkingToHome = false; // No longer in walk phase (abort window closed)
+        }));
+
+        // Phase 1: Drift radially from walkway to room edge
+        tween.TweenMethod(
+            Callable.From((float t) => SetRadialPosition(targetAngle, Mathf.Lerp(currentRadius, targetRadius, t))),
+            0.0f, 1.0f, DriftDuration
+        );
+
+        // Phase 2: Fade out
+        tween.TweenMethod(
+            Callable.From((float alpha) => SetMeshAlpha(alpha)),
+            1.0f, 0.0f, FadeDuration
+        );
+
+        // Phase 3: Hide citizen, create Zzz, pause wish timer, emit entered event
+        tween.TweenCallback(Callable.From(() =>
+        {
+            Visible = false;
+            // BEHV-03: Pause wish timer during rest-inside phase
+            _wishTimer?.Stop();
+            // Create Zzz Label3D at home segment position
+            CreateZzzLabel(new Vector3(zzzX, zzzY, zzzZ));
+            GameEvents.Instance?.EmitCitizenEnteredHome(citizenName, homeSegment);
+        }));
+
+        // Phase 3b: Fade in Zzz label (locked: ~0.5s fade in)
+        tween.TweenCallback(Callable.From(() =>
+        {
+            if (_zzzLabel == null) return;
+            var fadeIn = CreateTween();
+            fadeIn.SetParallel(true);
+            fadeIn.TweenProperty(_zzzLabel, "modulate:a", 1.0f, 0.5f);
+            fadeIn.TweenProperty(_zzzLabel, "outline_modulate:a", 1.0f, 0.5f);
+            fadeIn.SetParallel(false);
+            fadeIn.TweenCallback(Callable.From(() => StartZzzBob()));
+        }));
+
+        // Phase 4: Rest inside room
+        tween.TweenInterval(restDuration);
+
+        // Phase 4b: Fade out Zzz (locked: ~0.5s fade out)
+        tween.TweenCallback(Callable.From(() =>
+        {
+            if (_zzzLabel == null) return;
+            _zzzBobTween?.Kill();
+            _zzzBobTween = null;
+            var fadeOut = CreateTween();
+            fadeOut.SetParallel(true);
+            fadeOut.TweenProperty(_zzzLabel, "modulate:a", 0.0f, 0.5f);
+            fadeOut.TweenProperty(_zzzLabel, "outline_modulate:a", 0.0f, 0.5f);
+            fadeOut.SetParallel(false);
+            fadeOut.TweenCallback(Callable.From(() => RemoveZzzLabel()));
+        }));
+
+        // Phase 4c: Wait for fade out
+        tween.TweenInterval(0.5f);
+
+        // Phase 5: Show citizen, resume wish timer, emit exited event
+        tween.TweenCallback(Callable.From(() =>
+        {
+            Visible = true;
+            SetRadialPosition(targetAngle, targetRadius);
+            // Resume wish timer
+            _wishTimer?.Start();
+            GameEvents.Instance?.EmitCitizenExitedHome(citizenName, homeSegment);
+        }));
+
+        // Phase 6: Fade in citizen
+        tween.TweenMethod(
+            Callable.From((float alpha) => SetMeshAlpha(alpha)),
+            0.0f, 1.0f, FadeDuration
+        );
+
+        // Phase 7: Drift back to walkway
+        tween.TweenMethod(
+            Callable.From((float t) => SetRadialPosition(targetAngle, Mathf.Lerp(targetRadius, currentRadius, t))),
+            0.0f, 1.0f, DriftDuration
+        );
+
+        // Phase 8: Restore state, re-arm timer, resume normal behavior
+        tween.TweenCallback(Callable.From(() =>
+        {
+            SetMeshAlpha(1.0f);
+            SetMeshTransparencyMode(false);
+            _isAtHome = false;
+            _activeTween = null;
+
+            // Restore wish badge if citizen has a wish
+            if (_currentWish != null && _wishBadge != null)
+                _wishBadge.Visible = true;
+
+            // Re-arm home timer with fresh random interval
+            RearmHomeTimer();
+        }));
     }
 
     /// <summary>
