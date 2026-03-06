@@ -4,8 +4,8 @@ milestone: v1.2
 milestone_name: Housing
 status: completed
 stopped_at: Completed 18-01-PLAN.md
-last_updated: "2026-03-06T19:46:00.528Z"
-last_activity: "2026-03-06 -- Phase 18-01 housing-ui: home label, room tooltip, population display"
+last_updated: "2026-03-06T19:58:03Z"
+last_activity: "2026-03-06 -- Quick task 6: camera orbit pivot to walkway centerline"
 progress:
   total_phases: 6
   completed_phases: 5
@@ -88,6 +88,7 @@ None.
 | 3 | Camera tilt adjustment (W/S keys + middle-mouse, 20-60 deg) | 2026-03-03 | efa59ad | [3-i-want-to-be-able-adjust-the-tilt-of-the](./quick/3-i-want-to-be-able-adjust-the-tilt-of-the/) |
 | 4 | Remove mute button, keep M keyboard shortcut | 2026-03-05 | 70f0ed0 | [4-remove-the-mute-button-but-keep-the-keyb](./quick/4-remove-the-mute-button-but-keep-the-keyb/) |
 | 5 | Remove orphaned HappinessMultiplierCap from EconomyConfig | 2026-03-05 | b67d991 | [5-remove-the-orphaned-happinessmultiplierc](./quick/5-remove-the-orphaned-happinessmultiplierc/) |
+| 6 | Camera orbit pivot shifted to walkway centerline (radius 4.5) | 2026-03-06 | 773ec9e | [6-camera-should-focus-on-walk-path-rotatin](./quick/6-camera-should-focus-on-walk-path-rotatin/) |
 | Phase 14 P01 | 2min | 2 tasks | 6 files |
 | Phase 15 P01 | 3min | 2 tasks | 3 files |
 | Phase 15 P02 | 1min | 1 tasks | 1 files |
@@ -98,6 +99,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-06T17:45:00.000Z
-Stopped at: Completed 18-01-PLAN.md
+Last session: 2026-03-06T19:58:03Z
+Stopped at: Completed quick task 6 (camera walkway focus)
 Next: Phase 19 (Save/Load Integration) planning and execution
