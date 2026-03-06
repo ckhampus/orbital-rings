@@ -127,8 +127,6 @@ public partial class CitizenNode : Node3D
     private bool _isAtHome;                  // true during home rest sequence
     private bool _walkingToHome;             // true only during walk-to-home phase (for abort detection)
     private Timer _homeTimer;                // periodic home return scheduling
-    private Label3D _zzzLabel;               // "Zzz" indicator above room during rest
-    private Tween _zzzBobTween;              // bob animation on Zzz label
     private HousingConfig _housingConfig;    // timing constants
 
     // -------------------------------------------------------------------------
@@ -154,8 +152,21 @@ public partial class CitizenNode : Node3D
     /// Flat segment index of this citizen's home room. Null when unhoused.
     /// Set by HousingManager on assignment/displacement.
     /// HousingManager is the source of truth; this is a convenience cache.
+    /// When set to a non-null value, automatically starts the home timer
+    /// (ensures timer runs even when set during save restore, where the
+    /// CitizenAssignedHome event is suppressed).
     /// </summary>
-    public int? HomeSegmentIndex { get; set; }
+    public int? HomeSegmentIndex
+    {
+        get => _homeSegmentIndex;
+        set
+        {
+            _homeSegmentIndex = value;
+            if (value != null && IsInsideTree())
+                EnsureHomeTimer();
+        }
+    }
+    private int? _homeSegmentIndex;
 
     /// <summary>Whether this citizen is currently resting at home.</summary>
     public bool IsAtHome => _isAtHome;
@@ -223,8 +234,6 @@ public partial class CitizenNode : Node3D
         _activeTween?.Kill();
         _badgeTween?.Kill();
         _wishBadge?.QueueFree();
-        _zzzBobTween?.Kill();
-        _zzzLabel?.QueueFree();
         _homeTimer?.Stop();
     }
 
@@ -749,18 +758,42 @@ public partial class CitizenNode : Node3D
     {
         if (_isVisiting || _isAtHome) return;
         if (HomeSegmentIndex == null) return;
-        // BEHV-04: active wish takes priority
-        if (_currentWish != null)
-        {
-            RearmHomeTimer();
-            return;
-        }
         StartHomeReturn();
     }
 
     /// <summary>
     /// Re-arms the home timer with a fresh random interval.
     /// </summary>
+    /// <summary>
+    /// Creates the home timer lazily if it wasn't created during Initialize
+    /// (happens when HousingManager.Config is unavailable at spawn time,
+    /// e.g. during save restore). Starts the timer once created.
+    /// </summary>
+    private void EnsureHomeTimer()
+    {
+        if (_homeTimer != null)
+        {
+            if (_homeTimer.IsStopped())
+                RearmHomeTimer();
+            return;
+        }
+
+        // Try to get housing config now (may have been null during Initialize)
+        _housingConfig ??= HousingManager.Instance?.Config;
+        if (_housingConfig == null) return;
+
+        _homeTimer = new Timer
+        {
+            Name = "HomeTimer",
+            OneShot = true,
+            WaitTime = _housingConfig.HomeTimerMin
+                + GD.Randf() * (_housingConfig.HomeTimerMax - _housingConfig.HomeTimerMin)
+        };
+        _homeTimer.Timeout += OnHomeTimerTimeout;
+        AddChild(_homeTimer);
+        _homeTimer.Start();
+    }
+
     private void RearmHomeTimer()
     {
         if (_homeTimer == null || _housingConfig == null) return;
@@ -834,12 +867,6 @@ public partial class CitizenNode : Node3D
         var tween = CreateTween();
         _activeTween = tween;
 
-        // Compute Zzz world position: above home segment center
-        float segCenterAngle = targetAngle;
-        float zzzX = Mathf.Cos(segCenterAngle) * targetRadius;
-        float zzzZ = Mathf.Sin(segCenterAngle) * targetRadius;
-        float zzzY = SegmentGrid.RingHeight / 2f + 0.4f; // Above the room
-
         // Phase 0: Walk angularly along walkway to home segment
         tween.TweenMethod(
             Callable.From((float t) =>
@@ -871,50 +898,21 @@ public partial class CitizenNode : Node3D
             1.0f, 0.0f, FadeDuration
         );
 
-        // Phase 3: Hide citizen, create Zzz, pause wish timer, emit entered event
+        // Phase 3: Hide citizen, pause wish timer, emit entered event
+        // (Zzz indicator is managed by RingVisual via CitizenEnteredHome event)
         tween.TweenCallback(Callable.From(() =>
         {
             Visible = false;
             // BEHV-03: Pause wish timer during rest-inside phase
             _wishTimer?.Stop();
-            // Create Zzz Label3D at home segment position
-            CreateZzzLabel(new Vector3(zzzX, zzzY, zzzZ));
             GameEvents.Instance?.EmitCitizenEnteredHome(citizenName, homeSegment);
-        }));
-
-        // Phase 3b: Fade in Zzz label (locked: ~0.5s fade in)
-        tween.TweenCallback(Callable.From(() =>
-        {
-            if (_zzzLabel == null) return;
-            var fadeIn = CreateTween();
-            fadeIn.SetParallel(true);
-            fadeIn.TweenProperty(_zzzLabel, "modulate:a", 1.0f, 0.5f);
-            fadeIn.TweenProperty(_zzzLabel, "outline_modulate:a", 1.0f, 0.5f);
-            fadeIn.SetParallel(false);
-            fadeIn.TweenCallback(Callable.From(() => StartZzzBob()));
         }));
 
         // Phase 4: Rest inside room
         tween.TweenInterval(restDuration);
 
-        // Phase 4b: Fade out Zzz (locked: ~0.5s fade out)
-        tween.TweenCallback(Callable.From(() =>
-        {
-            if (_zzzLabel == null) return;
-            _zzzBobTween?.Kill();
-            _zzzBobTween = null;
-            var fadeOut = CreateTween();
-            fadeOut.SetParallel(true);
-            fadeOut.TweenProperty(_zzzLabel, "modulate:a", 0.0f, 0.5f);
-            fadeOut.TweenProperty(_zzzLabel, "outline_modulate:a", 0.0f, 0.5f);
-            fadeOut.SetParallel(false);
-            fadeOut.TweenCallback(Callable.From(() => RemoveZzzLabel()));
-        }));
-
-        // Phase 4c: Wait for fade out
-        tween.TweenInterval(0.5f);
-
         // Phase 5: Show citizen, resume wish timer, emit exited event
+        // (Zzz indicator removed by RingVisual via CitizenExitedHome event)
         tween.TweenCallback(Callable.From(() =>
         {
             Visible = true;
@@ -954,62 +952,6 @@ public partial class CitizenNode : Node3D
     }
 
     /// <summary>
-    /// Creates the "Zzz" Label3D indicator at the given world position.
-    /// Added to parent node (not self) because CitizenNode.Visible is false during
-    /// rest -- Godot visibility propagates to children regardless of TopLevel.
-    /// </summary>
-    private void CreateZzzLabel(Vector3 worldPosition)
-    {
-        _zzzLabel = new Label3D
-        {
-            Text = "Zzz",
-            Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
-            FontSize = 32,
-            OutlineSize = 4,
-            Modulate = new Color(0.6f, 0.55f, 0.9f, 0.0f),
-            OutlineModulate = new Color(0.3f, 0.25f, 0.5f, 0.0f),
-            PixelSize = 0.005f,
-            NoDepthTest = true,
-            Shaded = false,
-            DoubleSided = true,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            TopLevel = true,
-        };
-        _zzzLabel.GlobalPosition = worldPosition;
-        GetParent().AddChild(_zzzLabel);
-    }
-
-    /// <summary>
-    /// Removes and nulls the Zzz label and its bob tween.
-    /// </summary>
-    private void RemoveZzzLabel()
-    {
-        if (_zzzLabel == null) return;
-        _zzzBobTween?.Kill();
-        _zzzBobTween = null;
-        _zzzLabel.QueueFree();
-        _zzzLabel = null;
-    }
-
-    /// <summary>
-    /// Starts a gentle infinite vertical bob animation on the Zzz label.
-    /// </summary>
-    private void StartZzzBob()
-    {
-        if (_zzzLabel == null) return;
-        _zzzBobTween?.Kill();
-        var baseY = _zzzLabel.GlobalPosition.Y;
-        _zzzBobTween = CreateTween();
-        _zzzBobTween.SetLoops();
-        _zzzBobTween.TweenProperty(_zzzLabel, "global_position:y", baseY + 0.03f, 1.5f)
-            .SetEase(Tween.EaseType.InOut)
-            .SetTrans(Tween.TransitionType.Sine);
-        _zzzBobTween.TweenProperty(_zzzLabel, "global_position:y", baseY, 1.5f)
-            .SetEase(Tween.EaseType.InOut)
-            .SetTrans(Tween.TransitionType.Sine);
-    }
-
-    /// <summary>
     /// Aborts an in-progress home return: kills tween, restores visual state,
     /// re-arms the home timer if still housed.
     /// </summary>
@@ -1017,6 +959,11 @@ public partial class CitizenNode : Node3D
     {
         _activeTween?.Kill();
         _activeTween = null;
+
+        // Emit exited-home event so RingVisual removes Zzz label (if rest phase was reached)
+        if (HomeSegmentIndex != null)
+            GameEvents.Instance?.EmitCitizenExitedHome(_data.CitizenName, HomeSegmentIndex.Value);
+
         _isAtHome = false;
         _walkingToHome = false;
 
@@ -1024,7 +971,6 @@ public partial class CitizenNode : Node3D
         Visible = true;
         SetMeshAlpha(1.0f);
         SetMeshTransparencyMode(false);
-        RemoveZzzLabel();
 
         // Restore wish badge visibility if citizen has a wish
         if (_currentWish != null && _wishBadge != null)
@@ -1048,11 +994,12 @@ public partial class CitizenNode : Node3D
         _activeTween?.Kill();
         _activeTween = null;
 
+        // Emit exited-home event so RingVisual removes Zzz label
+        if (HomeSegmentIndex != null)
+            GameEvents.Instance?.EmitCitizenExitedHome(_data.CitizenName, HomeSegmentIndex.Value);
+
         // Resume wish timer
         _wishTimer?.Start();
-
-        // Clean up Zzz
-        RemoveZzzLabel();
 
         // Restore citizen visibility and state
         Visible = true;

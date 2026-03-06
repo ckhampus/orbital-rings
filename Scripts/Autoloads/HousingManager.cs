@@ -89,6 +89,10 @@ public partial class HousingManager : Node
 
     public override void _Ready()
     {
+        // Script autoloads don't populate [Export] properties from the inspector,
+        // so initialize Config with defaults if not already set.
+        Config ??= new HousingConfig();
+
         // Subscribe to events using stored delegate references for clean unsubscription
         if (GameEvents.Instance != null)
         {
