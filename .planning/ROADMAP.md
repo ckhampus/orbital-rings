@@ -33,12 +33,12 @@
 
 </details>
 
-### 🚧 v1.2 Housing (In Progress)
+### v1.2 Housing (In Progress)
 
 **Milestone Goal:** Give each citizen a home room they visibly return to, making housing feel personal and alive.
 
 - [x] **Phase 14: Housing Foundation** - Event signatures, config resource, and save schema for the housing system (completed 2026-03-06)
-- [x] **Phase 15: HousingManager Core** - Assignment engine with even-spread algorithm, capacity tracking, and lifecycle events (completed 2026-03-06)
+- [ ] **Phase 15: HousingManager Core** - Assignment engine with even-spread algorithm, capacity tracking, and lifecycle events (UAT gap closure in progress)
 - [ ] **Phase 16: Capacity Transfer** - Single source of truth for housing capacity in HousingManager, removing stale ownership from HappinessManager
 - [ ] **Phase 17: Return-Home Behavior** - Citizens periodically walk home, rest with Zzz indicator, and resume their routines
 - [ ] **Phase 18: Housing UI** - Info panel, room tooltip, and population display show housing state to the player
@@ -68,10 +68,11 @@ Plans:
   3. When a new housing room is built and unhoused citizens exist, the oldest-unhoused citizens are assigned first
   4. A 3-segment housing room holds more citizens than a 1-segment housing room (capacity = BaseCapacity + segments - 1)
   5. Unhoused citizens walk, visit rooms, and fulfill wishes identically to housed citizens
-**Plans:** 2/2 plans complete
+**Plans:** 3 plans (2 complete, 1 gap closure)
 Plans:
-- [ ] 15-01-PLAN.md — BuildManager API extension, CitizenNode home property, full HousingManager assignment engine
-- [ ] 15-02-PLAN.md — SaveManager housing persistence and autosave event wiring
+- [x] 15-01-PLAN.md — BuildManager API extension, CitizenNode home property, full HousingManager assignment engine
+- [x] 15-02-PLAN.md — SaveManager housing persistence and autosave event wiring
+- [ ] 15-03-PLAN.md — Fix stale home references on save/load (UAT gap closure)
 
 ### Phase 16: Capacity Transfer
 **Goal**: HousingManager is the single source of truth for housing capacity, with HappinessManager's stale capacity fields fully removed
@@ -136,7 +137,7 @@ Note: Phases 16, 17, and 18 depend only on Phase 15 (not each other) but are seq
 | 12. Save Format | v1.1 | 1/1 | Complete | 2026-03-05 |
 | 13. HUD Replacement | v1.1 | 1/1 | Complete | 2026-03-05 |
 | 14. Housing Foundation | v1.2 | 1/1 | Complete | 2026-03-06 |
-| 15. HousingManager Core | 2/2 | Complete    | 2026-03-06 | - |
+| 15. HousingManager Core | v1.2 | 2/3 | Gap closure | - |
 | 16. Capacity Transfer | v1.2 | 0/TBD | Not started | - |
 | 17. Return-Home Behavior | v1.2 | 0/TBD | Not started | - |
 | 18. Housing UI | v1.2 | 0/TBD | Not started | - |
@@ -144,4 +145,4 @@ Note: Phases 16, 17, and 18 depend only on Phase 15 (not each other) but are seq
 
 ---
 *Roadmap created: 2026-03-02*
-*Last updated: 2026-03-06 after Phase 15 planning*
+*Last updated: 2026-03-06 after Phase 15 UAT gap closure planning*
