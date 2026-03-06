@@ -84,7 +84,7 @@ Plans:
   3. Building or demolishing housing rooms updates capacity in one place only, with no desynchronization between systems
 **Plans:** 1/1 plans complete
 Plans:
-- [ ] 16-01-PLAN.md — Remove capacity tracking from HappinessManager, redirect arrival gating to HousingManager, clean up SaveManager/TitleScreen
+- [x] 16-01-PLAN.md — Remove capacity tracking from HappinessManager, redirect arrival gating to HousingManager, clean up SaveManager/TitleScreen
 
 ### Phase 17: Return-Home Behavior
 **Goal**: Citizens visibly return to their home room on a periodic cycle, rest with a sleeping indicator, and resume normal behavior without disrupting the wish loop
@@ -95,7 +95,9 @@ Plans:
   2. A "Zzz" text floater appears above citizens while they rest at home, distinguishing home visits from regular room visits
   3. Citizens do not generate new wishes while resting at home (wish timer paused)
   4. If a citizen has an active wish to fulfill, they skip or defer their home return until the wish is handled
-**Plans**: TBD
+**Plans:** 1 plans
+Plans:
+- [ ] 17-01-PLAN.md — Home timer, StartHomeReturn tween, Zzz Label3D indicator, priority/interruption handling, CitizenManager wiring
 
 ### Phase 18: Housing UI
 **Goal**: Players can see which citizen lives where, who occupies each housing room, and overall population vs capacity at a glance
@@ -140,11 +142,11 @@ Note: Phases 16, 17, and 18 depend only on Phase 15 (not each other) but are seq
 | 13. HUD Replacement | v1.1 | 1/1 | Complete | 2026-03-05 |
 | 14. Housing Foundation | v1.2 | 1/1 | Complete | 2026-03-06 |
 | 15. HousingManager Core | v1.2 | 3/3 | Complete | 2026-03-06 |
-| 16. Capacity Transfer | 1/1 | Complete    | 2026-03-06 | - |
-| 17. Return-Home Behavior | v1.2 | 0/TBD | Not started | - |
+| 16. Capacity Transfer | v1.2 | 1/1 | Complete | 2026-03-06 |
+| 17. Return-Home Behavior | v1.2 | 0/1 | Not started | - |
 | 18. Housing UI | v1.2 | 0/TBD | Not started | - |
 | 19. Save/Load Integration | v1.2 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-03-02*
-*Last updated: 2026-03-06 after Phase 16 planning*
+*Last updated: 2026-03-06 after Phase 17 planning*
