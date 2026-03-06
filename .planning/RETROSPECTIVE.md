@@ -95,6 +95,52 @@
 
 ---
 
+## Milestone: v1.2 — Housing
+
+**Shipped:** 2026-03-06
+**Phases:** 6 | **Plans:** 8 | **Sessions:** ~4
+
+### What Was Built
+- HousingManager autoload (8th singleton) with fewest-occupants-first assignment engine and reservoir sampling tiebreak
+- Size-scaled housing capacity (BaseCapacity + segments - 1) with single source of truth after capacity transfer from HappinessManager
+- Periodic home-return behavior (90-150s timer) with Zzz Label3D indicator, wish timer pausing, and wish priority handling
+- Three housing UI components: info panel home label, room tooltip with resident names, population count/capacity display
+- Save format v3 with nullable HomeSegmentIndex — all three code paths (normal, backward compat, stale reference) verified
+- Demolish-eject safety, unhoused graceful handling, and event-driven UI updates
+
+### What Worked
+- **PRD-first design**: Writing `docs/prd-housing.md` before any phase planning created clear requirements that held through all 6 phases without scope change
+- **Contracts-first foundation phase**: Phase 14 shipped all types/events/schemas before any logic — zero compilation issues in downstream phases
+- **Capacity transfer as separate phase**: Phase 16 isolated the HappinessManager → HousingManager ownership transfer, making a risky refactor clean and auditable
+- **Milestone audit caught real issues**: The audit identified 4 tech debt items and confirmed all 17 requirements were satisfied — the UI-03 semantic deviation was a conscious design choice, not a bug
+- **Quick tasks for mid-milestone fixes**: Quick tasks 6-8 handled camera focus, Zzz visibility, and arrival gate bugs without disrupting phase execution
+
+### What Was Inefficient
+- **Summary frontmatter still missing `one_liner`**: Third milestone in a row where `summary-extract --fields one_liner` returns N/A — the executor never generates this field
+- **Phase 18 had most execution time (13 min)**: Three UI components in a single plan was dense — splitting info panel, tooltip, and population display into separate plans would have been cleaner
+- **Phase 15 grew to 3 plans**: UAT gap closure (15-03) fixed a stale home reference bug found during testing — earlier integration testing would have caught this in 15-01
+- **ROADMAP.md formatting drift**: Phase 18 and 19 progress table rows had misaligned columns — manual table editing remains error-prone
+
+### Patterns Established
+- **Stored delegate pattern for event unsubscription**: Lambda → stored Action variable for clean unsubscribe (CitizenManager, HousingManager, SaveManager, PopulationDisplay)
+- **Label3D with TopLevel for parent-independent indicators**: Zzz indicator uses TopLevel=true so transforms aren't affected by parent node tweens
+- **Occupancy-based arrival gating**: TotalHoused < TotalCapacity is simpler and more correct than additive capacity formulas
+- **XML doc audit trail**: Documenting verified code paths in method comments (RestoreFromSave) for future readers
+- **Three-path save/load verification**: Normal, backward-compat, and stale-reference paths must each be explicitly verified
+
+### Key Lessons
+1. **Foundation phases pay for themselves**: Phase 14 was small (1 plan, 2 min) but enabled 5 downstream phases to compile against stable contracts
+2. **Capacity ownership transfer is a phase, not a task**: Moving state ownership between singletons touches multiple files and needs its own verification — don't bundle it into a feature phase
+3. **Label3D TopLevel solves parent-tween visibility**: When a visual indicator must stay visible while its parent node is animated, set TopLevel=true and manage position manually
+4. **Nullable types beat sentinel values for optional save data**: `int?` HomeSegmentIndex serializes cleanly as null, avoiding confusion with segment index 0
+
+### Cost Observations
+- Model mix: 85% opus, 10% sonnet, 5% haiku (quality profile)
+- Sessions: ~4 sessions across 2 days
+- Notable: 8 plans averaged ~4 min execution each. Phase 18 (UI) was the outlier at 13 min — multiple UI components in one plan. Quick tasks 6-8 averaged 2 min each.
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -103,6 +149,7 @@
 |-----------|----------|--------|------------|
 | v1.0 | ~8 | 9 | Full GSD workflow with research → plan → execute → verify per phase |
 | v1.1 | ~4 | 4 | Contracts-first plan ordering, milestone audit before completion |
+| v1.2 | ~4 | 6 | PRD-first design, dedicated capacity transfer phase, three-path save/load verification |
 
 ### Cumulative Quality
 
@@ -110,11 +157,13 @@
 |-----------|-------------|--------------|-----------|-----------|
 | v1.0 | 25/25 | 25/25 satisfied | 6/6 complete | 4 info-level items |
 | v1.1 | 12/12 | 12/12 satisfied | 3/3 complete | 1 item (resolved before ship) |
+| v1.2 | 38/38 | 17/17 satisfied | 1/1 complete | 4 items (non-blocking) |
 
 ### Top Lessons (Verified Across Milestones)
 
-1. Spreadsheet-first design for any system with tunable numbers prevents rework (v1.0 economy, v1.1 tier thresholds)
+1. Spreadsheet-first design for any system with tunable numbers prevents rework (v1.0 economy, v1.1 tier thresholds, v1.2 housing PRD)
 2. Per-instance materials in Godot 4 C# — always, no exceptions
-3. Event-driven architecture with typed C# delegates scales cleanly across 7+ singletons
-4. Contracts-first plan ordering (enums/configs/events before logic) eliminates merge conflicts between plans (v1.0 Phase 1, v1.1 Phase 10)
+3. Event-driven architecture with typed C# delegates scales cleanly across 8+ singletons (v1.2 added HousingManager)
+4. Contracts-first plan ordering (enums/configs/events before logic) eliminates merge conflicts between plans (v1.0 Phase 1, v1.1 Phase 10, v1.2 Phase 14)
 5. POCO simulation objects keep Autoload Nodes thin and logic testable (v1.1 MoodSystem)
+6. Ownership transfer deserves its own phase — moving state between singletons touches multiple files and needs isolated verification (v1.2 Phase 16)
