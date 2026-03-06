@@ -132,7 +132,7 @@ Note: Phases 16, 17, and 18 depend only on Phase 15 (not each other) but are seq
 | 11. Economy and Arrival Tier Integration | v1.1 | 3/3 | Complete | 2026-03-04 |
 | 12. Save Format | v1.1 | 1/1 | Complete | 2026-03-05 |
 | 13. HUD Replacement | v1.1 | 1/1 | Complete | 2026-03-05 |
-| 14. Housing Foundation | 1/1 | Complete   | 2026-03-06 | - |
+| 14. Housing Foundation | 1/1 | Complete    | 2026-03-06 | - |
 | 15. HousingManager Core | v1.2 | 0/TBD | Not started | - |
 | 16. Capacity Transfer | v1.2 | 0/TBD | Not started | - |
 | 17. Return-Home Behavior | v1.2 | 0/TBD | Not started | - |
