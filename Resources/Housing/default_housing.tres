@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="HousingConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/Data/HousingConfig.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+HomeTimerMin = 90.0
+HomeTimerMax = 150.0
+RestDurationMin = 8.0
+RestDurationMax = 15.0
