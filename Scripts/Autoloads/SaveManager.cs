@@ -19,7 +19,7 @@ namespace OrbitalRings.Autoloads;
 /// </summary>
 public class SaveData
 {
-    public int Version { get; set; } = 1;
+    public int Version { get; set; } = 3;
     public int Credits { get; set; }
     public float Happiness { get; set; }
     public int CrossedMilestoneCount { get; set; }
@@ -67,6 +67,12 @@ public class SavedCitizen
     public float WalkwayAngle { get; set; }
     public float Direction { get; set; }
     public string CurrentWishId { get; set; }
+
+    /// <summary>
+    /// Flat segment index of the citizen's home room. Null when unhoused.
+    /// Added in save format v3. Deserializes as null from v2 saves (backward-compatible).
+    /// </summary>
+    public int? HomeSegmentIndex { get; set; }
 }
 
 // -------------------------------------------------------------------------
@@ -272,7 +278,7 @@ public partial class SaveManager : Node
     {
         var data = new SaveData
         {
-            Version = 2,
+            Version = 3,
             Credits = EconomyManager.Instance?.Credits ?? 0,
             Happiness = 0f, // v1 field: write 0 in v2 saves
             CrossedMilestoneCount = HappinessManager.Instance?.GetCrossedMilestoneCount() ?? 0,

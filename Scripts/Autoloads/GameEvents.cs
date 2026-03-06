@@ -226,4 +226,21 @@ public partial class GameEvents : Node
 
     public void EmitWishCountChanged(int newCount)
         => WishCountChanged?.Invoke(newCount);
+
+    // ---------------------------------------------------------------------------
+    // Housing Events (Phase 14)
+    // ---------------------------------------------------------------------------
+
+    /// <param name="citizenName">Display name of the assigned citizen.</param>
+    /// <param name="segmentIndex">Flat segment index of the home room.</param>
+    public event Action<string, int> CitizenAssignedHome;
+
+    /// <param name="citizenName">Display name of the now-unhoused citizen.</param>
+    public event Action<string> CitizenUnhoused;
+
+    public void EmitCitizenAssignedHome(string citizenName, int segmentIndex)
+        => CitizenAssignedHome?.Invoke(citizenName, segmentIndex);
+
+    public void EmitCitizenUnhoused(string citizenName)
+        => CitizenUnhoused?.Invoke(citizenName);
 }
