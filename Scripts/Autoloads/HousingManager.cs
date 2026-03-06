@@ -173,6 +173,11 @@ public partial class HousingManager : Node
     /// <summary>
     /// Rebuilds internal state from save data without emitting events.
     /// Called by SaveManager after rooms and citizens are restored.
+    ///
+    /// Three verified code paths converge here (audited Phase 19):
+    /// 1. Normal save/load: each citizen's homeIndex maps to a restored room -> AssignCitizen.
+    /// 2. v2 backward compat: homeIndex is null (field absent in JSON) -> skip -> AssignAllUnhoused.
+    /// 3. Stale reference: homeIndex points to a demolished room -> ContainsKey fails -> skip + log -> AssignAllUnhoused.
     /// </summary>
     public void RestoreFromSave(IReadOnlyList<(string citizenName, int? homeIndex)> assignments)
     {
