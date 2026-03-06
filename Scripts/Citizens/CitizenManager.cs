@@ -158,9 +158,9 @@ public partial class CitizenManager : SafeNode
             }
         }
 
-        // If selected citizen starts visiting (invisible), auto-deselect
+        // If selected citizen starts visiting or resting at home (invisible), auto-deselect
         // to prevent glow on invisible citizen
-        if (_selectedCitizen != null && _selectedCitizen.IsVisiting)
+        if (_selectedCitizen != null && (_selectedCitizen.IsVisiting || _selectedCitizen.IsAtHome))
         {
             DeselectCitizen();
         }
@@ -221,8 +221,8 @@ public partial class CitizenManager : SafeNode
         {
             var citizen = _citizens[i];
 
-            // Skip invisible/visiting citizens (pitfall #6)
-            if (citizen.IsVisiting) continue;
+            // Skip invisible/visiting/at-home citizens (pitfall #6)
+            if (citizen.IsVisiting || citizen.IsAtHome) continue;
 
             // XZ distance between hit point and citizen position
             float dx = hitPoint.X - citizen.Position.X;
@@ -322,7 +322,7 @@ public partial class CitizenManager : SafeNode
 
         var citizen = new CitizenNode();
         float angle = startAngle ?? GD.Randf() * Mathf.Tau;
-        citizen.Initialize(data, angle, _grid);
+        citizen.Initialize(data, angle, _grid, HousingManager.Instance?.Config);
 
         AddChild(citizen);
         _citizens.Add(citizen);
@@ -384,7 +384,7 @@ public partial class CitizenManager : SafeNode
         };
 
         var citizen = new CitizenNode();
-        citizen.Initialize(data, angle, _grid);
+        citizen.Initialize(data, angle, _grid, HousingManager.Instance?.Config);
         citizen.SetDirection(direction);
 
         AddChild(citizen);
