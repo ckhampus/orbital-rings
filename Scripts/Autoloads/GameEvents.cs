@@ -244,6 +244,12 @@ public partial class GameEvents : Node
     public void EmitCitizenUnhoused(string citizenName)
         => CitizenUnhoused?.Invoke(citizenName);
 
+    /// <summary>Fired after housing state is fully restored from save.</summary>
+    public event Action HousingStateChanged;
+
+    public void EmitHousingStateChanged()
+        => HousingStateChanged?.Invoke();
+
     // ---------------------------------------------------------------------------
     // Home Visit Events (Phase 17)
     // ---------------------------------------------------------------------------

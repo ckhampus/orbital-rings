@@ -79,6 +79,7 @@ public partial class PopulationDisplay : MarginContainer
             _onRoomDemolished = (_) => { UpdateDisplay(); PlayTickAnimation(); };
             GameEvents.Instance.RoomPlaced += _onRoomPlaced;
             GameEvents.Instance.RoomDemolished += _onRoomDemolished;
+            GameEvents.Instance.HousingStateChanged += UpdateDisplay;
         }
 
         // Initialize housed/capacity display from current state
@@ -94,6 +95,7 @@ public partial class PopulationDisplay : MarginContainer
                 GameEvents.Instance.RoomPlaced -= _onRoomPlaced;
             if (_onRoomDemolished != null)
                 GameEvents.Instance.RoomDemolished -= _onRoomDemolished;
+            GameEvents.Instance.HousingStateChanged -= UpdateDisplay;
         }
     }
 

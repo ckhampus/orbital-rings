@@ -198,6 +198,8 @@ public partial class HousingManager : Node
         AssignAllUnhoused();
 
         _isRestoring = false;
+
+        GameEvents.Instance?.EmitHousingStateChanged();
     }
 
     // -------------------------------------------------------------------------
