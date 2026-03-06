@@ -1,9 +1,9 @@
 ---
-status: diagnosed
+status: resolved
 phase: 15-housingmanager-core
 source: [15-01-SUMMARY.md, 15-02-SUMMARY.md]
 started: 2026-03-06T10:10:00Z
-updated: 2026-03-06T10:18:00Z
+updated: 2026-03-06
 ---
 
 ## Current Test
@@ -57,7 +57,7 @@ skipped: 0
 ## Gaps
 
 - truth: "Loading a save restores housing assignments exactly as saved (same citizen names at same segment indices)"
-  status: failed
+  status: resolved
   reason: "User reported: All citizens get 'Stale home reference' on load — RestoreFromSave cannot find rooms in _housingRoomCapacities. All 7 citizens become unhoused despite having valid saved home indices (segments 4, 19, 9)."
   severity: major
   test: 7
