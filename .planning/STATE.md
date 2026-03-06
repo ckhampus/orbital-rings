@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Housing
-status: completed
-stopped_at: Phase 17 context gathered
-last_updated: "2026-03-06T14:37:40.600Z"
-last_activity: "2026-03-06 -- Phase 16-01 capacity transfer: HousingManager single source of truth"
+status: in-progress
+stopped_at: Phase 17-01 complete
+last_updated: "2026-03-06T15:26:55Z"
+last_activity: "2026-03-06 -- Phase 17-01 return-home-behavior: periodic home return with Zzz indicator"
 progress:
   total_phases: 6
-  completed_phases: 3
-  total_plans: 5
-  completed_plans: 5
+  completed_phases: 4
+  total_plans: 6
+  completed_plans: 6
   percent: 100
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** The wish-driven building loop: citizens express wishes, the player builds rooms to fulfill them, happiness rises, new citizens arrive, new wishes emerge.
-**Current focus:** v1.2 Housing -- Phase 16 complete, Phase 17 next (Sleep Cycle)
+**Current focus:** v1.2 Housing -- Phase 17 complete (Return Home Behavior)
 
 ## Current Position
 
-Phase: 16 of 19 (Capacity Transfer) -- third phase of v1.2
+Phase: 17 of 19 (Return Home Behavior) -- fourth phase of v1.2
 Plan: 1 of 1 (complete)
-Status: Phase 16 complete, Phase 17 next
-Last activity: 2026-03-06 -- Phase 16-01 capacity transfer: HousingManager single source of truth
+Status: Phase 17 complete
+Last activity: 2026-03-06 -- Phase 17-01 return-home-behavior: periodic home return with Zzz indicator
 
 Progress: [██████████] 100%
 
@@ -63,6 +63,9 @@ v1.2 design decisions (from PRD and research):
 - [Phase 16-01]: Arrival gating: StarterCitizenCapacity + HousingManager.Instance.TotalCapacity (null-safe with ?? 0)
 - [Phase 16-01]: HousingCapacity removed from SaveData (no version bump -- System.Text.Json ignores unknown properties)
 - [Phase 16-01]: StateLoaded removed from HappinessManager (only guarded deleted InitializeHousingCapacity)
+- [Phase 17-01]: Label3D with TopLevel=true for Zzz indicator (parent-independent visibility)
+- [Phase 17-01]: Separate nested tweens for Zzz fade in/out (concurrent with main sequence)
+- [Phase 17-01]: _walkingToHome flag scopes abort window to angular walk phase only
 
 ### Pending Todos
 
@@ -70,7 +73,7 @@ None.
 
 ### Blockers/Concerns
 
-- Phase 17: Zzz visual may need FloatingText vs Label3D spike (research flag)
+None.
 
 ### Quick Tasks Completed
 
@@ -86,9 +89,10 @@ None.
 | Phase 15 P02 | 1min | 1 tasks | 1 files |
 | Phase 15 P03 | 1min | 1 tasks | 1 files |
 | Phase 16 P01 | 4min | 2 tasks | 4 files |
+| Phase 17 P01 | 5min | 3 tasks | 3 files |
 
 ## Session Continuity
 
-Last session: 2026-03-06T14:37:40.596Z
-Stopped at: Phase 17 context gathered
-Next: Phase 17 (Sleep Cycle)
+Last session: 2026-03-06T15:26:55Z
+Stopped at: Completed 17-01-PLAN.md
+Next: Visual testing of home return behavior in Godot editor

@@ -40,7 +40,7 @@
 - [x] **Phase 14: Housing Foundation** - Event signatures, config resource, and save schema for the housing system (completed 2026-03-06)
 - [x] **Phase 15: HousingManager Core** - Assignment engine with even-spread algorithm, capacity tracking, and lifecycle events (UAT gap closure in progress) (completed 2026-03-06)
 - [x] **Phase 16: Capacity Transfer** - Single source of truth for housing capacity in HousingManager, removing stale ownership from HappinessManager (completed 2026-03-06)
-- [ ] **Phase 17: Return-Home Behavior** - Citizens periodically walk home, rest with Zzz indicator, and resume their routines
+- [x] **Phase 17: Return-Home Behavior** - Citizens periodically walk home, rest with Zzz indicator, and resume their routines (completed 2026-03-06)
 - [ ] **Phase 18: Housing UI** - Info panel, room tooltip, and population display show housing state to the player
 - [ ] **Phase 19: Save/Load Integration** - Housing assignments persist across sessions with backward-compatible v3 save format
 
@@ -95,7 +95,7 @@ Plans:
   2. A "Zzz" text floater appears above citizens while they rest at home, distinguishing home visits from regular room visits
   3. Citizens do not generate new wishes while resting at home (wish timer paused)
   4. If a citizen has an active wish to fulfill, they skip or defer their home return until the wish is handled
-**Plans:** 1 plans
+**Plans:** 1/1 plans complete
 Plans:
 - [ ] 17-01-PLAN.md — Home timer, StartHomeReturn tween, Zzz Label3D indicator, priority/interruption handling, CitizenManager wiring
 
@@ -143,7 +143,7 @@ Note: Phases 16, 17, and 18 depend only on Phase 15 (not each other) but are seq
 | 14. Housing Foundation | v1.2 | 1/1 | Complete | 2026-03-06 |
 | 15. HousingManager Core | v1.2 | 3/3 | Complete | 2026-03-06 |
 | 16. Capacity Transfer | v1.2 | 1/1 | Complete | 2026-03-06 |
-| 17. Return-Home Behavior | v1.2 | 0/1 | Not started | - |
+| 17. Return-Home Behavior | 1/1 | Complete   | 2026-03-06 | - |
 | 18. Housing UI | v1.2 | 0/TBD | Not started | - |
 | 19. Save/Load Integration | v1.2 | 0/TBD | Not started | - |
 

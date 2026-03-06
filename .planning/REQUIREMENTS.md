@@ -17,10 +17,10 @@ Requirements for the Housing milestone. Each maps to roadmap phases.
 
 ### Return-Home Behavior
 
-- [ ] **BEHV-01**: Housed citizens periodically return to their home room (90-150s cycle)
-- [ ] **BEHV-02**: Home rest lasts 8-15s with a "Zzz" FloatingText indicator
-- [ ] **BEHV-03**: Citizen wish timer pauses during home rest
-- [ ] **BEHV-04**: Home return is lower priority than active wish fulfillment
+- [x] **BEHV-01**: Housed citizens periodically return to their home room (90-150s cycle)
+- [x] **BEHV-02**: Home rest lasts 8-15s with a "Zzz" FloatingText indicator
+- [x] **BEHV-03**: Citizen wish timer pauses during home rest
+- [x] **BEHV-04**: Home return is lower priority than active wish fulfillment
 
 ### UI & Feedback
 
@@ -76,10 +76,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HOME-03 | Phase 15 | Complete |
 | HOME-04 | Phase 15 | Complete |
 | HOME-05 | Phase 15 | Complete |
-| BEHV-01 | Phase 17 | Pending |
-| BEHV-02 | Phase 17 | Pending |
-| BEHV-03 | Phase 17 | Pending |
-| BEHV-04 | Phase 17 | Pending |
+| BEHV-01 | Phase 17 | Complete |
+| BEHV-02 | Phase 17 | Complete |
+| BEHV-03 | Phase 17 | Complete |
+| BEHV-04 | Phase 17 | Complete |
 | UI-01 | Phase 18 | Pending |
 | UI-02 | Phase 18 | Pending |
 | UI-03 | Phase 18 | Pending |
