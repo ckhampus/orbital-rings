@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Housing
-status: in-progress
-stopped_at: Phase 17-01 complete
-last_updated: "2026-03-06T15:26:55Z"
+status: completed
+stopped_at: Completed 17-01-PLAN.md
+last_updated: "2026-03-06T15:32:38.002Z"
 last_activity: "2026-03-06 -- Phase 17-01 return-home-behavior: periodic home return with Zzz indicator"
 progress:
   total_phases: 6

@@ -143,7 +143,7 @@ Note: Phases 16, 17, and 18 depend only on Phase 15 (not each other) but are seq
 | 14. Housing Foundation | v1.2 | 1/1 | Complete | 2026-03-06 |
 | 15. HousingManager Core | v1.2 | 3/3 | Complete | 2026-03-06 |
 | 16. Capacity Transfer | v1.2 | 1/1 | Complete | 2026-03-06 |
-| 17. Return-Home Behavior | 1/1 | Complete   | 2026-03-06 | - |
+| 17. Return-Home Behavior | 1/1 | Complete    | 2026-03-06 | - |
 | 18. Housing UI | v1.2 | 0/TBD | Not started | - |
 | 19. Save/Load Integration | v1.2 | 0/TBD | Not started | - |
 
