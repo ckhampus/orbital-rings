@@ -4,8 +4,8 @@ milestone: v1.2
 milestone_name: Housing
 status: completed
 stopped_at: Completed 18-01-PLAN.md
-last_updated: "2026-03-06T20:29:07Z"
-last_activity: "2026-03-06 -- Quick task 7: fix Zzz label visibility during home rest"
+last_updated: "2026-03-06T21:54:02Z"
+last_activity: "2026-03-06 -- Quick task 8: fix citizen arrival gate to check actual housing vacancy"
 progress:
   total_phases: 6
   completed_phases: 5
@@ -60,7 +60,8 @@ v1.2 design decisions (from PRD and research):
 - [Phase 15-01]: FindCitizenNode iterates Citizens list (O(n) acceptable for small counts)
 - [Phase 15-02]: HousingManager.StateLoaded set in ApplyState alongside other autoload flags (prevents double-initialization on load)
 - [Phase 15-03]: InitializeExistingRooms called at start of RestoreFromSave to populate capacities before ContainsKey check (fixes stale home reference on load)
-- [Phase 16-01]: Arrival gating: StarterCitizenCapacity + HousingManager.Instance.TotalCapacity (null-safe with ?? 0)
+- [Phase 16-01]: Arrival gating: StarterCitizenCapacity + HousingManager.Instance.TotalCapacity (null-safe with ?? 0) -- SUPERSEDED by quick-8
+- [Quick-8]: Arrival gating: occupancy-based (TotalHoused < TotalCapacity) instead of additive formula
 - [Phase 16-01]: HousingCapacity removed from SaveData (no version bump -- System.Text.Json ignores unknown properties)
 - [Phase 16-01]: StateLoaded removed from HappinessManager (only guarded deleted InitializeHousingCapacity)
 - [Phase 17-01]: Label3D with TopLevel=true for Zzz indicator (parent-independent visibility)
@@ -90,6 +91,7 @@ None.
 | 5 | Remove orphaned HappinessMultiplierCap from EconomyConfig | 2026-03-05 | b67d991 | [5-remove-the-orphaned-happinessmultiplierc](./quick/5-remove-the-orphaned-happinessmultiplierc/) |
 | 6 | Camera orbit pivot shifted to walkway centerline (radius 4.5) | 2026-03-06 | 773ec9e | [6-camera-should-focus-on-walk-path-rotatin](./quick/6-camera-should-focus-on-walk-path-rotatin/) |
 | 7 | Fix Zzz label visibility by reparenting to CitizenManager | 2026-03-06 | c2761b3 | [7-the-zzz-isn-t-showing-when-a-citizen-goe](./quick/7-the-zzz-isn-t-showing-when-a-citizen-goe/) |
+| 8 | Fix citizen arrival gate to check actual housing vacancy | 2026-03-06 | 9f73a28 | [8-fix-new-citizens-arriving-when-no-housin](./quick/8-fix-new-citizens-arriving-when-no-housin/) |
 | Phase 14 P01 | 2min | 2 tasks | 6 files |
 | Phase 15 P01 | 3min | 2 tasks | 3 files |
 | Phase 15 P02 | 1min | 1 tasks | 1 files |
@@ -100,6 +102,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-06T20:29:07Z
-Stopped at: Completed quick task 7 (Zzz label visibility fix)
+Last session: 2026-03-06T21:54:02Z
+Stopped at: Completed quick task 8 (arrival gate housing vacancy fix)
 Next: Phase 19 (Save/Load Integration) planning and execution
