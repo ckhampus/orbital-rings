@@ -1,5 +1,25 @@
 # Milestones
 
+## v1.2 Housing (Shipped: 2026-03-06)
+
+**Phases:** 6 | **Plans:** 8 | **Tasks:** 16
+**Lines of code:** 9,508 C# | **Timeline:** 2 days (2026-03-05 to 2026-03-06)
+**Git range:** `feat(14-01)` to `chore(19-01)` | **Requirements:** 17/17 satisfied
+
+**Delivered:** Give each citizen a home room they visibly return to — automatic assignment with fewest-occupants-first, periodic Zzz rest cycle, housing UI showing who lives where, and save/load persistence with backward compatibility.
+
+**Key accomplishments:**
+1. HousingConfig resource and HousingManager autoload singleton (8th autoload) with save schema v3
+2. Full assignment engine with fewest-occupants-first algorithm, reservoir sampling tiebreak, and size-scaled capacity
+3. Capacity ownership transferred from HappinessManager to HousingManager (single source of truth)
+4. Periodic home-return behavior (90-150s) with Zzz Label3D indicator, wish timer pausing, and wish priority
+5. Housing UI: info panel home label, room tooltips with resident names, population count/capacity display
+6. Save/load housing round-trip verified across all three code paths (normal, v2 backward compat, stale reference)
+
+**Archive:** `.planning/milestones/v1.2-ROADMAP.md` | `.planning/milestones/v1.2-REQUIREMENTS.md`
+
+---
+
 ## v1.1 Happiness v2 (Shipped: 2026-03-05)
 
 **Phases:** 4 | **Plans:** 7 | **Tasks:** 14
