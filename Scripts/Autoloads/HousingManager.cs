@@ -408,7 +408,6 @@ public partial class HousingManager : Node
     /// <summary>
     /// Scans all 24 segment indices for pre-placed housing rooms.
     /// Populates capacity and occupant tracking, then assigns existing unhoused citizens.
-    /// Same pattern as HappinessManager.InitializeHousingCapacity.
     /// </summary>
     private void InitializeExistingRooms()
     {
