@@ -1,16 +1,18 @@
 using Godot;
 using OrbitalRings.Autoloads;
+using OrbitalRings.Ring;
 
 namespace OrbitalRings.Camera;
 
 /// <summary>
 /// Orbital camera system providing smooth momentum orbit, bounded zoom,
-/// idle auto-orbit, and WASD/right-click-drag input around a central point.
+/// idle auto-orbit, and WASD/right-click-drag input along the walkway circle.
 ///
-/// Attach to a Node3D ("CameraRig") at world origin with a child Camera3D.
-/// The rig rotates on Y (orbit). The child Camera3D is positioned using
-/// spherical coordinates (tilt angle + distance) so it always looks at the
-/// origin from an elevated vantage point.
+/// Attach to a Node3D ("CameraRig") with a child Camera3D. The rig
+/// translates along the walkway centerline (radius 4.5) as the user orbits,
+/// so the viewpoint follows the ring path. The child Camera3D is positioned
+/// using spherical coordinates (tilt angle + distance) and always looks at
+/// the walkway point beneath it rather than the world origin.
 ///
 /// Does NOT extend SafeNode — the camera manages its own lifecycle as a
 /// scene-level node, not a signal consumer.
@@ -45,6 +47,14 @@ public partial class OrbitalCamera : Node3D
     [Export] public float TiltSmoothing { get; set; } = 8.0f;
 
     // -------------------------------------------------------------------------
+    // Constants
+    // -------------------------------------------------------------------------
+
+    /// <summary>Walkway centerline radius (midpoint of inner and outer row edges).</summary>
+    private static readonly float WalkwayCenterRadius =
+        (SegmentGrid.InnerRowOuter + SegmentGrid.OuterRowInner) / 2f;
+
+    // -------------------------------------------------------------------------
     // Private State
     // -------------------------------------------------------------------------
 
@@ -77,9 +87,8 @@ public partial class OrbitalCamera : Node3D
         _targetTiltDeg = TiltAngleDeg;
         _currentTiltDeg = TiltAngleDeg;
 
-        // Position camera using spherical coordinates and look at origin.
-        // The CameraRig sits at world origin; Camera3D is offset so it
-        // looks down at the pivot from the correct tilt angle and distance.
+        // Position rig on walkway circle and offset camera child to look
+        // down at the walkway point from the correct tilt angle and distance.
         UpdateCameraTransform();
     }
 
@@ -221,22 +230,30 @@ public partial class OrbitalCamera : Node3D
     }
 
     /// <summary>
-    /// Position the Camera3D using spherical coordinates so it looks down
-    /// at the CameraRig pivot (world origin) from the configured tilt angle
-    /// and current zoom distance.
+    /// Translate the rig to the walkway circle at the current orbit angle,
+    /// then position the Camera3D child using spherical coordinates so it
+    /// looks down at the walkway point from the configured tilt and zoom.
     ///
-    /// Y = zoom * sin(tilt) = height above ground
-    /// Z = zoom * cos(tilt) = horizontal distance from pivot
-    /// Then LookAt(origin) to point the camera correctly.
+    /// The rig's Y rotation drives the orbit angle. We compute a point on
+    /// the walkway centerline circle at that angle and move the rig there.
+    /// The Camera3D child is offset in the rig's local space (0, height, distance)
+    /// so it naturally orbits around the walkway point as the rig rotates.
     /// </summary>
     private void UpdateCameraTransform()
     {
+        // Move rig to walkway circle at current orbit angle
+        float orbitAngle = Rotation.Y;
+        float walkX = WalkwayCenterRadius * Mathf.Sin(orbitAngle);
+        float walkZ = WalkwayCenterRadius * Mathf.Cos(orbitAngle);
+        Position = new Vector3(walkX, 0, walkZ);
+
+        // Position camera child using spherical offset from walkway point
         float tiltRad = Mathf.DegToRad(_currentTiltDeg);
         float height = _currentZoom * Mathf.Sin(tiltRad);
         float distance = _currentZoom * Mathf.Cos(tiltRad);
 
         _camera.Position = new Vector3(0, height, distance);
-        _camera.LookAt(Vector3.Zero, Vector3.Up);
+        _camera.LookAt(GlobalPosition, Vector3.Up);
     }
 
     /// <summary>
