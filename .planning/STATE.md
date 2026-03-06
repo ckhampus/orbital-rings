@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Housing
 status: completed
-stopped_at: Completed 15-02-PLAN.md
-last_updated: "2026-03-06T10:09:49.184Z"
-last_activity: 2026-03-06 -- Phase 15-02 SaveManager housing persistence complete
+stopped_at: Completed 15-03-PLAN.md
+last_updated: "2026-03-06T10:40:50.820Z"
+last_activity: "2026-03-06 -- Phase 15-03 gap closure: stale home reference on load fixed"
 progress:
   total_phases: 6
   completed_phases: 2
-  total_plans: 3
-  completed_plans: 3
+  total_plans: 4
+  completed_plans: 4
   percent: 100
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 15 of 19 (HousingManager Core) -- second phase of v1.2
-Plan: 2 of 2 (complete)
-Status: Phase 15 complete, Phase 16 next
-Last activity: 2026-03-06 -- Phase 15-02 SaveManager housing persistence complete
+Plan: 3 of 3 (complete)
+Status: Phase 15 complete (including gap closure), Phase 16 next
+Last activity: 2026-03-06 -- Phase 15-03 gap closure: stale home reference on load fixed
 
 Progress: [██████████] 100%
 
@@ -59,6 +59,7 @@ v1.2 design decisions (from PRD and research):
 - [Phase 15-01]: Stored delegate references for clean event unsubscription
 - [Phase 15-01]: FindCitizenNode iterates Citizens list (O(n) acceptable for small counts)
 - [Phase 15-02]: HousingManager.StateLoaded set in ApplyState alongside other autoload flags (prevents double-initialization on load)
+- [Phase 15-03]: InitializeExistingRooms called at start of RestoreFromSave to populate capacities before ContainsKey check (fixes stale home reference on load)
 
 ### Pending Todos
 
@@ -80,9 +81,10 @@ None.
 | Phase 14 P01 | 2min | 2 tasks | 6 files |
 | Phase 15 P01 | 3min | 2 tasks | 3 files |
 | Phase 15 P02 | 1min | 1 tasks | 1 files |
+| Phase 15 P03 | 1min | 1 tasks | 1 files |
 
 ## Session Continuity
 
-Last session: 2026-03-06T10:04:52.841Z
-Stopped at: Completed 15-02-PLAN.md
+Last session: 2026-03-06T10:40:34.595Z
+Stopped at: Completed 15-03-PLAN.md
 Next: Phase 16 (Capacity Transfer from HappinessManager to HousingManager)
