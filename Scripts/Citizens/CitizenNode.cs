@@ -955,7 +955,8 @@ public partial class CitizenNode : Node3D
 
     /// <summary>
     /// Creates the "Zzz" Label3D indicator at the given world position.
-    /// Uses TopLevel=true so it stays visible when citizen node is hidden.
+    /// Added to parent node (not self) because CitizenNode.Visible is false during
+    /// rest -- Godot visibility propagates to children regardless of TopLevel.
     /// </summary>
     private void CreateZzzLabel(Vector3 worldPosition)
     {
@@ -972,10 +973,10 @@ public partial class CitizenNode : Node3D
             Shaded = false,
             DoubleSided = true,
             HorizontalAlignment = HorizontalAlignment.Center,
-            TopLevel = true, // Renders independently from parent visibility
+            TopLevel = true,
         };
         _zzzLabel.GlobalPosition = worldPosition;
-        AddChild(_zzzLabel);
+        GetParent().AddChild(_zzzLabel);
     }
 
     /// <summary>
