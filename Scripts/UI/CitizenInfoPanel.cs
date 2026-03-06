@@ -1,6 +1,9 @@
 using Godot;
+using OrbitalRings.Autoloads;
+using OrbitalRings.Build;
 using OrbitalRings.Citizens;
 using OrbitalRings.Data;
+using OrbitalRings.Ring;
 
 namespace OrbitalRings.UI;
 
@@ -16,6 +19,7 @@ namespace OrbitalRings.UI;
 public partial class CitizenInfoPanel : PanelContainer
 {
     private Label _nameLabel;
+    private Label _homeLabel;
     private Label _categoryLabel;
     private Label _wishLabel;
 
@@ -54,6 +58,15 @@ public partial class CitizenInfoPanel : PanelContainer
         _nameLabel.AddThemeFontSizeOverride("font_size", 16);
         vbox.AddChild(_nameLabel);
 
+        // Home label (shows room name + location, or "No home")
+        _homeLabel = new Label
+        {
+            MouseFilter = MouseFilterEnum.Ignore
+        };
+        _homeLabel.AddThemeColorOverride("font_color", new Color(0.68f, 0.66f, 0.62f));
+        _homeLabel.AddThemeFontSizeOverride("font_size", 12);
+        vbox.AddChild(_homeLabel);
+
         // Category label (small, colored by category -- hidden when no wish)
         _categoryLabel = new Label
         {
@@ -85,6 +98,27 @@ public partial class CitizenInfoPanel : PanelContainer
     public void ShowForCitizen(CitizenNode citizen, Vector2 screenPos)
     {
         _nameLabel.Text = citizen.Data.CitizenName;
+
+        // Update home label from HousingManager
+        var homeAnchor = HousingManager.Instance?.GetHomeForCitizen(citizen.Data.CitizenName);
+        if (homeAnchor != null)
+        {
+            var roomInfo = BuildManager.Instance?.GetPlacedRoom(homeAnchor.Value);
+            if (roomInfo != null)
+            {
+                var (homeRow, homePos) = SegmentGrid.FromIndex(roomInfo.Value.AnchorIndex);
+                string rowName = homeRow == SegmentRow.Outer ? "Outer" : "Inner";
+                _homeLabel.Text = $"{roomInfo.Value.Definition.RoomName} ({rowName} {homePos + 1})";
+            }
+            else
+            {
+                _homeLabel.Text = "No home";
+            }
+        }
+        else
+        {
+            _homeLabel.Text = "No home";
+        }
 
         // Display wish text from citizen's active wish (direct property access)
         var wish = citizen.CurrentWish;

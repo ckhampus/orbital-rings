@@ -257,8 +257,25 @@ public partial class SegmentInteraction : OrbitalRings.Core.SafeNode
             }
         }
 
-        // 9. Update tooltip with current segment label
+        // 9. Update tooltip with current segment label + room info
         string label = _ringVisual.Grid.GetLabel(row, segIndex);
+        int flatIdx = SegmentGrid.ToIndex(row, segIndex);
+
+        var roomInfo = OrbitalRings.Build.BuildManager.Instance?.GetPlacedRoom(flatIdx);
+        if (roomInfo != null)
+        {
+            label += $"\n{roomInfo.Value.Definition.RoomName}";
+
+            if (roomInfo.Value.Definition.Category == OrbitalRings.Data.RoomDefinition.RoomCategory.Housing)
+            {
+                var occupants = OrbitalRings.Autoloads.HousingManager.Instance?.GetOccupants(roomInfo.Value.AnchorIndex);
+                if (occupants != null && occupants.Count > 0)
+                {
+                    label += $"\nResidents: {string.Join(", ", occupants)}";
+                }
+            }
+        }
+
         _tooltip?.Show(label, _lastMousePos);
     }
 
