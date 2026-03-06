@@ -220,7 +220,6 @@ public partial class TitleScreen : Control
 
         // Reset StateLoaded flags so managers initialize with defaults
         CitizenManager.StateLoaded = false;
-        HappinessManager.StateLoaded = false;
         EconomyManager.StateLoaded = false;
 
         GetTree().ChangeSceneToFile(GameScenePath);

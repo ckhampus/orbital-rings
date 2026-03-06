@@ -23,7 +23,6 @@ public class SaveData
     public int Credits { get; set; }
     public float Happiness { get; set; }
     public int CrossedMilestoneCount { get; set; }
-    public int HousingCapacity { get; set; }
 
     // v2 fields (default to 0/0f when deserializing v1 saves)
     public int LifetimeHappiness { get; set; }
@@ -290,7 +289,6 @@ public partial class SaveManager : Node
             Credits = EconomyManager.Instance?.Credits ?? 0,
             Happiness = 0f, // v1 field: write 0 in v2 saves
             CrossedMilestoneCount = HappinessManager.Instance?.GetCrossedMilestoneCount() ?? 0,
-            HousingCapacity = HappinessManager.Instance?.GetHousingCapacity() ?? 5,
             LifetimeHappiness = HappinessManager.Instance?.LifetimeWishes ?? 0,
             Mood = HappinessManager.Instance?.Mood ?? 0f,
             MoodBaseline = HappinessManager.Instance?.MoodBaseline ?? 0f,
@@ -394,7 +392,6 @@ public partial class SaveManager : Node
     {
         // Set StateLoaded flags so _Ready() guards skip default initialization
         CitizenManager.StateLoaded = true;
-        HappinessManager.StateLoaded = true;
         EconomyManager.StateLoaded = true;
         HousingManager.StateLoaded = true;
 
@@ -409,8 +406,7 @@ public partial class SaveManager : Node
                 data.Mood,
                 data.MoodBaseline,
                 new HashSet<string>(data.UnlockedRooms),
-                data.CrossedMilestoneCount,
-                data.HousingCapacity);
+                data.CrossedMilestoneCount);
         }
         else
         {
@@ -420,8 +416,7 @@ public partial class SaveManager : Node
                 data.Happiness,
                 0f,
                 new HashSet<string>(data.UnlockedRooms),
-                data.CrossedMilestoneCount,
-                data.HousingCapacity);
+                data.CrossedMilestoneCount);
         }
 
         // Store for scene-dependent restoration after scene loads
