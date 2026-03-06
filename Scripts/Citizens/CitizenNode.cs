@@ -123,6 +123,14 @@ public partial class CitizenNode : Node3D
     private Tween _badgeTween;               // Badge pop animation (separate from visit tween)
     private int _visitTargetSegment = -1;    // Segment index of current visit target (for fulfillment check)
 
+    // ---- Home return fields ----
+    private bool _isAtHome;                  // true during home rest sequence
+    private bool _walkingToHome;             // true only during walk-to-home phase (for abort detection)
+    private Timer _homeTimer;                // periodic home return scheduling
+    private Label3D _zzzLabel;               // "Zzz" indicator above room during rest
+    private Tween _zzzBobTween;              // bob animation on Zzz label
+    private HousingConfig _housingConfig;    // timing constants
+
     // -------------------------------------------------------------------------
     // Properties
     // -------------------------------------------------------------------------
@@ -148,6 +156,9 @@ public partial class CitizenNode : Node3D
     /// HousingManager is the source of truth; this is a convenience cache.
     /// </summary>
     public int? HomeSegmentIndex { get; set; }
+
+    /// <summary>Whether this citizen is currently resting at home.</summary>
+    public bool IsAtHome => _isAtHome;
 
     // -------------------------------------------------------------------------
     // Save/Load helpers (internal -- used by CitizenManager.SpawnCitizenFromSave)
@@ -195,6 +206,10 @@ public partial class CitizenNode : Node3D
         // (Timer.Start() requires being inside the tree — can't call in Initialize())
         _visitTimer?.Start();
         _wishTimer?.Start();
+
+        // Start home timer only if citizen has a home
+        if (HomeSegmentIndex != null)
+            _homeTimer?.Start();
     }
 
     public override void _EnterTree()
@@ -208,7 +223,15 @@ public partial class CitizenNode : Node3D
         _activeTween?.Kill();
         _badgeTween?.Kill();
         _wishBadge?.QueueFree();
+        _zzzBobTween?.Kill();
+        _zzzLabel?.QueueFree();
+        _homeTimer?.Stop();
     }
+
+    // ---- Stored delegate references for clean event unsubscription ----
+    private System.Action<int> _onRoomDemolished;
+    private System.Action<string, int> _onCitizenAssignedHome;
+    private System.Action<string> _onCitizenUnhoused;
 
     /// <summary>
     /// Connect to signal sources. Called automatically in _EnterTree().
@@ -217,6 +240,17 @@ public partial class CitizenNode : Node3D
     {
         if (WishBoard.Instance != null)
             WishBoard.Instance.WishNudgeRequested += OnWishNudgeRequested;
+
+        if (GameEvents.Instance != null)
+        {
+            _onRoomDemolished = OnRoomDemolished;
+            _onCitizenAssignedHome = OnCitizenAssignedHome;
+            _onCitizenUnhoused = OnCitizenUnhoused;
+
+            GameEvents.Instance.RoomDemolished += _onRoomDemolished;
+            GameEvents.Instance.CitizenAssignedHome += _onCitizenAssignedHome;
+            GameEvents.Instance.CitizenUnhoused += _onCitizenUnhoused;
+        }
     }
 
     /// <summary>
@@ -227,6 +261,16 @@ public partial class CitizenNode : Node3D
     {
         if (WishBoard.Instance != null)
             WishBoard.Instance.WishNudgeRequested -= OnWishNudgeRequested;
+
+        if (GameEvents.Instance != null)
+        {
+            if (_onRoomDemolished != null)
+                GameEvents.Instance.RoomDemolished -= _onRoomDemolished;
+            if (_onCitizenAssignedHome != null)
+                GameEvents.Instance.CitizenAssignedHome -= _onCitizenAssignedHome;
+            if (_onCitizenUnhoused != null)
+                GameEvents.Instance.CitizenUnhoused -= _onCitizenUnhoused;
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -240,7 +284,8 @@ public partial class CitizenNode : Node3D
     /// <param name="data">Citizen identity and appearance data.</param>
     /// <param name="startAngle">Starting angular position in radians (0 to Tau).</param>
     /// <param name="grid">Ring segment grid for occupancy checks during room visits.</param>
-    public void Initialize(CitizenData data, float startAngle, SegmentGrid grid)
+    /// <param name="housingConfig">Optional housing timing config for home return behavior.</param>
+    public void Initialize(CitizenData data, float startAngle, SegmentGrid grid, HousingConfig housingConfig = null)
     {
         _data = data;
         _currentAngle = startAngle;
@@ -283,6 +328,22 @@ public partial class CitizenNode : Node3D
         AddChild(_wishTimer);
         // Timer.Start() deferred to _Ready() per established pattern
 
+        // Create home return timer (one-shot: re-armed in handler with fresh random interval)
+        if (housingConfig != null)
+        {
+            _housingConfig = housingConfig;
+            _homeTimer = new Timer
+            {
+                Name = "HomeTimer",
+                OneShot = true,
+                WaitTime = housingConfig.HomeTimerMin
+                    + GD.Randf() * (housingConfig.HomeTimerMax - housingConfig.HomeTimerMin)
+            };
+            _homeTimer.Timeout += OnHomeTimerTimeout;
+            AddChild(_homeTimer);
+            // Timer.Start() deferred to _Ready() — only starts if citizen has a home
+        }
+
         // Set initial position from angle
         UpdatePositionFromAngle();
     }
@@ -293,8 +354,8 @@ public partial class CitizenNode : Node3D
 
     public override void _Process(double delta)
     {
-        // Don't walk during room visits
-        if (_isVisiting) return;
+        // Don't walk during room visits or home rest
+        if (_isVisiting || _isAtHome) return;
 
         float dt = (float)delta;
 
@@ -358,8 +419,8 @@ public partial class CitizenNode : Node3D
     /// </summary>
     private void OnVisitTimerTimeout()
     {
-        // Don't start a new visit while already visiting
-        if (_isVisiting) return;
+        // Don't start a new visit while already visiting or resting at home
+        if (_isVisiting || _isAtHome) return;
 
         // No grid reference means no occupancy data (shouldn't happen, but guard)
         if (_grid == null) return;
@@ -665,12 +726,203 @@ public partial class CitizenNode : Node3D
         // Only respond to nudges for this citizen
         if (_data.CitizenName != citizenName) return;
 
-        // Don't nudge if currently visiting
-        if (_isVisiting) return;
+        // Don't nudge if currently visiting or resting at home
+        if (_isVisiting || _isAtHome) return;
 
         // Reset visit timer to short delay for responsive feedback
         _visitTimer.WaitTime = NudgeDelay;
         _visitTimer.Start();
+    }
+
+    // -------------------------------------------------------------------------
+    // Home return system
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Fired by _homeTimer. Checks guards and initiates home return if appropriate.
+    /// </summary>
+    private void OnHomeTimerTimeout()
+    {
+        if (_isVisiting || _isAtHome) return;
+        if (HomeSegmentIndex == null) return;
+        // BEHV-04: active wish takes priority
+        if (_currentWish != null)
+        {
+            RearmHomeTimer();
+            return;
+        }
+        StartHomeReturn();
+    }
+
+    /// <summary>
+    /// Re-arms the home timer with a fresh random interval.
+    /// </summary>
+    private void RearmHomeTimer()
+    {
+        if (_homeTimer == null || _housingConfig == null) return;
+        _homeTimer.WaitTime = _housingConfig.HomeTimerMin
+            + GD.Randf() * (_housingConfig.HomeTimerMax - _housingConfig.HomeTimerMin);
+        _homeTimer.Start();
+    }
+
+    /// <summary>
+    /// Starts the home timer when this citizen is assigned a home.
+    /// </summary>
+    private void OnCitizenAssignedHome(string citizenName, int segmentIndex)
+    {
+        if (citizenName != _data.CitizenName) return;
+        // Start home timer if not already running
+        if (_homeTimer != null && _homeTimer.IsStopped())
+            RearmHomeTimer();
+    }
+
+    /// <summary>
+    /// Stops the home timer and aborts home return when this citizen loses their home.
+    /// </summary>
+    private void OnCitizenUnhoused(string citizenName)
+    {
+        if (citizenName != _data.CitizenName) return;
+        _homeTimer?.Stop();
+        // If walking to home or resting, abort
+        if (_isAtHome || _walkingToHome)
+            AbortHomeReturn();
+    }
+
+    /// <summary>
+    /// Begins the full home return tween sequence: walk to home segment, drift,
+    /// fade out, rest with Zzz indicator, fade in, drift back.
+    /// Implemented in Task 2.
+    /// </summary>
+    private void StartHomeReturn()
+    {
+        // Full implementation added in Task 2
+    }
+
+    /// <summary>
+    /// Creates the "Zzz" Label3D indicator at the given world position.
+    /// Uses TopLevel=true so it stays visible when citizen node is hidden.
+    /// </summary>
+    private void CreateZzzLabel(Vector3 worldPosition)
+    {
+        _zzzLabel = new Label3D
+        {
+            Text = "Zzz",
+            Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
+            FontSize = 32,
+            OutlineSize = 4,
+            Modulate = new Color(0.6f, 0.55f, 0.9f, 0.0f),
+            OutlineModulate = new Color(0.3f, 0.25f, 0.5f, 0.0f),
+            PixelSize = 0.005f,
+            NoDepthTest = true,
+            Shaded = false,
+            DoubleSided = true,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            TopLevel = true, // Renders independently from parent visibility
+        };
+        _zzzLabel.GlobalPosition = worldPosition;
+        AddChild(_zzzLabel);
+    }
+
+    /// <summary>
+    /// Removes and nulls the Zzz label and its bob tween.
+    /// </summary>
+    private void RemoveZzzLabel()
+    {
+        if (_zzzLabel == null) return;
+        _zzzBobTween?.Kill();
+        _zzzBobTween = null;
+        _zzzLabel.QueueFree();
+        _zzzLabel = null;
+    }
+
+    /// <summary>
+    /// Starts a gentle infinite vertical bob animation on the Zzz label.
+    /// </summary>
+    private void StartZzzBob()
+    {
+        if (_zzzLabel == null) return;
+        _zzzBobTween?.Kill();
+        var baseY = _zzzLabel.GlobalPosition.Y;
+        _zzzBobTween = CreateTween();
+        _zzzBobTween.SetLoops();
+        _zzzBobTween.TweenProperty(_zzzLabel, "global_position:y", baseY + 0.03f, 1.5f)
+            .SetEase(Tween.EaseType.InOut)
+            .SetTrans(Tween.TransitionType.Sine);
+        _zzzBobTween.TweenProperty(_zzzLabel, "global_position:y", baseY, 1.5f)
+            .SetEase(Tween.EaseType.InOut)
+            .SetTrans(Tween.TransitionType.Sine);
+    }
+
+    /// <summary>
+    /// Aborts an in-progress home return: kills tween, restores visual state,
+    /// re-arms the home timer if still housed.
+    /// </summary>
+    private void AbortHomeReturn()
+    {
+        _activeTween?.Kill();
+        _activeTween = null;
+        _isAtHome = false;
+        _walkingToHome = false;
+
+        // Restore visual state
+        Visible = true;
+        SetMeshAlpha(1.0f);
+        SetMeshTransparencyMode(false);
+        RemoveZzzLabel();
+
+        // Restore wish badge visibility if citizen has a wish
+        if (_currentWish != null && _wishBadge != null)
+            _wishBadge.Visible = true;
+
+        // Resume wish timer if it was paused
+        if (_wishTimer != null && _wishTimer.IsStopped() && _currentWish == null)
+            _wishTimer.Start();
+
+        // Re-arm home timer (only if still housed)
+        if (HomeSegmentIndex != null)
+            RearmHomeTimer();
+    }
+
+    /// <summary>
+    /// Called when this citizen's home is demolished while resting inside.
+    /// Restores citizen to walkway immediately.
+    /// </summary>
+    private void EjectFromHome()
+    {
+        _activeTween?.Kill();
+        _activeTween = null;
+
+        // Resume wish timer
+        _wishTimer?.Start();
+
+        // Clean up Zzz
+        RemoveZzzLabel();
+
+        // Restore citizen visibility and state
+        Visible = true;
+        SetMeshAlpha(1.0f);
+        SetMeshTransparencyMode(false);
+        _isAtHome = false;
+        _walkingToHome = false;
+
+        // Restore wish badge if has active wish
+        if (_currentWish != null && _wishBadge != null)
+            _wishBadge.Visible = true;
+
+        // Don't re-arm home timer -- citizen is now unhoused
+        _homeTimer?.Stop();
+    }
+
+    /// <summary>
+    /// Handles RoomDemolished event. Ejects citizen if demolished room is their home.
+    /// </summary>
+    private void OnRoomDemolished(int segmentIndex)
+    {
+        // Only react if this is our home room
+        if (HomeSegmentIndex == null || HomeSegmentIndex.Value != segmentIndex) return;
+
+        if (_isAtHome || _walkingToHome)
+            EjectFromHome();
     }
 
     // -------------------------------------------------------------------------

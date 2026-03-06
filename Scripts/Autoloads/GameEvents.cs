@@ -243,4 +243,22 @@ public partial class GameEvents : Node
 
     public void EmitCitizenUnhoused(string citizenName)
         => CitizenUnhoused?.Invoke(citizenName);
+
+    // ---------------------------------------------------------------------------
+    // Home Visit Events (Phase 17)
+    // ---------------------------------------------------------------------------
+
+    /// <param name="citizenName">Display name of the citizen entering home.</param>
+    /// <param name="segmentIndex">Flat segment index of the home room.</param>
+    public event Action<string, int> CitizenEnteredHome;
+
+    /// <param name="citizenName">Display name of the citizen exiting home.</param>
+    /// <param name="segmentIndex">Flat segment index of the home room.</param>
+    public event Action<string, int> CitizenExitedHome;
+
+    public void EmitCitizenEnteredHome(string citizenName, int segmentIndex)
+        => CitizenEnteredHome?.Invoke(citizenName, segmentIndex);
+
+    public void EmitCitizenExitedHome(string citizenName, int segmentIndex)
+        => CitizenExitedHome?.Invoke(citizenName, segmentIndex);
 }
