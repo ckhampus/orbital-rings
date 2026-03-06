@@ -7,3 +7,7 @@ project. The patterns you establish will be copied. The corners
 you cut will be cut again.
 
 Fight entropy. Leave the codebase better than you found it.
+
+When working with Godot APIs, use Context7 to look up the official
+Godot docs before making assumptions about engine behavior or API
+signatures.
