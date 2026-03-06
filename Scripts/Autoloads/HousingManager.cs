@@ -172,6 +172,11 @@ public partial class HousingManager : Node
     /// </summary>
     public void RestoreFromSave(IReadOnlyList<(string citizenName, int? homeIndex)> assignments)
     {
+        // Populate capacity dictionary from already-restored BuildManager rooms.
+        // During save/load, neither _Ready().InitializeExistingRooms (skipped: StateLoaded=true)
+        // nor OnRoomPlaced events (not emitted by RestorePlacedRoom) populate this dictionary.
+        InitializeExistingRooms();
+
         _isRestoring = true;
 
         foreach (var (citizenName, homeIndex) in assignments)
