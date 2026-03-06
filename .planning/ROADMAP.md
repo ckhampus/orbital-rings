@@ -42,7 +42,7 @@
 - [x] **Phase 16: Capacity Transfer** - Single source of truth for housing capacity in HousingManager, removing stale ownership from HappinessManager (completed 2026-03-06)
 - [x] **Phase 17: Return-Home Behavior** - Citizens periodically walk home, rest with Zzz indicator, and resume their routines (completed 2026-03-06)
 - [x] **Phase 18: Housing UI** - Info panel, room tooltip, and population display show housing state to the player (completed 2026-03-06)
-- [ ] **Phase 19: Save/Load Integration** - Housing assignments persist across sessions with backward-compatible v3 save format
+- [x] **Phase 19: Save/Load Integration** - Housing assignments persist across sessions with backward-compatible v3 save format (completed 2026-03-06)
 
 ## Phase Details
 
@@ -119,7 +119,7 @@ Plans:
   1. After saving and reloading, every citizen retains their home room assignment and resumes the home-return cycle
   2. Loading a v2 save (pre-housing) results in all citizens starting as unhoused, then being assigned homes from scratch as if they just arrived
   3. If a saved assignment references a demolished room (stale data), the citizen is marked unhoused and reassigned automatically on load
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 Plans:
 - [ ] 19-01-PLAN.md — Audit and verify all three save/load code paths, fix gaps, commit verification
 
@@ -149,7 +149,7 @@ Note: Phases 16, 17, and 18 depend only on Phase 15 (not each other) but are seq
 | 16. Capacity Transfer | v1.2 | 1/1 | Complete | 2026-03-06 |
 | 17. Return-Home Behavior | v1.2 | 1/1 | Complete | 2026-03-06 |
 | 18. Housing UI | v1.2 | Complete    | 2026-03-06 | 2026-03-06 |
-| 19. Save/Load Integration | v1.2 | 0/1 | Not started | - |
+| 19. Save/Load Integration | 1/1 | Complete   | 2026-03-06 | - |
 
 ---
 *Roadmap created: 2026-03-02*
