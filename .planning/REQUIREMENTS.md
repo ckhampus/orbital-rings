@@ -9,11 +9,11 @@ Requirements for the Housing milestone. Each maps to roadmap phases.
 
 ### Home Assignment
 
-- [ ] **HOME-01**: Citizens are automatically assigned to a housing room on arrival (fewest-occupants-first)
-- [ ] **HOME-02**: Citizens are reassigned when their home room is demolished (or become unhoused)
-- [ ] **HOME-03**: Unhoused citizens are assigned when new housing rooms are built (oldest-first)
-- [ ] **HOME-04**: Housing capacity scales with room size (BaseCapacity + segments - 1)
-- [ ] **HOME-05**: Unhoused citizens function identically to housed ones (no penalty, no debuff)
+- [x] **HOME-01**: Citizens are automatically assigned to a housing room on arrival (fewest-occupants-first)
+- [x] **HOME-02**: Citizens are reassigned when their home room is demolished (or become unhoused)
+- [x] **HOME-03**: Unhoused citizens are assigned when new housing rooms are built (oldest-first)
+- [x] **HOME-04**: Housing capacity scales with room size (BaseCapacity + segments - 1)
+- [x] **HOME-05**: Unhoused citizens function identically to housed ones (no penalty, no debuff)
 
 ### Return-Home Behavior
 
@@ -71,11 +71,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| HOME-01 | Phase 15 | Pending |
-| HOME-02 | Phase 15 | Pending |
-| HOME-03 | Phase 15 | Pending |
-| HOME-04 | Phase 15 | Pending |
-| HOME-05 | Phase 15 | Pending |
+| HOME-01 | Phase 15 | Complete |
+| HOME-02 | Phase 15 | Complete |
+| HOME-03 | Phase 15 | Complete |
+| HOME-04 | Phase 15 | Complete |
+| HOME-05 | Phase 15 | Complete |
 | BEHV-01 | Phase 17 | Pending |
 | BEHV-02 | Phase 17 | Pending |
 | BEHV-03 | Phase 17 | Pending |
