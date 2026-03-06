@@ -41,7 +41,7 @@
 - [x] **Phase 15: HousingManager Core** - Assignment engine with even-spread algorithm, capacity tracking, and lifecycle events (UAT gap closure in progress) (completed 2026-03-06)
 - [x] **Phase 16: Capacity Transfer** - Single source of truth for housing capacity in HousingManager, removing stale ownership from HappinessManager (completed 2026-03-06)
 - [x] **Phase 17: Return-Home Behavior** - Citizens periodically walk home, rest with Zzz indicator, and resume their routines (completed 2026-03-06)
-- [ ] **Phase 18: Housing UI** - Info panel, room tooltip, and population display show housing state to the player
+- [x] **Phase 18: Housing UI** - Info panel, room tooltip, and population display show housing state to the player (completed 2026-03-06)
 - [ ] **Phase 19: Save/Load Integration** - Housing assignments persist across sessions with backward-compatible v3 save format
 
 ## Phase Details
@@ -107,9 +107,9 @@ Plans:
   1. Clicking a citizen shows their home room name and location in the info panel (or "No home" if unhoused)
   2. Hovering over a housing room tooltip shows the names of citizens currently assigned to that room
   3. The population display shows a "count/capacity" format (e.g., "5/7") so the player knows how much housing room remains
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 Plans:
-- [ ] 18-01-PLAN.md — Home label in CitizenInfoPanel, room-aware tooltip in SegmentInteraction, housed/capacity PopulationDisplay
+- [x] 18-01-PLAN.md — Home label in CitizenInfoPanel, room-aware tooltip in SegmentInteraction, housed/capacity PopulationDisplay
 
 ### Phase 19: Save/Load Integration
 **Goal**: Housing assignments survive save-quit-load cycles, old saves load cleanly, and stale assignments are corrected automatically
@@ -146,9 +146,9 @@ Note: Phases 16, 17, and 18 depend only on Phase 15 (not each other) but are seq
 | 15. HousingManager Core | v1.2 | 3/3 | Complete | 2026-03-06 |
 | 16. Capacity Transfer | v1.2 | 1/1 | Complete | 2026-03-06 |
 | 17. Return-Home Behavior | v1.2 | 1/1 | Complete | 2026-03-06 |
-| 18. Housing UI | v1.2 | 0/1 | Not started | - |
+| 18. Housing UI | v1.2 | 1/1 | Complete | 2026-03-06 |
 | 19. Save/Load Integration | v1.2 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-03-02*
-*Last updated: 2026-03-06 after Phase 18 planning*
+*Last updated: 2026-03-06 after Phase 18-01 complete*

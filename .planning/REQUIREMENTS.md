@@ -24,9 +24,9 @@ Requirements for the Housing milestone. Each maps to roadmap phases.
 
 ### UI & Feedback
 
-- [ ] **UI-01**: CitizenInfoPanel shows home room name and location (or "--" if unhoused)
-- [ ] **UI-02**: Housing room tooltip shows current resident names
-- [ ] **UI-03**: PopulationDisplay shows count/capacity format (e.g., "5/7")
+- [x] **UI-01**: CitizenInfoPanel shows home room name and location (or "--" if unhoused)
+- [x] **UI-02**: Housing room tooltip shows current resident names
+- [x] **UI-03**: PopulationDisplay shows count/capacity format (e.g., "5/7")
 
 ### Infrastructure
 
@@ -80,9 +80,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | BEHV-02 | Phase 17 | Complete |
 | BEHV-03 | Phase 17 | Complete |
 | BEHV-04 | Phase 17 | Complete |
-| UI-01 | Phase 18 | Pending |
-| UI-02 | Phase 18 | Pending |
-| UI-03 | Phase 18 | Pending |
+| UI-01 | Phase 18 | Complete |
+| UI-02 | Phase 18 | Complete |
+| UI-03 | Phase 18 | Complete |
 | INFR-01 | Phase 14, Phase 15 | Complete |
 | INFR-02 | Phase 14 | Complete |
 | INFR-03 | Phase 16 | Complete |

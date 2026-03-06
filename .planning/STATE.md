@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Housing
-status: completed
-stopped_at: Phase 18 context gathered
-last_updated: "2026-03-06T16:10:45.670Z"
-last_activity: "2026-03-06 -- Phase 17-01 return-home-behavior: periodic home return with Zzz indicator"
+status: in-progress
+stopped_at: Phase 18-01 complete
+last_updated: "2026-03-06T17:45:00.000Z"
+last_activity: "2026-03-06 -- Phase 18-01 housing-ui: home label, room tooltip, population display"
 progress:
   total_phases: 6
-  completed_phases: 4
-  total_plans: 6
-  completed_plans: 6
+  completed_phases: 5
+  total_plans: 7
+  completed_plans: 7
   percent: 100
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** The wish-driven building loop: citizens express wishes, the player builds rooms to fulfill them, happiness rises, new citizens arrive, new wishes emerge.
-**Current focus:** v1.2 Housing -- Phase 17 complete (Return Home Behavior)
+**Current focus:** v1.2 Housing -- Phase 18 complete (Housing UI)
 
 ## Current Position
 
-Phase: 17 of 19 (Return Home Behavior) -- fourth phase of v1.2
+Phase: 18 of 19 (Housing UI) -- fifth phase of v1.2
 Plan: 1 of 1 (complete)
-Status: Phase 17 complete
-Last activity: 2026-03-06 -- Phase 17-01 return-home-behavior: periodic home return with Zzz indicator
+Status: Phase 18 complete
+Last activity: 2026-03-06 -- Phase 18-01 housing-ui: home label, room tooltip, population display
 
 Progress: [██████████] 100%
 
@@ -66,6 +66,10 @@ v1.2 design decisions (from PRD and research):
 - [Phase 17-01]: Label3D with TopLevel=true for Zzz indicator (parent-independent visibility)
 - [Phase 17-01]: Separate nested tweens for Zzz fade in/out (concurrent with main sequence)
 - [Phase 17-01]: _walkingToHome flag scopes abort window to angular walk phase only
+- [Phase 18-01]: Home label format: "RoomName (Outer 3)" for housed, "No home" for unhoused
+- [Phase 18-01]: Room name tooltip for all room types; "Residents:" line only for Housing category
+- [Phase 18-01]: Population display shows citizen count when no housing capacity exists (avoids "0/0" on new games)
+- [Phase 18-01]: RestoreFromSave passes assignCitizens: false to prevent duplicate resident names
 
 ### Pending Todos
 
@@ -90,9 +94,10 @@ None.
 | Phase 15 P03 | 1min | 1 tasks | 1 files |
 | Phase 16 P01 | 4min | 2 tasks | 4 files |
 | Phase 17 P01 | 5min | 3 tasks | 3 files |
+| Phase 18 P01 | 13min | 3 tasks | 4 files |
 
 ## Session Continuity
 
-Last session: 2026-03-06T16:10:45.662Z
-Stopped at: Phase 18 context gathered
-Next: Visual testing of home return behavior in Godot editor
+Last session: 2026-03-06T17:45:00.000Z
+Stopped at: Completed 18-01-PLAN.md
+Next: Phase 19 (Save/Load Integration) planning and execution
