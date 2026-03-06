@@ -258,14 +258,22 @@ public partial class HappinessManager : Node
 
     /// <summary>
     /// Periodic check (~60s): roll a probability based on the current mood tier.
-    /// If successful and population is below housing capacity, spawn a citizen
-    /// with fade-in animation and floating arrival text.
+    /// If successful and there is room for a new citizen, spawn one with fade-in
+    /// animation and floating arrival text.
+    /// If population is below StarterCitizenCapacity (5), arrival is allowed
+    /// regardless of housing. Otherwise, arrival requires at least one unoccupied
+    /// housing bed (TotalHoused &lt; TotalCapacity).
     /// Quiet tier always gives 0.15 probability — no early-return guard needed.
     /// </summary>
     private void OnArrivalCheck()
     {
         int currentPop = CitizenManager.Instance?.CitizenCount ?? 0;
-        if (currentPop >= StarterCitizenCapacity + (HousingManager.Instance?.TotalCapacity ?? 0)) return;
+        int housingCapacity = HousingManager.Instance?.TotalCapacity ?? 0;
+        int housed = HousingManager.Instance?.TotalHoused ?? 0;
+        bool belowStarterCap = currentPop < StarterCitizenCapacity;
+        bool hasFreeBed = housingCapacity > 0 && housed < housingCapacity;
+
+        if (!belowStarterCap && !hasFreeBed) return;
 
         float chance = ArrivalProbabilityForTier(_lastReportedTier);
         if (GD.Randf() < chance)
