@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Housing
 status: in-progress
-stopped_at: Completed 15-01-PLAN.md
-last_updated: "2026-03-06T10:01:17.734Z"
-last_activity: 2026-03-06 -- Phase 15-01 HousingManager assignment engine complete
+stopped_at: Completed 15-02-PLAN.md
+last_updated: "2026-03-06T10:04:52.844Z"
+last_activity: 2026-03-06 -- Phase 15-02 SaveManager housing persistence complete
 progress:
   total_phases: 6
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 3
-  completed_plans: 2
-  percent: 67
+  completed_plans: 3
+  percent: 100
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** The wish-driven building loop: citizens express wishes, the player builds rooms to fulfill them, happiness rises, new citizens arrive, new wishes emerge.
-**Current focus:** v1.2 Housing -- Phase 15 (HousingManager Core)
+**Current focus:** v1.2 Housing -- Phase 15 complete, Phase 16 next (Capacity Transfer)
 
 ## Current Position
 
 Phase: 15 of 19 (HousingManager Core) -- second phase of v1.2
-Plan: 1 of 2 (complete)
-Status: Plan 15-01 complete, Plan 15-02 next
-Last activity: 2026-03-06 -- Phase 15-01 HousingManager assignment engine complete
+Plan: 2 of 2 (complete)
+Status: Phase 15 complete, Phase 16 next
+Last activity: 2026-03-06 -- Phase 15-02 SaveManager housing persistence complete
 
-Progress: [██████░░░░] 67%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -58,6 +58,7 @@ v1.2 design decisions (from PRD and research):
 - [Phase 15-01]: StateLoaded flag on HousingManager for save/load guard (mirrors HappinessManager)
 - [Phase 15-01]: Stored delegate references for clean event unsubscription
 - [Phase 15-01]: FindCitizenNode iterates Citizens list (O(n) acceptable for small counts)
+- [Phase 15-02]: HousingManager.StateLoaded set in ApplyState alongside other autoload flags (prevents double-initialization on load)
 
 ### Pending Todos
 
@@ -78,9 +79,10 @@ None.
 | 5 | Remove orphaned HappinessMultiplierCap from EconomyConfig | 2026-03-05 | b67d991 | [5-remove-the-orphaned-happinessmultiplierc](./quick/5-remove-the-orphaned-happinessmultiplierc/) |
 | Phase 14 P01 | 2min | 2 tasks | 6 files |
 | Phase 15 P01 | 3min | 2 tasks | 3 files |
+| Phase 15 P02 | 1min | 1 tasks | 1 files |
 
 ## Session Continuity
 
-Last session: 2026-03-06T10:01:17.731Z
-Stopped at: Completed 15-01-PLAN.md
-Next: Phase 15 Plan 02 (Save/Load Integration)
+Last session: 2026-03-06T10:04:52.841Z
+Stopped at: Completed 15-02-PLAN.md
+Next: Phase 16 (Capacity Transfer from HappinessManager to HousingManager)
