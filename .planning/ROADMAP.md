@@ -56,7 +56,7 @@
   3. SavedCitizen has a nullable HomeSegmentIndex field that serializes to null (not 0) when unset
 **Plans:** 1/1 plans complete
 Plans:
-- [ ] 14-01-PLAN.md — HousingConfig resource, HousingManager skeleton, housing events, save schema v3
+- [x] 14-01-PLAN.md — HousingConfig resource, HousingManager skeleton, housing events, save schema v3
 
 ### Phase 15: HousingManager Core
 **Goal**: Citizens are automatically assigned to housing rooms with even distribution, and reassigned or gracefully unhoused when rooms change
@@ -68,7 +68,10 @@ Plans:
   3. When a new housing room is built and unhoused citizens exist, the oldest-unhoused citizens are assigned first
   4. A 3-segment housing room holds more citizens than a 1-segment housing room (capacity = BaseCapacity + segments - 1)
   5. Unhoused citizens walk, visit rooms, and fulfill wishes identically to housed citizens
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 15-01-PLAN.md — BuildManager API extension, CitizenNode home property, full HousingManager assignment engine
+- [ ] 15-02-PLAN.md — SaveManager housing persistence and autosave event wiring
 
 ### Phase 16: Capacity Transfer
 **Goal**: HousingManager is the single source of truth for housing capacity, with HappinessManager's stale capacity fields fully removed
@@ -132,8 +135,8 @@ Note: Phases 16, 17, and 18 depend only on Phase 15 (not each other) but are seq
 | 11. Economy and Arrival Tier Integration | v1.1 | 3/3 | Complete | 2026-03-04 |
 | 12. Save Format | v1.1 | 1/1 | Complete | 2026-03-05 |
 | 13. HUD Replacement | v1.1 | 1/1 | Complete | 2026-03-05 |
-| 14. Housing Foundation | 1/1 | Complete    | 2026-03-06 | - |
-| 15. HousingManager Core | v1.2 | 0/TBD | Not started | - |
+| 14. Housing Foundation | v1.2 | 1/1 | Complete | 2026-03-06 |
+| 15. HousingManager Core | v1.2 | 0/2 | Not started | - |
 | 16. Capacity Transfer | v1.2 | 0/TBD | Not started | - |
 | 17. Return-Home Behavior | v1.2 | 0/TBD | Not started | - |
 | 18. Housing UI | v1.2 | 0/TBD | Not started | - |
@@ -141,4 +144,4 @@ Note: Phases 16, 17, and 18 depend only on Phase 15 (not each other) but are seq
 
 ---
 *Roadmap created: 2026-03-02*
-*Last updated: 2026-03-06 after Phase 14 planning*
+*Last updated: 2026-03-06 after Phase 15 planning*
