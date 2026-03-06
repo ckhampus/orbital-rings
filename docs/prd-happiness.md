@@ -1,4 +1,4 @@
-# Happiness System v2 — Design Spec
+# PRD: Happiness System
 
 **Status:** Draft
 **Date:** 2026-03-04
