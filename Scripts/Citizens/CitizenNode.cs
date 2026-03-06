@@ -142,6 +142,13 @@ public partial class CitizenNode : Node3D
     /// <summary>Current walking direction: +1.0 (CCW) or -1.0 (CW).</summary>
     public float Direction => _direction;
 
+    /// <summary>
+    /// Flat segment index of this citizen's home room. Null when unhoused.
+    /// Set by HousingManager on assignment/displacement.
+    /// HousingManager is the source of truth; this is a convenience cache.
+    /// </summary>
+    public int? HomeSegmentIndex { get; set; }
+
     // -------------------------------------------------------------------------
     // Save/Load helpers (internal -- used by CitizenManager.SpawnCitizenFromSave)
     // -------------------------------------------------------------------------

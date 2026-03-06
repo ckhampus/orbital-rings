@@ -243,11 +243,11 @@ public partial class BuildManager : Node
     /// Returns the placed room at the given flat index, or null.
     /// Checks all placed rooms since a multi-segment room's anchor may differ from the queried index.
     /// </summary>
-    public (RoomDefinition Definition, int AnchorIndex, int Cost)? GetPlacedRoom(int flatIndex)
+    public (RoomDefinition Definition, int AnchorIndex, int SegmentCount, int Cost)? GetPlacedRoom(int flatIndex)
     {
         // Direct anchor lookup
         if (_placedRooms.TryGetValue(flatIndex, out var directRoom))
-            return (directRoom.Definition, flatIndex, directRoom.Cost);
+            return (directRoom.Definition, flatIndex, directRoom.SegmentCount, directRoom.Cost);
 
         // Check if flatIndex falls within any multi-segment room's range
         var (queryRow, queryPos) = SegmentGrid.FromIndex(flatIndex);
@@ -259,7 +259,7 @@ public partial class BuildManager : Node
             {
                 int pos = SegmentGrid.WrapPosition(room.StartPos + i);
                 if (pos == queryPos)
-                    return (room.Definition, anchorIndex, room.Cost);
+                    return (room.Definition, anchorIndex, room.SegmentCount, room.Cost);
             }
         }
 
