@@ -175,7 +175,8 @@ public partial class HousingManager : Node
         // Populate capacity dictionary from already-restored BuildManager rooms.
         // During save/load, neither _Ready().InitializeExistingRooms (skipped: StateLoaded=true)
         // nor OnRoomPlaced events (not emitted by RestorePlacedRoom) populate this dictionary.
-        InitializeExistingRooms();
+        // Pass assignCitizens: false — the save data loop below handles assignments.
+        InitializeExistingRooms(assignCitizens: false);
 
         _isRestoring = true;
 
@@ -407,9 +408,13 @@ public partial class HousingManager : Node
 
     /// <summary>
     /// Scans all 24 segment indices for pre-placed housing rooms.
-    /// Populates capacity and occupant tracking, then assigns existing unhoused citizens.
+    /// Populates capacity and occupant tracking, then optionally assigns existing unhoused citizens.
     /// </summary>
-    private void InitializeExistingRooms()
+    /// <param name="assignCitizens">
+    /// When false, only populates room capacities without assigning citizens.
+    /// Used by RestoreFromSave which handles assignments from save data separately.
+    /// </param>
+    private void InitializeExistingRooms(bool assignCitizens = true)
     {
         if (BuildManager.Instance == null) return;
 
@@ -433,7 +438,7 @@ public partial class HousingManager : Node
         }
 
         // Attempt to assign any existing unhoused citizens to discovered rooms
-        if (_housingRoomCapacities.Count > 0)
+        if (assignCitizens && _housingRoomCapacities.Count > 0)
         {
             AssignAllUnhoused();
         }
