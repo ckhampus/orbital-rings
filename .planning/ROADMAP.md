@@ -97,17 +97,19 @@ Plans:
   4. If a citizen has an active wish to fulfill, they skip or defer their home return until the wish is handled
 **Plans:** 1/1 plans complete
 Plans:
-- [ ] 17-01-PLAN.md — Home timer, StartHomeReturn tween, Zzz Label3D indicator, priority/interruption handling, CitizenManager wiring
+- [x] 17-01-PLAN.md — Home timer, StartHomeReturn tween, Zzz Label3D indicator, priority/interruption handling, CitizenManager wiring
 
 ### Phase 18: Housing UI
 **Goal**: Players can see which citizen lives where, who occupies each housing room, and overall population vs capacity at a glance
 **Depends on**: Phase 15
 **Requirements**: UI-01, UI-02, UI-03
 **Success Criteria** (what must be TRUE):
-  1. Clicking a citizen shows their home room name and location in the info panel (or "--" if unhoused)
+  1. Clicking a citizen shows their home room name and location in the info panel (or "No home" if unhoused)
   2. Hovering over a housing room tooltip shows the names of citizens currently assigned to that room
   3. The population display shows a "count/capacity" format (e.g., "5/7") so the player knows how much housing room remains
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 18-01-PLAN.md — Home label in CitizenInfoPanel, room-aware tooltip in SegmentInteraction, housed/capacity PopulationDisplay
 
 ### Phase 19: Save/Load Integration
 **Goal**: Housing assignments survive save-quit-load cycles, old saves load cleanly, and stale assignments are corrected automatically
@@ -143,10 +145,10 @@ Note: Phases 16, 17, and 18 depend only on Phase 15 (not each other) but are seq
 | 14. Housing Foundation | v1.2 | 1/1 | Complete | 2026-03-06 |
 | 15. HousingManager Core | v1.2 | 3/3 | Complete | 2026-03-06 |
 | 16. Capacity Transfer | v1.2 | 1/1 | Complete | 2026-03-06 |
-| 17. Return-Home Behavior | 1/1 | Complete    | 2026-03-06 | - |
-| 18. Housing UI | v1.2 | 0/TBD | Not started | - |
+| 17. Return-Home Behavior | v1.2 | 1/1 | Complete | 2026-03-06 |
+| 18. Housing UI | v1.2 | 0/1 | Not started | - |
 | 19. Save/Load Integration | v1.2 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-03-02*
-*Last updated: 2026-03-06 after Phase 17 planning*
+*Last updated: 2026-03-06 after Phase 18 planning*
