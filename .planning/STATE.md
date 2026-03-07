@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Testing
 status: completed
-stopped_at: Completed 21-01-PLAN.md
-last_updated: "2026-03-07T12:49:07.982Z"
-last_activity: 2026-03-07 — Completed 21-01 Singleton Reset Infrastructure
+stopped_at: Completed 21-02-PLAN.md
+last_updated: "2026-03-07T12:54:04.108Z"
+last_activity: 2026-03-07 — Completed Phase 21 (Integration Test Infrastructure)
 progress:
   total_phases: 6
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 4
-  completed_plans: 3
-  percent: 75
+  completed_plans: 4
+  percent: 100
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-03-07)
 ## Current Position
 
 Phase: 21 of 25 (Integration Test Infrastructure)
-Plan: 1 of 2
-Status: Plan 01 complete, Plan 02 next
-Last activity: 2026-03-07 — Completed 21-01 Singleton Reset Infrastructure
+Plan: 2 of 2
+Status: Phase 21 complete
+Last activity: 2026-03-07 — Completed Phase 21 (Integration Test Infrastructure)
 
-Progress: [████████░░] 75%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -49,6 +49,8 @@ All v1.0, v1.1, and v1.2 decisions logged in PROJECT.md Key Decisions table with
 - [Phase 20]: Used Chickensoft.GoDotTest namespace (v2.0.30, not the old GoDotTest namespace from outdated README examples)
 - [Phase 21]: GameEvents has 34 event delegates (not 32); ClearAllSubscribers() covers all
 - [Phase 21]: Singleton Reset() pattern: clears mutable state + stops timers, preserves Instance/Config/caches
+- [Phase 21]: SingletonResetTests extends TestClass (not GameTestClass) to avoid auto-reset hiding reset infrastructure bugs
+- [Phase 21]: Verification tests use only public APIs to dirty/verify state -- validates actual public contract
 
 ### Pending Todos
 
@@ -74,6 +76,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-07T12:49:07.979Z
-Stopped at: Completed 21-01-PLAN.md
-Next: Continue Phase 21 with Plan 02 (TestHelper, GameTestClass, verification tests)
+Last session: 2026-03-07T12:54:04.100Z
+Stopped at: Completed 21-02-PLAN.md
+Next: Phase 21 complete. Proceed to next phase.
