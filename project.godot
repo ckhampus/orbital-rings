@@ -25,6 +25,7 @@ WishBoard="*res://Scripts/Autoloads/WishBoard.cs"
 HappinessManager="*res://Scripts/Autoloads/HappinessManager.cs"
 HousingManager="*res://Scripts/Autoloads/HousingManager.cs"
 SaveManager="*res://Scripts/Autoloads/SaveManager.cs"
+StationClock="*res://Scripts/Autoloads/StationClock.cs"
 
 [display]
 

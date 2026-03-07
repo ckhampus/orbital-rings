@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="ClockConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/Data/ClockConfig.cs" id="1"]
+
+[resource]
+script = ExtResource("1")
+TotalCycleDuration = 480.0
+MorningWeight = 1.0
+DayWeight = 1.0
+EveningWeight = 1.0
+NightWeight = 1.0

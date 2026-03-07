@@ -37,6 +37,7 @@ public static class TestHelper
         HappinessManager.Instance?.Reset();
         HousingManager.Instance?.Reset();
         SaveManager.Instance?.Reset();
+        StationClock.Instance?.Reset();
     }
 
     /// <summary>

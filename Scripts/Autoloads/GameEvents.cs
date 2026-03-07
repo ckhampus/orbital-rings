@@ -105,6 +105,9 @@ public partial class GameEvents : Node
         // Home Visit Events
         CitizenEnteredHome = null;
         CitizenExitedHome = null;
+
+        // Clock Events
+        PeriodChanged = null;
     }
 
     // ---------------------------------------------------------------------------
@@ -340,4 +343,16 @@ public partial class GameEvents : Node
 
     public void EmitCitizenExitedHome(string citizenName, int segmentIndex)
         => CitizenExitedHome?.Invoke(citizenName, segmentIndex);
+
+    // ---------------------------------------------------------------------------
+    // Clock Events (Phase 26)
+    // ---------------------------------------------------------------------------
+
+    /// <summary>Fired when the station clock crosses a period boundary.</summary>
+    /// <param name="newPeriod">The new station period.</param>
+    /// <param name="previousPeriod">The period before the change.</param>
+    public event Action<StationPeriod, StationPeriod> PeriodChanged;
+
+    public void EmitPeriodChanged(StationPeriod newPeriod, StationPeriod previousPeriod)
+        => PeriodChanged?.Invoke(newPeriod, previousPeriod);
 }
