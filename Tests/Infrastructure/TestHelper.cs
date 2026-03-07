@@ -38,4 +38,16 @@ public static class TestHelper
         HousingManager.Instance?.Reset();
         SaveManager.Instance?.Reset();
     }
+
+    /// <summary>
+    /// Re-subscribes all singletons to GameEvents after ClearAllSubscribers().
+    /// Called after ResetAllSingletons() to restore event chains for integration tests.
+    /// Harmless if singletons are null (headless test context) or events are unused.
+    /// </summary>
+    public static void ResubscribeAllSingletons()
+    {
+        HousingManager.Instance?.SubscribeToEvents();
+        HappinessManager.Instance?.SubscribeToEvents();
+        EconomyManager.Instance?.SubscribeToEvents();
+    }
 }

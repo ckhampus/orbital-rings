@@ -18,5 +18,6 @@ public class GameTestClass : TestClass
     public void ResetGameState()
     {
         TestHelper.ResetAllSingletons();
+        TestHelper.ResubscribeAllSingletons();
     }
 }
