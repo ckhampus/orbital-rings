@@ -1,896 +1,872 @@
 # Architecture Research
 
-**Domain:** Testing infrastructure for Godot 4 C# game with autoload singleton architecture
+**Domain:** Citizen AI integration (traits, utility scoring, day/night cycle, state machine) for Godot 4 C# cozy space station builder
 **Researched:** 2026-03-07
-**Confidence:** MEDIUM-HIGH (GoDotTest/GodotTestDriver APIs verified against NuGet and GitHub docs; singleton testing patterns derived from direct codebase analysis; some integration patterns inferred from framework design rather than verified production usage)
+**Confidence:** HIGH -- derived from direct codebase inspection of all 8 autoload singletons, CitizenNode behavior, event bus topology, and save format. Utility AI patterns verified against Game AI Pro references and established game development literature.
 
 ---
 
 ## Executive Summary
 
-Integrating GoDotTest + GodotTestDriver into Orbital Rings requires navigating a fundamental tension: the codebase relies on 8 autoload singletons accessed via static `Instance` properties, while testing best practices demand isolation between test runs. The architecture recommended here works with this reality rather than fighting it. The game's autoloads already initialize before scene nodes enter the tree, which means GoDotTest's test runner scene inherits a fully initialized singleton graph automatically. The key insight is to classify tests into three tiers -- pure C# tests (no engine), singleton-aware tests (engine + autoloads), and scene integration tests (engine + autoloads + scene tree) -- and structure the test project so each tier is distinct in both organization and setup complexity.
+The v1.4 milestone adds four interlocking systems -- StationClock, citizen traits, utility scoring, and a citizen state machine -- on top of 8 existing autoload singletons coordinated through a typed C# event bus. The architectural challenge is that CitizenNode currently owns three independent timers (visit, wish, home) with boolean guards (`_isVisiting`, `_isAtHome`) acting as a flat state machine. The v1.4 state machine must replace this implicit state with an explicit enum-driven state machine while preserving the proven tween-based animation sequences.
 
-The existing codebase has one major testability advantage: MoodSystem is already a POCO (plain C# object) with no Godot Node inheritance, proving the project already separates pure logic from engine lifecycle. The economy formulas in EconomyManager are also pure functions (CalculateTickIncome, CalculateRoomCost, CalculateDemolishRefund). The save data POCOs (SaveData, SavedRoom, SavedCitizen) are plain C# types serializable without engine context. These are the easiest wins for test coverage.
+The recommended architecture introduces one new autoload singleton (StationClock, bringing the total to 9), three new POCO/data types (CitizenTrait, ScheduleTemplate, UtilityScorer), one new scene node (StationLighting), and significant internal refactoring of CitizenNode. The key integration insight is that StationClock drives period transitions through GameEvents (a new `PeriodChanged` event), which CitizenNode's state machine consumes to trigger schedule evaluation. The utility scorer replaces the current proximity-only room selection with a weighted multi-factor decision that incorporates traits, recency, proximity, and wish bonuses.
 
-The harder challenge is testing systems that depend on singleton state: HousingManager's fewest-occupants-first algorithm reads from BuildManager.Instance, and HappinessManager's arrival gating reads from HousingManager.Instance. For these, the test approach is "bootstrap and reset" -- let autoloads initialize naturally via the test runner scene, then reset their internal state at the start of each test suite using existing public APIs (ClearAllRooms, ClearCitizens, ClearAssignments, RestoreCredits).
+Save format advances to v4 with two new fields on SavedCitizen (InterestTrait, RhythmTrait) and two new fields on SaveData (ClockElapsed, ClockPeriod). The existing version-gating pattern (v1/v2/v3) extends cleanly to v4 with null/default fallbacks for older saves.
 
 ---
 
 ## System Overview
 
-### Testing Architecture Layers
+### Current Architecture (v1.3)
 
 ```
 +---------------------------------------------------------------+
-|                     Test Runner Scene                          |
-|  (TestRunner.tscn + TestRunner.cs -- main scene for tests)    |
-+----------------------------+----------------------------------+
-|                            |                                  |
-|  Autoloads (project.godot) |  Test Scene (Node2D root)       |
-|  GameEvents                |  passed to TestClass constructor  |
-|  EconomyManager            |  tests add/remove child nodes    |
-|  BuildManager              |                                  |
-|  CitizenManager            |                                  |
-|  WishBoard                 |                                  |
-|  HappinessManager          |                                  |
-|  HousingManager            |                                  |
-|  SaveManager               |                                  |
-+----------------------------+----------------------------------+
-                    |
-    +---------------+---------------+
-    |               |               |
-  Tier 1          Tier 2          Tier 3
-  Pure C#         Singleton       Scene
-  Tests           Tests           Tests
-  (MoodSystem,    (Economy calc,  (Save round-
-  SaveData,       Housing assign, trip, wish
-  SegmentGrid)    Mood tiers)     fulfillment)
+|                     Autoload Singletons (8)                    |
+|                                                                |
+|  GameEvents ---- EconomyManager ---- BuildManager              |
+|       |               |                   |                    |
+|  WishBoard       HappinessManager    CitizenManager            |
+|       |               |                   |                    |
+|  SaveManager     HousingManager      (owns CitizenNodes)       |
++---------------------------------------------------------------+
+|                                                                |
+|  CitizenNode (per citizen)                                     |
+|  - _visitTimer (20-40s) --> OnVisitTimerTimeout --> StartVisit  |
+|  - _wishTimer (30-60s) --> OnWishTimerTimeout --> GenerateWish  |
+|  - _homeTimer (90-150s) --> OnHomeTimerTimeout --> StartHomeReturn |
+|  - _isVisiting / _isAtHome boolean guards                      |
+|  - Room selection: nearest occupied segment within 1.5 arcs    |
++---------------------------------------------------------------+
 ```
 
-### Test Execution Flow
+### Target Architecture (v1.4)
 
 ```
-Godot starts with --run-tests flag
-    |
-    v
-project.godot loads autoloads (1-8) -- all singletons initialize
-    |
-    v
-TestRunner.tscn is the main scene (or test entry detects --run-tests)
-    |
-    v
-TestRunner._Ready() calls GoTest.RunTests(Assembly, this)
-    |
-    v
-GoDotTest discovers all TestClass subclasses via reflection
-    |
-    v
-For each test class (sequential, NOT parallel):
-    [SetupAll] -> [Setup] -> [Test] -> [Cleanup] -> ... -> [CleanupAll]
-    |
-    v
-After all suites: exit with result code (--quit-on-finish)
++---------------------------------------------------------------+
+|                   Autoload Singletons (9)                      |
+|                                                                |
+|  GameEvents ---+--- EconomyManager --- BuildManager            |
+|       |        |         |                 |                   |
+|  WishBoard     |    HappinessManager  CitizenManager           |
+|       |        |         |                 |                   |
+|  SaveManager   |    HousingManager    (owns CitizenNodes)      |
+|                |                                               |
+|           StationClock  <-- NEW (9th singleton)                |
+|           (owns time, emits PeriodChanged)                     |
++---------------------------------------------------------------+
+|                                                                |
+|  Scene Layer                                                   |
+|  +------------------+     +---------------------------+        |
+|  | StationLighting  |     | CitizenNode (refactored)  |        |
+|  | (Node3D child    |     | - CitizenStateMachine     |        |
+|  |  of game scene)  |     | - UtilityScorer (POCO)    |        |
+|  | - DirectionalLight|    | - CitizenSchedule (POCO)  |        |
+|  | - env transitions|     | - CitizenTraits (data)    |        |
+|  +------------------+     +---------------------------+        |
+|                                                                |
+|  Data Layer                                                    |
+|  +---------------+  +----------------+  +-----------------+    |
+|  | CitizenData   |  | ScheduleConfig |  | StationClockConfig| |
+|  | + Interest    |  | (Resource)     |  | (Resource)       |  |
+|  | + Rhythm      |  | period weights |  | period durations |  |
+|  +---------------+  +----------------+  +-----------------+    |
++---------------------------------------------------------------+
 ```
+
+### Component Responsibilities
+
+| Component | Responsibility | Type | New/Modified |
+|-----------|----------------|------|--------------|
+| **StationClock** | Owns elapsed time, current period (Morning/Day/Evening/Night), emits PeriodChanged. Ticks in _Process. | Autoload singleton | NEW |
+| **StationClockConfig** | Inspector-tunable period durations, total day length | Godot Resource | NEW |
+| **StationLighting** | Responds to PeriodChanged, tweens DirectionalLight energy/color, env fog, room window emissives | Scene Node3D | NEW |
+| **CitizenData** | Extended with Interest and Rhythm trait enums | Godot Resource | MODIFIED |
+| **CitizenNode** | Refactored: explicit state machine replaces boolean guards, decision timer replaces visit+home timers | Scene Node3D | MODIFIED (major) |
+| **CitizenStateMachine** | Enum-driven state (Walking/Evaluating/Visiting/Resting), manages transitions, owns decision timer | POCO (inner class or separate) | NEW |
+| **UtilityScorer** | Scores each room for a given citizen: trait affinity + proximity + recency + wish bonus. Pure function. | POCO (static class) | NEW |
+| **CitizenSchedule** | Maps (period, rhythm) to activity probability weights (visit, rest, wander). Consults ScheduleConfig. | POCO | NEW |
+| **ScheduleConfig** | Resource defining per-period activity weights for each Rhythm type | Godot Resource | NEW |
+| **GameEvents** | Extended with PeriodChanged, CitizenStateChanged events | Autoload singleton | MODIFIED |
+| **SaveManager** | Extended for v4 format: clock state, citizen traits | Autoload singleton | MODIFIED |
+| **SaveData** | Extended with ClockElapsed, ClockPeriod fields | POCO | MODIFIED |
+| **SavedCitizen** | Extended with InterestTrait, RhythmTrait fields | POCO | MODIFIED |
+| **ClockHUD** | Sun/moon icon in HUD corner showing current period | UI Control | NEW |
+| **CitizenInfoPanel** | Extended to show trait icons | UI Control | MODIFIED |
 
 ---
 
 ## Recommended Project Structure
 
+### New Files
+
 ```
-Orbital Rings/
-+-- Scripts/                    # Production code (unchanged)
-|   +-- Autoloads/
-|   +-- Build/
-|   +-- Citizens/
-|   +-- Core/
-|   +-- Data/
-|   +-- Happiness/
-|   +-- Ring/
-|   +-- UI/
-|   +-- Audio/
-|   +-- Camera/
-|
-+-- test/                       # All test code lives here
-|   +-- TestRunner.cs           # GoDotTest entry point script
-|   +-- TestRunner.tscn         # Minimal Node2D scene for test execution
-|   +-- Helpers/
-|   |   +-- TestHelper.cs       # Singleton reset utilities
-|   |   +-- SaveDataBuilder.cs  # Builder for constructing test save data
-|   +-- Unit/                   # Tier 1: Pure C# tests (no engine deps)
-|   |   +-- MoodSystemTest.cs
-|   |   +-- SegmentGridTest.cs
-|   |   +-- SaveDataSerializationTest.cs
-|   |   +-- EconomyFormulaTest.cs
-|   |   +-- HousingCapacityTest.cs
-|   +-- Integration/            # Tier 2: Singleton-aware tests
-|   |   +-- EconomyManagerTest.cs
-|   |   +-- HousingManagerTest.cs
-|   |   +-- HappinessManagerTest.cs
-|   |   +-- MoodTierTransitionTest.cs
-|   +-- System/                 # Tier 3: Full scene/save tests
-|       +-- SaveLoadRoundTripTest.cs
-|       +-- WishFulfillmentTest.cs
-|
-+-- Scenes/                     # Production scenes (unchanged)
-+-- Resources/                  # Production resources (unchanged)
-+-- Orbital Rings.csproj        # Add test package references
-+-- project.godot               # No changes needed (autoloads stay)
+Scripts/
++-- Autoloads/
+|   +-- StationClock.cs              # NEW: 9th autoload singleton
++-- Clock/
+|   +-- StationLighting.cs           # NEW: day/night visual transitions
+|   +-- ClockHUD.cs                  # NEW: period indicator in HUD
++-- Citizens/
+|   +-- CitizenStateMachine.cs       # NEW: enum state machine for citizen behavior
+|   +-- UtilityScorer.cs             # NEW: room scoring pure functions
+|   +-- CitizenSchedule.cs           # NEW: period-weighted activity selection
+|   +-- CitizenNode.cs               # MODIFIED: integrate state machine
++-- Data/
+|   +-- CitizenData.cs               # MODIFIED: add Interest + Rhythm enums
+|   +-- StationClockConfig.cs        # NEW: period duration config
+|   +-- ScheduleConfig.cs            # NEW: activity weight tables
++-- UI/
+|   +-- CitizenInfoPanel.cs          # MODIFIED: show traits
 ```
 
 ### Structure Rationale
 
-- **test/ at project root:** Matches GoDotTest's recommended pattern and the project's existing folder convention. Not inside Scripts/ because test code is not game logic. The `.csproj` conditional exclusion (`<DefaultItemExcludes>` for ExportRelease) keeps test code out of release builds.
-- **Three subdirectories by tier, not by feature:** Tests grouped by execution characteristics (pure C#, needs singletons, needs scene tree) because setup/teardown complexity differs dramatically between tiers. A MoodSystem unit test needs zero setup; a save/load round-trip test needs rooms placed, citizens spawned, and housing assigned.
-- **Helpers/ directory:** Shared test utilities that are neither tests nor production code. TestHelper provides singleton reset methods. SaveDataBuilder provides a fluent API for constructing test save data with different format versions.
+- **Scripts/Clock/:** New folder for clock-related scene nodes. StationLighting is a visual node (not an autoload) because it manages DirectionalLight3D children that belong in the scene tree. ClockHUD is a UI node.
+- **Scripts/Citizens/:** UtilityScorer and CitizenSchedule live alongside CitizenNode because they are citizen-domain logic. CitizenStateMachine is tightly coupled to CitizenNode's lifecycle.
+- **Scripts/Data/:** Config resources follow the established pattern (HappinessConfig, EconomyConfig, HousingConfig) -- inspector-tunable, `new()` constructors for testability.
+- **StationClock as Autoload:** Must be an autoload because multiple consumers need it (CitizenNode via schedule evaluation, StationLighting via period transitions, ClockHUD via display, SaveManager via save/load). Autoload guarantees it initializes before all scene nodes.
 
 ---
 
 ## Architectural Patterns
 
-### Pattern 1: Test Runner Scene with Conditional Entry
+### Pattern 1: Enum State Machine Replacing Boolean Guards
 
-**What:** A single entry point that detects the `--run-tests` command line flag and either runs tests or loads the normal game. This avoids needing a separate Godot project or changing the main scene.
+**What:** CitizenNode currently uses `_isVisiting` and `_isAtHome` booleans with cascading guard checks in `_Process`, `OnVisitTimerTimeout`, and `OnHomeTimerTimeout`. This implicit state machine has 4 effective states but no single point of truth. Replace with an explicit `CitizenState` enum and a transition method that enforces valid transitions.
 
-**When to use:** Always. GoDotTest requires a scene node as the test root.
+**When to use:** When CitizenNode's behavior adds a new state dimension (Evaluating) and the boolean guards would require a third flag creating 8 theoretical combinations.
 
-**Trade-offs:** The main scene script gains a conditional check. This is a few lines of code and keeps the project as a single Godot project rather than requiring a separate test project.
-
-**Implementation:**
-
-The TestRunner scene is a minimal Node2D with a script that calls GoDotTest:
-
-```csharp
-// test/TestRunner.cs
-using System.Reflection;
-using Godot;
-using GoDotTest;
-
-public partial class TestRunner : Node2D
-{
-    public override async void _Ready()
-        => await GoTest.RunTests(Assembly.GetExecutingAssembly(), this);
-}
-```
-
-The game's existing main scene (TitleScreen) gains a test detection guard:
-
-```csharp
-// In Scripts/UI/TitleScreen.cs, at the top of _Ready():
-#if DEBUG
-var env = TestEnvironment.From(OS.GetCmdlineArgs());
-if (env.ShouldRunTests)
-{
-    GetTree().ChangeSceneToFile("res://test/TestRunner.tscn");
-    return;
-}
-#endif
-// ... normal title screen logic ...
-```
-
-This approach means the main scene in project.godot stays as TitleScreen.tscn. When `--run-tests` is passed, TitleScreen immediately redirects to the test runner scene. The `#if DEBUG` guard ensures zero overhead in release builds.
-
-**Alternative considered: Changing main scene to test runner.** Rejected because it would require changing project.godot for every test run and changing it back for playtesting. The conditional approach is simpler.
-
-### Pattern 2: Singleton Reset Between Test Suites
-
-**What:** A TestHelper class that resets all 8 singleton instances to a clean state before each test suite, using the public APIs the singletons already expose.
-
-**When to use:** For Tier 2 (singleton-aware) and Tier 3 (scene) tests. Not needed for Tier 1 (pure C#) tests.
-
-**Trade-offs:** Relies on singletons having adequate reset APIs. The codebase already has RestoreCredits, ClearAllRooms, ClearCitizens, RestoreFromSave, RestoreActiveWishes -- this is sufficient. Does not provide true isolation (singletons share process memory), but is practical for the scope of this project.
+**Trade-offs:** More code upfront, but eliminates the "what happens if _isVisiting AND _isAtHome are both true?" class of bugs. The existing tween-based animations remain unchanged -- only the entry/exit guards change.
 
 **Implementation:**
 
 ```csharp
-// test/Helpers/TestHelper.cs
-using OrbitalRings.Autoloads;
-using OrbitalRings.Data;
+public enum CitizenState
+{
+    Walking,      // Moving along walkway, can be interrupted
+    Evaluating,   // Running utility scoring, picking next action
+    Visiting,     // Tween sequence: walk to room, fade, wait, fade back
+    Resting       // Tween sequence: walk home, fade, sleep, fade back
+}
 
-namespace OrbitalRings.Tests.Helpers;
+// Inside CitizenNode:
+private CitizenState _state = CitizenState.Walking;
 
-public static class TestHelper
+public CitizenState State => _state;
+
+private bool TryTransition(CitizenState newState)
+{
+    // Valid transitions:
+    // Walking -> Evaluating (decision timer fires)
+    // Evaluating -> Walking (no good action found)
+    // Evaluating -> Visiting (room selected)
+    // Evaluating -> Resting (schedule says rest)
+    // Visiting -> Walking (visit complete)
+    // Resting -> Walking (rest complete)
+    bool valid = (_state, newState) switch
+    {
+        (CitizenState.Walking, CitizenState.Evaluating) => true,
+        (CitizenState.Evaluating, CitizenState.Walking) => true,
+        (CitizenState.Evaluating, CitizenState.Visiting) => true,
+        (CitizenState.Evaluating, CitizenState.Resting) => true,
+        (CitizenState.Visiting, CitizenState.Walking) => true,
+        (CitizenState.Resting, CitizenState.Walking) => true,
+        _ => false
+    };
+
+    if (!valid) return false;
+    _state = newState;
+    return true;
+}
+
+public override void _Process(double delta)
+{
+    if (_state != CitizenState.Walking) return;
+    // ... walking movement (unchanged) ...
+}
+```
+
+**Migration from current code:** The existing `_isVisiting` boolean becomes `_state == CitizenState.Visiting`. The existing `_isAtHome` becomes `_state == CitizenState.Resting`. The three separate timers (visit, wish, home) collapse into a single decision timer that fires periodically and transitions to Evaluating state.
+
+### Pattern 2: Decision Timer Replacing Three Timers
+
+**What:** Currently CitizenNode has three independent timers: `_visitTimer` (20-40s), `_homeTimer` (90-150s), and `_wishTimer` (30-60s). The visit and home timers both trigger room-selection behavior with different targets. Replace visit and home timers with a single `_decisionTimer` (15-30s) that transitions to Evaluating state, where the schedule and utility scorer determine whether to visit a room or go home. The wish timer remains separate because wish generation is orthogonal to movement decisions.
+
+**When to use:** When the number of possible actions grows beyond two (visit room, go home) to include period-aware behavior where the same timer should route to different actions based on schedule.
+
+**Trade-offs:** The decision timer fires more frequently than the old visit timer, but the Evaluating state is computationally cheap (score a handful of rooms + one rest check). The benefit is unified decision-making that naturally incorporates time-of-day, traits, and recency.
+
+**Implementation:**
+
+```csharp
+// Replace _visitTimer + _homeTimer with:
+private Timer _decisionTimer;
+
+private void OnDecisionTimerTimeout()
+{
+    if (_state != CitizenState.Walking) return;
+    TryTransition(CitizenState.Evaluating);
+    EvaluateNextAction();
+}
+
+private void EvaluateNextAction()
+{
+    var period = StationClock.Instance?.CurrentPeriod ?? StationPeriod.Day;
+    var schedule = CitizenSchedule.GetActivityWeights(period, _data.Rhythm);
+
+    // Roll weighted random: visit room vs rest vs continue walking
+    float roll = GD.Randf();
+    if (roll < schedule.RestWeight && HomeSegmentIndex != null)
+    {
+        TryTransition(CitizenState.Resting);
+        StartHomeReturn();  // existing tween sequence
+    }
+    else if (roll < schedule.RestWeight + schedule.VisitWeight)
+    {
+        int bestRoom = UtilityScorer.SelectRoom(this, _grid);
+        if (bestRoom >= 0)
+        {
+            TryTransition(CitizenState.Visiting);
+            StartVisit(bestRoom);  // existing tween sequence
+        }
+        else
+        {
+            TryTransition(CitizenState.Walking);  // nothing to visit
+        }
+    }
+    else
+    {
+        TryTransition(CitizenState.Walking);  // continue walking
+    }
+
+    // Re-arm decision timer
+    _decisionTimer.WaitTime = DecisionTimerMin
+        + GD.Randf() * (DecisionTimerMax - DecisionTimerMin);
+    _decisionTimer.Start();
+}
+```
+
+### Pattern 3: Pure Function Utility Scoring
+
+**What:** Room selection moves from "nearest occupied segment with wish-matching distance reduction" to a multi-factor utility score computed as a pure function. Each factor (trait affinity, proximity, recency, wish bonus) produces a normalized 0-1 score, then they are combined with weighted multiplication.
+
+**When to use:** Use utility scoring because it is the established pattern for cozy/simulation games where NPCs should exhibit preference-based behavior without hard rules. It naturally handles the "all else being equal, prefer variety" principle through recency decay.
+
+**Trade-offs:** More parameters to tune than the current distance-only approach. Mitigated by using a ScheduleConfig Godot Resource with Inspector-exposed weights.
+
+**Implementation:**
+
+```csharp
+// Scripts/Citizens/UtilityScorer.cs
+public static class UtilityScorer
 {
     /// <summary>
-    /// Resets all singletons to a clean initial state.
-    /// Call in [SetupAll] or [Setup] for tests that depend on singleton state.
+    /// Scores all occupied rooms for a citizen and returns the best
+    /// flat segment index, or -1 if no room scores above threshold.
     /// </summary>
-    public static void ResetAllSingletons()
+    public static int SelectRoom(CitizenNode citizen, SegmentGrid grid)
     {
-        // Reset economy to starting credits
-        EconomyManager.Instance?.RestoreCredits(
-            EconomyManager.Instance.Config?.StartingCredits ?? 750);
-        EconomyManager.Instance?.SetCitizenCount(0);
-        EconomyManager.Instance?.SetWorkingCitizenCount(0);
-        EconomyManager.Instance?.SetMoodTier(MoodTier.Quiet);
+        int bestSegment = -1;
+        float bestScore = 0f;
 
-        // Clear build state -- note: requires RingVisual which may not exist
-        // in test runner scene. BuildManager guards against null _ringVisual.
-        // For tests needing room placement, load the game scene instead.
-
-        // Reset happiness to zero
-        HappinessManager.Instance?.RestoreState(
-            0, 0f, 0f, new System.Collections.Generic.HashSet<string>
-            { "bunk_pod", "air_recycler", "workshop",
-              "reading_nook", "storage_bay", "garden_nook" }, 0);
-
-        // Clear citizens (safe even if none exist)
-        CitizenManager.Instance?.ClearCitizens();
-
-        // Clear housing
-        // HousingManager needs BuildManager rooms cleared first
-        // but HousingManager.RestoreFromSave with empty list effectively clears
-
-        // Clear wish board
-        WishBoard.Instance?.RestoreActiveWishes(
-            new System.Collections.Generic.Dictionary<string, string>());
-        WishBoard.Instance?.RestorePlacedRoomTypes(
-            new System.Collections.Generic.Dictionary<string, int>());
-
-        // Reset StateLoaded flags
-        CitizenManager.StateLoaded = false;
-        EconomyManager.StateLoaded = false;
-        HousingManager.StateLoaded = false;
-    }
-}
-```
-
-### Pattern 3: Three-Tier Test Classification
-
-**What:** Every test class is categorized by its dependency level, determining its setup requirements.
-
-**Tier 1 -- Pure C# (test/Unit/):**
-- Tests classes that have no Godot Node inheritance and no singleton dependencies
-- Examples: MoodSystem, SegmentGrid, SaveData serialization, economy formulas, HousingManager.ComputeCapacity
-- Setup: Construct the class directly. No scene tree needed.
-- These tests run fastest and are the most reliable.
-
-```csharp
-public class MoodSystemTest : TestClass
-{
-    public MoodSystemTest(Node testScene) : base(testScene) { }
-
-    [Test]
-    public void WishFulfilledIncreasesMood()
-    {
-        var config = new HappinessConfig();
-        var mood = new MoodSystem(config);
-
-        // Initial state: mood is 0, tier is Quiet
-        Assert.Equal(MoodTier.Quiet, mood.CurrentTier);
-
-        // Fulfill a wish
-        mood.OnWishFulfilled();
-
-        // Mood should increase by MoodGainPerWish (0.06)
-        Assert.True(mood.Mood > 0f);
-    }
-}
-```
-
-**Tier 2 -- Singleton-Aware (test/Integration/):**
-- Tests that read or mutate singleton state but do not require scene tree nodes beyond the test root
-- Examples: EconomyManager income calculation with citizen counts, HousingManager assignment with mock room data, HappinessManager tier transitions
-- Setup: Call TestHelper.ResetAllSingletons() in [SetupAll] or [Setup]. Manipulate singleton state via public APIs.
-
-```csharp
-public class EconomyManagerTest : TestClass
-{
-    public EconomyManagerTest(Node testScene) : base(testScene) { }
-
-    [SetupAll]
-    public void SetupAll()
-    {
-        TestHelper.ResetAllSingletons();
-    }
-
-    [Test]
-    public void IncomeIncludesBaseStationIncome()
-    {
-        EconomyManager.Instance.SetCitizenCount(0);
-        EconomyManager.Instance.SetMoodTier(MoodTier.Quiet);
-
-        int income = EconomyManager.Instance.CalculateTickIncome();
-
-        // Base station income is 1.0, Quiet multiplier is 1.0
-        // Round(1.0 * 1.0) = 1
-        Assert.Equal(1, income);
-    }
-}
-```
-
-**Tier 3 -- Scene Integration (test/System/):**
-- Tests that require scene nodes, frame advancement, or complex multi-singleton coordination
-- Examples: Save/load round-trip, wish fulfillment loop (citizen visits room, wish fulfilled, happiness increases)
-- Setup: May need to load game scene or construct scene fragments. Uses GodotTestDriver's Fixture for managed node lifecycle.
-
-```csharp
-public class SaveLoadRoundTripTest : TestClass
-{
-    public SaveLoadRoundTripTest(Node testScene) : base(testScene) { }
-
-    [SetupAll]
-    public void SetupAll()
-    {
-        TestHelper.ResetAllSingletons();
-    }
-
-    [Test]
-    public void SaveDataSerializesAndDeserializesCorrectly()
-    {
-        var original = SaveDataBuilder.CreateV3()
-            .WithCredits(500)
-            .WithLifetimeHappiness(10)
-            .WithMood(0.45f)
-            .WithRoom("bunk_pod", row: 0, startPos: 0, segments: 2, cost: 140)
-            .WithCitizen("Nova", bodyType: 0, homeSegment: 0)
-            .WithCitizen("Pixel", bodyType: 1, homeSegment: null)
-            .Build();
-
-        string json = System.Text.Json.JsonSerializer.Serialize(original);
-        var loaded = System.Text.Json.JsonSerializer.Deserialize<SaveData>(json);
-
-        Assert.Equal(3, loaded.Version);
-        Assert.Equal(500, loaded.Credits);
-        Assert.Equal(10, loaded.LifetimeHappiness);
-        Assert.Equal(2, loaded.Citizens.Count);
-        Assert.Equal(0, loaded.Citizens[0].HomeSegmentIndex);
-        Assert.Null(loaded.Citizens[1].HomeSegmentIndex);
-    }
-}
-```
-
-### Pattern 4: SaveDataBuilder for Test Fixtures
-
-**What:** A fluent builder for constructing SaveData objects with different format versions and configurations. Eliminates repetitive POCO construction across test classes.
-
-**When to use:** Any test involving save/load data, format version compatibility, or game state restoration.
-
-```csharp
-// test/Helpers/SaveDataBuilder.cs
-using System.Collections.Generic;
-using OrbitalRings.Autoloads;
-
-namespace OrbitalRings.Tests.Helpers;
-
-public class SaveDataBuilder
-{
-    private readonly SaveData _data;
-
-    private SaveDataBuilder(int version)
-    {
-        _data = new SaveData { Version = version };
-    }
-
-    public static SaveDataBuilder CreateV1() => new(1);
-    public static SaveDataBuilder CreateV2() => new(2);
-    public static SaveDataBuilder CreateV3() => new(3);
-
-    public SaveDataBuilder WithCredits(int credits)
-    {
-        _data.Credits = credits;
-        return this;
-    }
-
-    public SaveDataBuilder WithLifetimeHappiness(int lh)
-    {
-        _data.LifetimeHappiness = lh;
-        return this;
-    }
-
-    public SaveDataBuilder WithMood(float mood)
-    {
-        _data.Mood = mood;
-        return this;
-    }
-
-    public SaveDataBuilder WithMoodBaseline(float baseline)
-    {
-        _data.MoodBaseline = baseline;
-        return this;
-    }
-
-    public SaveDataBuilder WithRoom(string roomId, int row, int startPos,
-        int segments, int cost)
-    {
-        _data.PlacedRooms.Add(new SavedRoom
+        for (int i = 0; i < SegmentGrid.TotalSegments; i++)
         {
-            RoomId = roomId,
-            Row = row,
-            StartPos = startPos,
-            SegmentCount = segments,
-            Cost = cost
-        });
-        return this;
-    }
+            var (row, pos) = SegmentGrid.FromIndex(i);
+            if (!grid.IsOccupied(row, pos)) continue;
 
-    public SaveDataBuilder WithCitizen(string name, int bodyType = 0,
-        int? homeSegment = null, string wishId = null)
-    {
-        _data.Citizens.Add(new SavedCitizen
-        {
-            Name = name,
-            BodyType = bodyType,
-            PrimaryR = 0.9f, PrimaryG = 0.6f, PrimaryB = 0.5f,
-            SecondaryR = 0.6f, SecondaryG = 0.85f, SecondaryB = 0.7f,
-            WalkwayAngle = 0f,
-            Direction = 1f,
-            CurrentWishId = wishId,
-            HomeSegmentIndex = homeSegment
-        });
-        return this;
-    }
+            // Skip home room (resting is handled separately)
+            if (citizen.HomeSegmentIndex == i) continue;
 
-    public SaveDataBuilder WithUnlockedRoom(string roomId)
-    {
-        _data.UnlockedRooms.Add(roomId);
-        return this;
-    }
-
-    public SaveDataBuilder WithActiveWish(string citizenName, string wishId)
-    {
-        _data.ActiveWishes[citizenName] = wishId;
-        return this;
-    }
-
-    public SaveData Build() => _data;
-}
-```
-
-### Pattern 5: Assertions Without External Framework
-
-**What:** GoDotTest does not include an assertion library. Use a lightweight custom Assert class or adopt Shouldly/FluentAssertions via NuGet.
-
-**Trade-offs:**
-- Custom Assert: Zero dependencies, minimal API, easy to understand. Sufficient for the scope of this project.
-- Shouldly: Richer assertion messages, widely used in .NET. Adds a NuGet dependency.
-
-**Recommendation:** Start with a minimal custom Assert class. Add Shouldly later if assertion messages become a pain point.
-
-```csharp
-// test/Helpers/Assert.cs
-using System;
-
-namespace OrbitalRings.Tests.Helpers;
-
-public static class Assert
-{
-    public static void Equal<T>(T expected, T actual, string message = null)
-    {
-        if (!Equals(expected, actual))
-            throw new Exception(
-                message ?? $"Expected {expected} but got {actual}");
-    }
-
-    public static void True(bool condition, string message = null)
-    {
-        if (!condition)
-            throw new Exception(message ?? "Expected true but got false");
-    }
-
-    public static void False(bool condition, string message = null)
-    {
-        if (condition)
-            throw new Exception(message ?? "Expected false but got true");
-    }
-
-    public static void Null(object value, string message = null)
-    {
-        if (value != null)
-            throw new Exception(message ?? $"Expected null but got {value}");
-    }
-
-    public static void NotNull(object value, string message = null)
-    {
-        if (value == null)
-            throw new Exception(message ?? "Expected non-null but got null");
-    }
-
-    public static void ApproxEqual(float expected, float actual,
-        float tolerance = 0.001f, string message = null)
-    {
-        if (MathF.Abs(expected - actual) > tolerance)
-            throw new Exception(
-                message ?? $"Expected ~{expected} but got {actual} " +
-                           $"(tolerance {tolerance})");
-    }
-
-    public static void Throws<TException>(Action action, string message = null)
-        where TException : Exception
-    {
-        try
-        {
-            action();
-            throw new Exception(
-                message ?? $"Expected {typeof(TException).Name} but no exception was thrown");
+            float score = ScoreRoom(citizen, i);
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestSegment = i;
+            }
         }
-        catch (TException) { /* expected */ }
+
+        return bestScore > MinScoreThreshold ? bestSegment : -1;
+    }
+
+    private static float ScoreRoom(CitizenNode citizen, int flatIndex)
+    {
+        var placedRoom = BuildManager.Instance?.GetPlacedRoom(flatIndex);
+        if (placedRoom == null) return 0f;
+
+        float proximity = ScoreProximity(citizen.CurrentAngle, flatIndex);
+        float affinity = ScoreTraitAffinity(
+            citizen.Data.Interest, placedRoom.Value.Definition.Category);
+        float recency = ScoreRecency(citizen, flatIndex);
+        float wishBonus = ScoreWishMatch(citizen, placedRoom.Value.Definition);
+
+        // Weighted product: each factor is 0-1, weights control influence
+        return (proximity * ProximityWeight)
+             + (affinity * AffinityWeight)
+             + (recency * RecencyWeight)
+             + (wishBonus * WishWeight);
+    }
+}
+```
+
+**Key design decisions for scoring factors:**
+
+| Factor | Input | Curve | Weight | Rationale |
+|--------|-------|-------|--------|-----------|
+| **Proximity** | Angular distance from citizen to room | Linear falloff, 1.0 at distance=0, 0.0 at max range | 0.3 | Citizens should prefer nearby rooms but not exclusively |
+| **Trait affinity** | Citizen's Interest enum vs room's Category enum | Binary: 1.0 if match, 0.3 if no match (not zero -- citizens still visit non-preferred rooms) | 0.3 | Traits bias behavior, not dictate it |
+| **Recency** | Time since last visit to this room | Exponential growth from 0 to 1 as recency increases (haven't visited recently = higher score) | 0.2 | Prevents repetitive visits to the same room |
+| **Wish bonus** | Active wish matches room type | Binary: 1.0 if match, 0.0 if not | 0.2 | Preserves existing wish-nudge behavior |
+
+### Pattern 4: StationClock as Time Authority
+
+**What:** A single autoload singleton that owns the station's elapsed time and current period. Advances time in `_Process`, emits `PeriodChanged` through GameEvents when the period transitions. All other systems query StationClock.Instance.CurrentPeriod rather than tracking time independently.
+
+**When to use:** Always. A single time authority prevents drift between systems (lighting thinks it's Night but citizens think it's Day).
+
+**Trade-offs:** One more autoload singleton (9 total). The alternative -- making clock a scene node -- would require lazy discovery like RingVisual, which is fragile (proven by the existing `_grid == null` workaround in CitizenManager._Process).
+
+**Implementation:**
+
+```csharp
+public enum StationPeriod { Morning, Day, Evening, Night }
+
+public partial class StationClock : Node
+{
+    public static StationClock Instance { get; private set; }
+
+    [Export] public StationClockConfig Config { get; set; }
+
+    private float _elapsed;
+    private StationPeriod _currentPeriod = StationPeriod.Morning;
+
+    public float Elapsed => _elapsed;
+    public StationPeriod CurrentPeriod => _currentPeriod;
+
+    /// <summary>
+    /// Returns normalized progress within the current period (0.0 to 1.0).
+    /// Used by StationLighting for smooth interpolation within a period.
+    /// </summary>
+    public float PeriodProgress => CalculatePeriodProgress();
+
+    public override void _EnterTree() => Instance = this;
+
+    public override void _Process(double delta)
+    {
+        _elapsed += (float)delta;
+        float totalDay = Config.TotalDayLength;
+
+        // Wrap elapsed time to day cycle
+        if (_elapsed >= totalDay)
+            _elapsed -= totalDay;
+
+        // Determine period from elapsed time
+        var newPeriod = CalculatePeriod(_elapsed);
+        if (newPeriod != _currentPeriod)
+        {
+            var previous = _currentPeriod;
+            _currentPeriod = newPeriod;
+            GameEvents.Instance?.EmitPeriodChanged(newPeriod, previous);
+        }
+    }
+
+    // Save/load API
+    public void RestoreState(float elapsed)
+    {
+        _elapsed = elapsed;
+        _currentPeriod = CalculatePeriod(_elapsed);
     }
 }
 ```
 
 ---
 
-## Component Responsibilities
+## Data Flow
 
-| Component | Responsibility | Typical Implementation |
-|-----------|----------------|------------------------|
-| **TestRunner.cs** | Entry point for GoDotTest. Detects `--run-tests` flag and kicks off test discovery and execution. | Node2D script calling `GoTest.RunTests()` in `_Ready()` |
-| **TestRunner.tscn** | Minimal scene providing a root node for GoDotTest. No visual nodes needed. | Single Node2D with TestRunner.cs attached |
-| **TestHelper.cs** | Resets all 8 singletons to clean state between test suites. Provides shorthand for common test setup operations. | Static methods calling existing singleton public APIs (RestoreCredits, ClearCitizens, etc.) |
-| **SaveDataBuilder.cs** | Fluent builder for constructing SaveData with specific versions and game state configurations. | Builder pattern with version-specific factory methods (CreateV1/V2/V3) |
-| **Assert.cs** | Lightweight assertion library throwing descriptive exceptions on failure. | Static methods: Equal, True, False, Null, NotNull, ApproxEqual, Throws |
-| **Unit tests (test/Unit/)** | Test pure C# classes with no engine dependencies. Fast, reliable, no setup. | Directly construct POCOs and call methods |
-| **Integration tests (test/Integration/)** | Test singleton behavior with controlled state. Reset before each suite. | Call TestHelper.ResetAllSingletons() in [SetupAll], manipulate via public APIs |
-| **System tests (test/System/)** | Test multi-system flows including serialization round-trips. | Construct SaveData, serialize/deserialize, verify field preservation |
+### Clock-Driven Decision Flow
+
+```
+StationClock._Process(delta)
+    |
+    | (every frame: advance _elapsed, check period boundary)
+    |
+    v
+[Period boundary crossed?] --NO--> done
+    |
+    YES
+    |
+    v
+GameEvents.EmitPeriodChanged(newPeriod, previousPeriod)
+    |
+    +---> StationLighting.OnPeriodChanged
+    |     (tween light energy, color, fog, window emissives)
+    |
+    +---> ClockHUD.OnPeriodChanged
+    |     (update sun/moon icon)
+    |
+    +---> SaveManager.OnAnyStateChanged
+          (debounced autosave)
+```
+
+### Citizen Decision Flow (per citizen, on decision timer timeout)
+
+```
+DecisionTimer fires
+    |
+    v
+[State == Walking?] --NO--> re-arm timer, done
+    |
+    YES
+    |
+    v
+Transition to Evaluating
+    |
+    v
+Query StationClock.CurrentPeriod
+    |
+    v
+CitizenSchedule.GetActivityWeights(period, citizen.Rhythm)
+    |
+    v
+Returns: { VisitWeight, RestWeight, WanderWeight }
+    |
+    v
+Weighted random roll
+    |
+    +--[Rest]--> [Has home?] --YES--> Transition to Resting
+    |                          |       StartHomeReturn()
+    |                          NO
+    |                          |
+    |                          v
+    |                       Fall through to Visit
+    |
+    +--[Visit]--> UtilityScorer.SelectRoom(citizen, grid)
+    |             |
+    |             v
+    |          [bestRoom >= 0?] --YES--> Transition to Visiting
+    |                                    StartVisit(bestRoom)
+    |             |
+    |             NO
+    |             |
+    |             v
+    |          Transition to Walking (nothing to visit)
+    |
+    +--[Wander]--> Transition to Walking (continue walking)
+
+    v
+Re-arm decision timer with fresh random interval
+```
+
+### Save/Load Data Flow (v4 additions)
+
+```
+SaveManager.CollectGameState()
+    |
+    v
+SaveData v4:
+    - (existing v3 fields unchanged)
+    + ClockElapsed: float (StationClock.Instance.Elapsed)
+    + ClockPeriod: int (cast of StationPeriod enum)
+
+SavedCitizen v4:
+    - (existing v3 fields unchanged)
+    + InterestTrait: int? (nullable for v3 backward compat)
+    + RhythmTrait: int? (nullable for v3 backward compat)
+
+    v
+SaveManager.ApplyState(data)
+    |
+    v
+[Version >= 4?]
+    YES: StationClock.RestoreState(data.ClockElapsed)
+    NO:  StationClock starts at Morning (fresh cycle)
+
+    v
+SaveManager.ApplySceneState(data)
+    |
+    v
+SpawnCitizenFromSave() extended:
+    - If SavedCitizen.InterestTrait != null: set from save
+    - If SavedCitizen.InterestTrait == null: assign random (v3 compat)
+```
 
 ---
 
-## Integration Points with Existing Autoloads
+## Integration Points with Existing Singletons
 
-### How Autoloads Behave During Test Runs
+### GameEvents Extensions (new events)
 
-When Godot starts with `--run-tests`, the engine loads autoloads from project.godot BEFORE any scene enters the tree. This means:
+| Event | Signature | Emitter | Consumers |
+|-------|-----------|---------|-----------|
+| `PeriodChanged` | `Action<StationPeriod, StationPeriod>` (new, previous) | StationClock | StationLighting, ClockHUD, SaveManager |
+| `CitizenStateChanged` | `Action<string, CitizenState>` (name, newState) | CitizenNode | CitizenInfoPanel (optional, for debug/tooltip) |
 
-1. **GameEvents.Instance** is set in `_EnterTree()` -- available immediately
-2. **EconomyManager.Instance** is set in `_Ready()` -- creates Timer, loads EconomyConfig, subscribes to events
-3. **BuildManager.Instance** is set in `_Ready()` -- tries to find RingVisual (will be null in test scene), loads RoomDefinitions
-4. **CitizenManager.Instance** is set in `_Ready()` -- tries to find RingVisual (null), spawns 5 starter citizens (attaching to self as parent)
-5. **WishBoard.Instance** is set in `_Ready()` -- loads WishTemplates from Resources/Wishes/
-6. **HappinessManager.Instance** is set in `_Ready()` -- creates Timer, loads HappinessConfig, creates MoodSystem
-7. **HousingManager.Instance** is set in `_EnterTree()` -- subscribes to events
-8. **SaveManager.Instance** is set in `_Ready()` -- creates debounce Timer, subscribes to all state-change events
+These follow the existing event pattern: typed C# delegates with `Emit*` helper methods and null-safe `?.Invoke()`.
 
-**Critical implication:** By the time TestRunner._Ready() fires, all 8 singletons are initialized with their default state. CitizenManager has already spawned 5 starter citizens (because StateLoaded is false). EconomyManager has 750 starting credits. HappinessManager is at Quiet tier. This is the "warm start" state that TestHelper.ResetAllSingletons() must clean up.
+### Singleton Interaction Map
 
-### Singleton Testability Matrix
+| From | To | Integration Point | Change Type |
+|------|-----|-------------------|-------------|
+| **StationClock** | GameEvents | Emits PeriodChanged | New event |
+| **StationClock** | SaveManager | Provides Elapsed/Period for save | New save fields |
+| **CitizenNode** | StationClock | Reads CurrentPeriod in EvaluateNextAction | New read dependency |
+| **CitizenNode** | BuildManager | Reads GetPlacedRoom in UtilityScorer (existing) | Unchanged |
+| **CitizenNode** | WishBoard | Reads via WishNudgeRequested (existing) | Unchanged |
+| **CitizenManager** | CitizenNode | SpawnCitizen assigns traits at creation | Modified spawn |
+| **CitizenManager** | CitizenNode | SpawnCitizenFromSave restores traits | Modified save spawn |
+| **SaveManager** | StationClock | Restores clock state on load | New restore call |
+| **SaveManager** | CitizenManager | Restores trait data per citizen | Modified restore |
+| **HousingManager** | CitizenNode | HomeSegmentIndex (existing) | Unchanged |
+| **StationLighting** | StationClock | Subscribes to PeriodChanged | New subscription |
+| **ClockHUD** | StationClock | Reads CurrentPeriod, subscribes PeriodChanged | New UI |
 
-| Singleton | Reset API Available | Pure Functions Available | Testing Strategy |
-|-----------|--------------------|-----------------------|-----------------|
-| **GameEvents** | Events auto-reset (no persistent state) | N/A (event bus only) | No reset needed. Subscribe in test, verify event fires. |
-| **EconomyManager** | `RestoreCredits()`, `SetCitizenCount()`, `SetWorkingCitizenCount()`, `SetMoodTier()` | `CalculateTickIncome()`, `CalculateRoomCost()`, `CalculateDemolishRefund()`, `GetIncomeBreakdown()` | Tier 1 for formulas (extract to static helpers or test via Instance). Tier 2 for state-dependent income. |
-| **BuildManager** | `ClearAllRooms()` (needs RingVisual) | `GetPlacedRoom()` (read-only query) | Tier 2/3 only -- room placement requires RingVisual scene node. Use RestorePlacedRoom for controlled setup, but also requires RingVisual. |
-| **CitizenManager** | `ClearCitizens()` | None (all methods mutate state or need scene tree) | Tier 2 for citizen count tracking. Tier 3 for spawn/despawn behavior. |
-| **WishBoard** | `RestoreActiveWishes()`, `RestorePlacedRoomTypes()` | `GetTemplateById()`, `IsRoomTypeAvailable()` | Tier 2 for wish tracking state. |
-| **HappinessManager** | `RestoreState()` | `LifetimeWishes` (getter), `Mood` (getter), `CurrentTier` (getter) | Tier 1 for MoodSystem POCO. Tier 2 for tier transitions via RestoreState + manual updates. |
-| **HousingManager** | `RestoreFromSave()` (clears and rebuilds) | `ComputeCapacity()` (static pure function) | Tier 1 for ComputeCapacity. Tier 2 for assignment logic (needs BuildManager rooms). |
-| **SaveManager** | `PendingLoad` (settable), `ClearSave()` | `Load()` (reads file) | Tier 3 for round-trip testing. File I/O via Godot's `user://` path. |
+### What Does NOT Change
 
-### BuildManager Limitation
+These singletons and systems are untouched by v1.4:
 
-BuildManager is the hardest singleton to test because `ClearAllRooms()` and `RestorePlacedRoom()` both require a non-null `_ringVisual` reference (the RingVisual scene node). In the test runner scene, `_ringVisual` will be null because the Ring scene is not loaded.
-
-**Workaround options:**
-
-1. **Test without BuildManager room placement:** For tests that need room data (housing assignment, economy costs), construct SaveData with pre-configured rooms and test the serialization/deserialization path rather than the placement path. This covers the critical path (save/load) without requiring a full game scene.
-
-2. **Load the game scene in Tier 3 tests:** For full integration tests that need room placement to work, use GodotTestDriver's Fixture to load QuickTestScene.tscn. This provides RingVisual, enabling BuildManager to function. These tests are slower but test the real code paths.
-
-3. **Add a test-only room registration method to BuildManager:** This is the cleanest solution but requires modifying production code for testability. Not recommended for the initial testing milestone.
-
-**Recommendation:** Use approach 1 (SaveData-based testing) for most tests, and approach 2 (full scene loading) only for end-to-end save/load round-trip tests.
+- **EconomyManager** -- income formulas, credit management, tier multipliers all unchanged
+- **HappinessManager** -- mood system, tier transitions, arrival gating all unchanged
+- **HousingManager** -- assignment algorithm, capacity tracking unchanged
+- **WishBoard** -- wish tracking, nudge system unchanged (utility scorer replaces the distance-based weighting in CitizenNode, not WishBoard)
+- **BuildManager** -- room placement, demolition unchanged
+- **MoodSystem** -- POCO unchanged
 
 ---
 
-## Data Flow: Test Execution
+## Detailed Component Specifications
 
-### Test Discovery and Execution
+### StationClockConfig (Godot Resource)
 
-```
-Godot --run-tests --quit-on-finish
-    |
-    v
-Engine initializes, loads autoloads from project.godot
-    |
-    v
-TitleScreen._Ready() detects --run-tests, calls ChangeSceneToFile("res://test/TestRunner.tscn")
-    |
-    v
-TestRunner._Ready() calls GoTest.RunTests(Assembly.GetExecutingAssembly(), this)
-    |
-    v
-GoDotTest TestProvider scans assembly for classes extending TestClass
-    |
-    v
-TestExecutor runs each suite:
-    |
-    +-- MoodSystemTest (Tier 1)
-    |     [SetupAll] -- nothing needed
-    |     [Test] WishFulfilledIncreasesMood -- pure POCO test
-    |     [Test] DecayConvergesToBaseline -- pure POCO test
-    |     [Test] HysteresisPreventsOscillation -- pure POCO test
-    |     [CleanupAll] -- nothing needed
-    |
-    +-- EconomyFormulaTest (Tier 1)
-    |     [Test] BaseIncomeSqrtScaling -- pure formula test
-    |     [Test] RoomCostCategoryMultipliers -- pure formula test
-    |     [Test] DemolishRefundRatio -- pure formula test
-    |
-    +-- SegmentGridTest (Tier 1)
-    |     [Test] ToIndexFromIndexRoundTrip -- pure POCO test
-    |     [Test] WrapPositionHandlesNegative -- pure POCO test
-    |     [Test] AreSegmentsFreeChecksRange -- pure POCO test
-    |
-    +-- SaveDataSerializationTest (Tier 1)
-    |     [Test] V3RoundTrip -- serialize/deserialize
-    |     [Test] V2BackwardCompat -- missing fields default correctly
-    |     [Test] V1BackwardCompat -- old format loads
-    |     [Test] NullableHomeSegmentPreserved -- null vs 0 distinction
-    |
-    +-- EconomyManagerTest (Tier 2)
-    |     [SetupAll] -- TestHelper.ResetAllSingletons()
-    |     [Setup] -- reset credits to known value
-    |     [Test] TrySpendInsufficientFundsFails
-    |     [Test] TrySpendDeductsCorrectly
-    |     [Test] EarnAddsToBalance
-    |     [Test] RefundAddsAndEmitsEvent
-    |     [Test] MoodTierMultiplierAffectsIncome
-    |
-    +-- HousingCapacityTest (Tier 1)
-    |     [Test] SingleSegmentBaseCapacity
-    |     [Test] MultiSegmentScalesCorrectly
-    |
-    +-- MoodTierTransitionTest (Tier 2)
-    |     [SetupAll] -- TestHelper.ResetAllSingletons()
-    |     [Test] RestoreStateSetsTierCorrectly
-    |     [Test] WishFulfilledAdvancesTier
-    |
-    +-- SaveLoadRoundTripTest (Tier 3)
-    |     [SetupAll] -- TestHelper.ResetAllSingletons()
-    |     [Test] V3SaveDataPreservesAllFields
-    |     [Test] V2SaveLoadsWithNullHousing
-    |     [Test] V1SaveLoadsWithDefaultMood
-    |
-    v
-All suites complete -- GoDotTest exits with success/failure code
+```csharp
+[GlobalClass]
+public partial class StationClockConfig : Resource
+{
+    [ExportGroup("Day Cycle")]
+    [Export] public float TotalDayLength { get; set; } = 480.0f; // 8 minutes real time
+
+    [ExportGroup("Period Durations (fraction of day)")]
+    [Export] public float MorningFraction { get; set; } = 0.2f;  // 96s
+    [Export] public float DayFraction { get; set; } = 0.35f;     // 168s
+    [Export] public float EveningFraction { get; set; } = 0.2f;  // 96s
+    [Export] public float NightFraction { get; set; } = 0.25f;   // 120s
+    // Fractions must sum to 1.0 -- validated in StationClock._Ready()
+}
 ```
 
-### Key Data Flows for Tested Systems
+**Rationale for 8-minute day:** At the current visit frequency (20-40s between visits), an 8-minute day gives citizens 12-24 visits per day cycle. This is enough for the player to observe pattern differences between Morning (active) and Night (resting) without the cycle feeling rushed. The day is the longest period because it is the primary "active play" window.
 
-**1. Save/Load Round-Trip (Critical Path)**
+### CitizenData Extensions
 
-```
-Test constructs SaveData via SaveDataBuilder
-    |
-    v  System.Text.Json.JsonSerializer.Serialize(saveData)
-    |
-    v  string json
-    |
-    v  System.Text.Json.JsonSerializer.Deserialize<SaveData>(json)
-    |
-    v  Verify all fields match original:
-       - Version (3)
-       - Credits, LifetimeHappiness, Mood, MoodBaseline
-       - UnlockedRooms (list equality)
-       - PlacedRooms (count, each room's fields)
-       - Citizens (count, each citizen's fields including nullable HomeSegmentIndex)
-       - ActiveWishes (dictionary equality)
-       - PlacedRoomTypes (dictionary equality)
-```
+```csharp
+public enum InterestTrait
+{
+    Social,     // Prefers Comfort rooms (reading nook, garden)
+    Industrious, // Prefers Work rooms (workshop, craft lab)
+    Curious,    // Prefers Utility rooms (comm relay, star lounge)
+    Homebody    // Prefers Housing-adjacent rooms, rests more
+}
 
-**2. Mood Tier Transitions (Core Game Logic)**
+public enum RhythmTrait
+{
+    EarlyBird,  // Active Morning/Day, rests Evening/Night
+    NightOwl,   // Rests Morning, active Day/Evening/Night
+    Steady      // Balanced across all periods
+}
 
-```
-Test constructs HappinessConfig with known thresholds
-    |
-    v  new MoodSystem(config)
-    |
-    v  mood.Update(delta, lifetimeHappiness) -- simulate frames
-    |   or
-    v  mood.OnWishFulfilled() -- simulate wish events
-    |
-    v  Verify:
-       - mood.CurrentTier matches expected tier
-       - mood.Mood within expected range
-       - Hysteresis: tier does not demote until below (threshold - width)
-       - Baseline: mood decays toward correct floor
+// Added to CitizenData:
+[ExportGroup("Traits")]
+[Export] public InterestTrait Interest { get; set; }
+[Export] public RhythmTrait Rhythm { get; set; }
 ```
 
-**3. Economy Formulas (Deterministic)**
+**Rationale for exactly 2 traits:** The PROJECT.md specifies "1 Interest + 1 Rhythm per citizen." Interest creates observable room preferences (player sees a citizen repeatedly visiting the workshop and infers they are Industrious). Rhythm creates observable time-of-day patterns (EarlyBird citizens are walking at Morning while NightOwls are resting). Two traits are enough to make each citizen feel distinct without overwhelming the player with personality data.
 
-```
-Test constructs EconomyConfig with known values
-    |
-    v  Set singleton state: citizenCount, workingCount, tierMultiplier
-    |
-    v  EconomyManager.Instance.CalculateTickIncome()
-    |
-    v  Verify:
-       - Base + sqrt(citizens) * rate + workers * bonus) * tierMult
-       - Rounding matches RoundToInt
+### ScheduleConfig (Activity Weights)
+
+```csharp
+[GlobalClass]
+public partial class ScheduleConfig : Resource
+{
+    // Weights per (Period, Rhythm) combination
+    // Each row sums to 1.0: VisitWeight + RestWeight + WanderWeight = 1.0
+
+    [ExportGroup("EarlyBird")]
+    [Export] public Vector3 EarlyBirdMorning { get; set; } = new(0.6f, 0.1f, 0.3f);
+    [Export] public Vector3 EarlyBirdDay { get; set; } = new(0.5f, 0.15f, 0.35f);
+    [Export] public Vector3 EarlyBirdEvening { get; set; } = new(0.3f, 0.4f, 0.3f);
+    [Export] public Vector3 EarlyBirdNight { get; set; } = new(0.1f, 0.7f, 0.2f);
+
+    [ExportGroup("NightOwl")]
+    [Export] public Vector3 NightOwlMorning { get; set; } = new(0.1f, 0.7f, 0.2f);
+    [Export] public Vector3 NightOwlDay { get; set; } = new(0.4f, 0.2f, 0.4f);
+    [Export] public Vector3 NightOwlEvening { get; set; } = new(0.6f, 0.1f, 0.3f);
+    [Export] public Vector3 NightOwlNight { get; set; } = new(0.5f, 0.15f, 0.35f);
+
+    [ExportGroup("Steady")]
+    [Export] public Vector3 SteadyMorning { get; set; } = new(0.45f, 0.2f, 0.35f);
+    [Export] public Vector3 SteadyDay { get; set; } = new(0.45f, 0.2f, 0.35f);
+    [Export] public Vector3 SteadyEvening { get; set; } = new(0.4f, 0.25f, 0.35f);
+    [Export] public Vector3 SteadyNight { get; set; } = new(0.25f, 0.45f, 0.3f);
+}
 ```
 
-**4. Housing Capacity (Static Pure Function)**
+**Note:** Using `Vector3` for (visit, rest, wander) triples is a pragmatic choice because Godot's Inspector natively displays Vector3 with labeled X/Y/Z fields, making tuning straightforward. A custom struct would require a custom Inspector plugin.
 
+### StationLighting (Scene Node)
+
+StationLighting is a **Node3D added to the game scene** (not an autoload) because it manages visual children (DirectionalLight3D, potentially WorldEnvironment overrides). It subscribes to PeriodChanged via GameEvents and tweens visual properties.
+
+```csharp
+public partial class StationLighting : Node3D
+{
+    private DirectionalLight3D _sunLight;
+    private Tween _lightTween;
+
+    // Period-indexed lighting presets
+    private static readonly Dictionary<StationPeriod, LightPreset> Presets = new()
+    {
+        { StationPeriod.Morning, new(energy: 0.6f, color: new Color(1.0f, 0.85f, 0.7f)) },
+        { StationPeriod.Day,     new(energy: 1.0f, color: new Color(1.0f, 0.98f, 0.95f)) },
+        { StationPeriod.Evening, new(energy: 0.5f, color: new Color(1.0f, 0.7f, 0.5f)) },
+        { StationPeriod.Night,   new(energy: 0.15f, color: new Color(0.4f, 0.45f, 0.7f)) },
+    };
+
+    private void OnPeriodChanged(StationPeriod newPeriod, StationPeriod previous)
+    {
+        var preset = Presets[newPeriod];
+        _lightTween?.Kill();
+        _lightTween = CreateTween();
+        _lightTween.SetParallel(true);
+        _lightTween.TweenProperty(_sunLight, "light_energy",
+            preset.Energy, 3.0f).SetTrans(Tween.TransitionType.Sine);
+        _lightTween.TweenProperty(_sunLight, "light_color",
+            preset.Color, 3.0f).SetTrans(Tween.TransitionType.Sine);
+    }
+}
 ```
-Test calls HousingManager.ComputeCapacity(definition, segmentCount)
-    |
-    v  Verify:
-       - 1 segment: BaseCapacity
-       - 2 segments: BaseCapacity + 1
-       - 3 segments: BaseCapacity + 2
-```
+
+**Why scene node, not autoload:** StationLighting owns visual children (DirectionalLight3D). Autoloads are Nodes added outside the scene tree's main hierarchy. Placing lights under an autoload would require manual reparenting or TopLevel flags. A scene node naturally parents the light into the 3D world.
 
 ---
 
 ## Anti-Patterns
 
-### Anti-Pattern 1: Testing Through the Full Game Scene
+### Anti-Pattern 1: Behavior Trees for This Scope
 
-**What people do:** Load QuickTestScene.tscn for every test to get BuildManager working with RingVisual.
-**Why it's wrong:** Slow (scene loading per test suite), fragile (depends on full game scene stability), tests too much at once (a UI change breaks economy tests).
-**Do this instead:** Use SaveData-based testing for most tests. Only load the game scene for explicit scene integration tests. Test pure logic and singleton state directly.
+**What people do:** Reach for a behavior tree library (LimboAI, BehaviourToolkit) to implement citizen AI.
+**Why it's wrong:** The citizen has exactly 4 states and 6 transitions. A behavior tree adds node-graph complexity, plugin dependencies, and debugging overhead for a problem that an enum + switch solves in 50 lines. Behavior trees shine when there are 15+ states with dynamic priorities. This is not that project.
+**Do this instead:** Enum-driven state machine with a pure-function utility scorer. No external AI libraries.
 
-### Anti-Pattern 2: Mocking Singletons
+### Anti-Pattern 2: Per-Frame Utility Evaluation
 
-**What people do:** Create mock implementations of EconomyManager, BuildManager, etc. to isolate tests.
-**Why it's wrong:** The existing singletons use static `Instance` properties, not interfaces. Replacing them requires either reflection hacks, interface extraction (architectural refactor), or DI framework integration. This is massive scope for a v1.3 testing milestone.
-**Do this instead:** Use the singletons as they are. Reset their state between test suites via existing public APIs. The singletons ARE the system under test. Test pure functions directly where available (MoodSystem, SegmentGrid, economy formulas).
+**What people do:** Score all rooms every frame to allow instant behavior changes.
+**Why it's wrong:** 24 rooms * 20 citizens = 480 scoring calls per frame. Not catastrophically expensive, but wasteful. More importantly, per-frame evaluation causes oscillation -- a citizen ping-pongs between two equally-scored rooms.
+**Do this instead:** Evaluate on a timer (15-30s). Once a decision is made (Visiting/Resting), commit to it until the tween completes. Re-evaluate only on the next decision timer fire. This also means scoring costs are amortized: ~1 evaluation per citizen per 20s = 1 citizen per second at 20 citizens.
 
-### Anti-Pattern 3: Testing Implementation Details via Private Field Access
+### Anti-Pattern 3: Clock as Scene Node with Lazy Discovery
 
-**What people do:** Use reflection to read or set private fields on singletons for test assertions.
-**Why it's wrong:** Tests become coupled to implementation details. Refactoring internal fields breaks tests even when behavior is unchanged.
-**Do this instead:** Test through public APIs. Verify EconomyManager income by calling `CalculateTickIncome()`. Verify HousingManager assignment by calling `GetHomeForCitizen()`. Verify mood by checking `HappinessManager.Instance.Mood` and `CurrentTier`.
+**What people do:** Make StationClock a scene node (like RingVisual) and use the `FindChild` lazy discovery pattern that CitizenManager already uses for `_grid`.
+**Why it's wrong:** The lazy discovery pattern (`if (_grid == null) { FindChild... }`) is a known wart in the codebase. It exists because RingVisual is a 3D scene node that can't be an autoload. StationClock has no visual children and no reason to be in the scene tree. Making it an autoload avoids the null-discovery problem entirely.
+**Do this instead:** Register StationClock as the 9th autoload in project.godot. It initializes before any scene node's `_Ready()`, so `StationClock.Instance` is always available.
 
-### Anti-Pattern 4: Test Ordering Dependencies
+### Anti-Pattern 4: Complex Trait Interactions
 
-**What people do:** Assume tests run in a specific order across test classes, relying on state left by a previous test suite.
-**Why it's wrong:** GoDotTest runs test methods within a class in declaration order, but the order of test classes is determined by reflection and may change. Cross-suite state leakage makes failures non-reproducible.
-**Do this instead:** Each test suite calls `TestHelper.ResetAllSingletons()` in [SetupAll]. Each test suite is independently runnable via `--run-tests=SuiteName`.
+**What people do:** Design traits that interact with each other (e.g., "Social + EarlyBird means they invite other EarlyBirds to morning gatherings").
+**Why it's wrong:** Cross-trait interactions create combinatorial complexity that is invisible to the player. The player sees a citizen visiting a garden and has no way to know if that is because of their Interest trait, their Rhythm trait, or a combination. Visible behavior must map to simple causes.
+**Do this instead:** Interest affects WHICH room. Rhythm affects WHEN (what period). They are orthogonal axes with no interaction. The player learns "this citizen likes the workshop" (Interest) and "this citizen is active at night" (Rhythm) as two independent observations.
 
-### Anti-Pattern 5: Mixing Tier 1 and Tier 2 Tests
+### Anti-Pattern 5: Extending Existing Event Signatures
 
-**What people do:** Put a MoodSystem POCO test and an EconomyManager singleton test in the same file because they are both "happiness-related."
-**Why it's wrong:** The POCO test needs zero setup and runs instantly. The singleton test needs a full singleton reset. Mixing tiers means the fast tests carry the overhead of the slow tests' setup.
-**Do this instead:** Separate by tier. `test/Unit/MoodSystemTest.cs` for pure POCO tests. `test/Integration/MoodTierTransitionTest.cs` for singleton-dependent tests.
-
----
-
-## New vs Modified Components
-
-### New Files
-
-| File | Type | Purpose | Estimated LOC |
-|------|------|---------|---------------|
-| `test/TestRunner.cs` | Script | GoDotTest entry point, calls GoTest.RunTests | ~10 |
-| `test/TestRunner.tscn` | Scene | Minimal Node2D scene for test execution root | ~5 lines .tscn |
-| `test/Helpers/TestHelper.cs` | Helper | Singleton reset utilities | ~40 |
-| `test/Helpers/SaveDataBuilder.cs` | Helper | Fluent builder for SaveData test fixtures | ~80 |
-| `test/Helpers/Assert.cs` | Helper | Lightweight assertion library | ~50 |
-| `test/Unit/MoodSystemTest.cs` | Test | MoodSystem POCO: decay, gain, hysteresis, tier calc | ~120 |
-| `test/Unit/SegmentGridTest.cs` | Test | SegmentGrid: index mapping, wrap, adjacency, occupancy | ~80 |
-| `test/Unit/SaveDataSerializationTest.cs` | Test | SaveData JSON round-trip for v1/v2/v3 formats | ~100 |
-| `test/Unit/EconomyFormulaTest.cs` | Test | Economy pure functions: income, cost, refund | ~80 |
-| `test/Unit/HousingCapacityTest.cs` | Test | ComputeCapacity static function | ~30 |
-| `test/Integration/EconomyManagerTest.cs` | Test | EconomyManager singleton: spend, earn, income with state | ~80 |
-| `test/Integration/HousingManagerTest.cs` | Test | HousingManager assignment logic with pre-set rooms | ~100 |
-| `test/Integration/HappinessManagerTest.cs` | Test | HappinessManager tier transitions and arrival gating | ~80 |
-| `test/System/SaveLoadRoundTripTest.cs` | Test | Full save/load with version compatibility | ~120 |
-
-### Modified Files
-
-| File | Change Scope | What Changes |
-|------|-------------|-------------|
-| `Orbital Rings.csproj` | Small | Add PackageReference for Chickensoft.GoDotTest and Chickensoft.GodotTestDriver. Add conditional exclude for test code in ExportRelease builds. |
-| `Scripts/UI/TitleScreen.cs` | Small | Add `#if DEBUG` guard at top of _Ready() to detect `--run-tests` and redirect to test scene (~10 LOC). |
-
-### Untouched Production Files
-
-All 40+ existing production C# files remain untouched. The testing infrastructure is purely additive. No production code needs modification for testability beyond the TitleScreen entry point guard.
+**What people do:** Add the current period to existing events like CitizenEnteredRoom(name, segment, period) to avoid consumers needing to query StationClock.
+**Why it's wrong:** Changing event signatures breaks all existing subscribers. The 10+ event handlers in the codebase would all need parameter updates. This is a high-risk, low-value change.
+**Do this instead:** Consumers that need the current period call `StationClock.Instance.CurrentPeriod`. This is a property read, not a method call. Zero allocation, zero indirection.
 
 ---
 
 ## Build Order Considering Dependencies
 
-### Phase 1: Framework Wiring
+### Dependency Graph
 
-**Files:** `Orbital Rings.csproj` (package refs), `test/TestRunner.cs`, `test/TestRunner.tscn`, `test/Helpers/Assert.cs`, `Scripts/UI/TitleScreen.cs` (entry guard)
-**Delivers:** Running `godot --run-tests --quit-on-finish` produces "0 tests found" output and exits cleanly.
-**Dependencies:** None.
-**Rationale:** Prove the framework works before writing any tests. The #1 pitfall with GoDotTest is misconfigured entry points or missing package versions.
+```
+StationClock (autoload)
+    |
+    +---> StationLighting (scene node, subscribes to PeriodChanged)
+    |
+    +---> ClockHUD (UI, subscribes to PeriodChanged)
+    |
+    +---> CitizenSchedule (POCO, reads CurrentPeriod)
+              |
+              +---> CitizenStateMachine (inside CitizenNode, uses schedule)
+                        |
+                        +---> UtilityScorer (POCO, called during Evaluating state)
+                                  |
+                                  +---> Requires CitizenData.Interest (trait affinity scoring)
 
-### Phase 2: Test Helpers
+CitizenData.Interest + CitizenData.Rhythm (data, no runtime deps)
+    |
+    +---> CitizenManager.SpawnCitizen (assigns traits at creation)
+    |
+    +---> SaveManager (v4 format with trait fields)
 
-**Files:** `test/Helpers/TestHelper.cs`, `test/Helpers/SaveDataBuilder.cs`
-**Delivers:** Shared utilities available for all subsequent test phases.
-**Dependencies:** Phase 1 (project compiles with GoDotTest).
-**Rationale:** Helpers are used by every test suite. Building them first avoids duplication.
+SaveManager v4 format
+    |
+    +---> Requires StationClock (save elapsed time)
+    +---> Requires CitizenData traits (save trait enums)
+```
 
-### Phase 3: Tier 1 Pure C# Tests
+### Recommended Build Order
 
-**Files:** `test/Unit/MoodSystemTest.cs`, `test/Unit/SegmentGridTest.cs`, `test/Unit/EconomyFormulaTest.cs`, `test/Unit/HousingCapacityTest.cs`
-**Delivers:** ~15 passing tests covering core game logic with zero engine dependency risk.
-**Dependencies:** Phase 2 (Assert helper).
-**Rationale:** Highest value-to-effort ratio. These tests are fast, reliable, and cover the most critical game math. MoodSystem tests verify decay/hysteresis/tier logic that affects every play session. Economy formula tests catch rounding bugs that would silently alter game balance.
+**Phase 1: StationClock + GameEvents Extension**
+- Add StationPeriod enum, StationClockConfig resource
+- Implement StationClock autoload (time advancement, period detection)
+- Add PeriodChanged event to GameEvents + ClearAllSubscribers cleanup
+- Add StationClock.Reset() + SubscribeToEvents() for test infrastructure
+- Register as 9th autoload in project.godot
+- **Dependencies:** None (standalone system)
+- **Delivers:** `StationClock.Instance.CurrentPeriod` queryable from any system
+- **Testable:** StationClockConfig + period calculation are pure functions
 
-### Phase 4: Save/Load Tests
+**Phase 2: Day/Night Visuals (StationLighting + ClockHUD)**
+- Create StationLighting node with DirectionalLight3D child
+- Subscribe to PeriodChanged, tween light energy/color
+- Add room window emissive changes (iterate room meshes on period change)
+- Create ClockHUD with sun/moon icon
+- **Dependencies:** Phase 1 (StationClock emits PeriodChanged)
+- **Delivers:** Visible day/night cycle, player can observe time passing
+- **Testable:** Manual visual verification
 
-**Files:** `test/Unit/SaveDataSerializationTest.cs`, `test/System/SaveLoadRoundTripTest.cs`
-**Delivers:** Confidence that v1, v2, and v3 save formats load correctly. Null vs 0 HomeSegmentIndex distinction verified. Backward compatibility regression-proof.
-**Dependencies:** Phase 2 (SaveDataBuilder).
-**Rationale:** Save/load is the highest-severity failure mode. A serialization bug silently corrupts player progress. These tests are the project's most valuable safety net for future changes.
+**Phase 3: Citizen Traits (Data + Assignment)**
+- Add InterestTrait and RhythmTrait enums to CitizenData
+- Modify CitizenManager.SpawnCitizen to assign random traits
+- Modify CitizenManager.SpawnCitizenFromSave to restore traits
+- Update CitizenInfoPanel to show trait icons
+- **Dependencies:** None (pure data additions, independent of clock)
+- **Delivers:** Each citizen has visible traits, info panel shows them
+- **Testable:** Trait assignment coverage, info panel display
 
-### Phase 5: Tier 2 Integration Tests
+**Phase 4: Schedule Templates + Utility Scoring**
+- Implement ScheduleConfig resource with activity weight tables
+- Implement CitizenSchedule POCO (period + rhythm -> weights)
+- Implement UtilityScorer static class (proximity + affinity + recency + wish)
+- **Dependencies:** Phase 1 (CurrentPeriod), Phase 3 (Interest trait for affinity)
+- **Delivers:** Scoring infrastructure ready for state machine integration
+- **Testable:** UtilityScorer is a pure function -- unit testable with known inputs
 
-**Files:** `test/Integration/EconomyManagerTest.cs`, `test/Integration/HousingManagerTest.cs`, `test/Integration/HappinessManagerTest.cs`
-**Delivers:** Singleton behavior verified under controlled state. Economy spend/earn/income, housing assignment/capacity, mood tier transitions.
-**Dependencies:** Phase 2 (TestHelper), Phase 1 (autoloads must initialize).
-**Rationale:** These tests exercise the singleton coordination that is hardest to verify manually. The `[Setup]` reset pattern ensures each test starts clean.
+**Phase 5: Citizen State Machine (Core Refactor)**
+- Add CitizenState enum and TryTransition to CitizenNode
+- Replace _visitTimer + _homeTimer with single _decisionTimer
+- Implement EvaluateNextAction using CitizenSchedule + UtilityScorer
+- Preserve existing StartVisit and StartHomeReturn tween sequences
+- Remove `_isVisiting` and `_isAtHome` boolean fields (replaced by state enum)
+- Update CitizenManager._Process auto-deselect to check state enum
+- Wire wish timer abort and wish nudge to state machine
+- **Dependencies:** Phase 4 (schedule + scorer), Phase 1 (clock period)
+- **Delivers:** Citizens make schedule-aware, trait-biased decisions
+- **Testable:** State transition validation, decision flow with mock periods
+
+**Phase 6: Save/Load v4**
+- Add ClockElapsed + ClockPeriod to SaveData
+- Add InterestTrait + RhythmTrait (nullable int?) to SavedCitizen
+- Bump SaveData.Version to 4
+- Extend SaveManager.CollectGameState for clock + traits
+- Extend SaveManager.ApplyState with version >= 4 gating
+- Extend SaveManager.ApplySceneState for trait restoration
+- Add StationClock state to ClearAllSubscribers/Reset test infrastructure
+- **Dependencies:** Phase 1 (clock state), Phase 3 (trait data), Phase 5 (state machine working)
+- **Delivers:** Full round-trip save/load with clock position and citizen traits
+- **Testable:** JSON round-trip for v4 format, v3 backward compatibility (traits null, clock defaults)
+
+**Phase 7: Room Tooltip Visitors**
+- Add visitor tracking to room tooltip (which citizens are currently visiting)
+- Subscribe to CitizenEnteredRoom / CitizenExitedRoom events
+- **Dependencies:** Phase 5 (state machine emits room visit events correctly)
+- **Delivers:** Player can see which citizens are in which rooms
+- **Testable:** Event subscription, visitor count accuracy
 
 ### Phase Ordering Rationale
 
 ```
-Phase 1 (Framework Wiring) --> no deps, proves infrastructure works
-    |
-    v
-Phase 2 (Test Helpers) --> depends on Phase 1
-    |
-    +---> Phase 3 (Pure C# Tests) --> depends on Phase 2
-    |
-    +---> Phase 4 (Save/Load Tests) --> depends on Phase 2
-    |
-    +---> Phase 5 (Integration Tests) --> depends on Phase 2
+Phase 1 (Clock)          Phase 3 (Traits)
+    |                        |
+    v                        v
+Phase 2 (Visuals)       Phase 4 (Schedule + Scoring)
+                             |
+                             v
+                        Phase 5 (State Machine)
+                             |
+                             v
+                        Phase 6 (Save/Load v4)
+                             |
+                             v
+                        Phase 7 (Room Tooltips)
 ```
 
-Phases 3, 4, and 5 are independent of each other after Phase 2. The recommended sequence (3 then 4 then 5) front-loads the easiest and most valuable tests, then adds save/load safety, then tackles the more complex singleton integration tests.
+- **Phases 1 and 3 are independent** and can be built in parallel or either order. Phase 1 first because it unblocks both visuals (Phase 2) and the decision system (Phase 4).
+- **Phase 2 before Phase 5** because day/night visuals give immediate player-visible feedback before the complex state machine refactor. If Phase 5 hits blockers, the milestone still has a shipped visual feature.
+- **Phase 5 is the riskiest phase** because it refactors 400+ lines of CitizenNode behavior code. All earlier phases add new code alongside existing code. Phase 5 is the only phase that replaces existing working code.
+- **Phase 6 last in the critical path** because save/load must capture all new state. Building it last means all the state it needs to persist actually exists.
+
+---
+
+## Recency Tracking (New Data Structure in CitizenNode)
+
+The utility scorer needs to know when a citizen last visited each room to compute recency scores. This requires a small per-citizen dictionary:
+
+```csharp
+// Inside CitizenNode:
+private readonly Dictionary<int, float> _lastVisitTime = new();
+
+// At the end of StartVisit tween completion callback:
+_lastVisitTime[targetSegment] = StationClock.Instance?.Elapsed ?? 0f;
+
+// In UtilityScorer:
+public static float ScoreRecency(CitizenNode citizen, int flatIndex)
+{
+    float elapsed = StationClock.Instance?.Elapsed ?? 0f;
+    if (!citizen.LastVisitTimes.TryGetValue(flatIndex, out float lastVisit))
+        return 1.0f; // Never visited = max recency score
+
+    float timeSince = elapsed - lastVisit;
+    if (timeSince < 0) timeSince += StationClock.Instance.Config.TotalDayLength;
+
+    // Normalize: 0 at just-visited, 1.0 at half-day-ago or more
+    float halfDay = StationClock.Instance.Config.TotalDayLength * 0.5f;
+    return Mathf.Clamp(timeSince / halfDay, 0f, 1f);
+}
+```
+
+Recency data is ephemeral -- it does NOT need to be saved. On load, all recency scores start at max (1.0), which is correct behavior (citizen hasn't visited anything "recently" in the loaded session).
 
 ---
 
 ## Scaling Considerations
 
-| Scale | Architecture Adjustments |
-|-------|--------------------------|
-| 10-20 tests (v1.3) | Current architecture is sufficient. Single test runner, sequential execution, manual singleton reset. Test run completes in under 5 seconds. |
-| 50-100 tests (v1.4+) | Consider splitting the `--run-tests` entry to support `--run-tests=Unit` and `--run-tests=Integration` for faster feedback during development. GoDotTest already supports `--run-tests=SuiteName`. |
-| 200+ tests (v2+) | If test execution time exceeds 30 seconds, consider a second test runner scene that skips autoload-heavy tests for rapid TDD feedback. Or adopt GdUnit4Net for out-of-process pure C# test execution. |
+| Concern | At 10 citizens | At 30 citizens | At 50 citizens |
+|---------|----------------|----------------|----------------|
+| **Decision evaluations** | ~0.5/sec (1 per 20s each) | ~1.5/sec | ~2.5/sec |
+| **Rooms scored per evaluation** | Up to 24 segments | Up to 24 segments | Up to 24 segments |
+| **Total scoring calls/sec** | ~12 | ~36 | ~60 |
+| **Memory per citizen** | ~200 bytes (recency dict) | ~200 bytes | ~200 bytes |
+
+This is negligible. The scoring is simple arithmetic (4 multiplications + 1 addition per room). Even at 50 citizens, the total scoring work is under 1500 arithmetic operations per second. The existing tween-based animations are far more expensive.
 
 ### First Bottleneck
 
-The first bottleneck will be **autoload initialization time** -- all 8 singletons initialize even for pure C# tests that do not need them. This is inherent to GoDotTest running inside Godot. For a project of this size (~50-100 tests), this adds ~1-2 seconds of startup overhead and is not worth optimizing in v1.3.
-
-### Second Bottleneck
-
-The second bottleneck will be **test scene loading** for Tier 3 tests that need the game scene. Loading QuickTestScene.tscn involves mesh generation, resource loading, and autoload state population. Limit the number of tests that require scene loading. Use SaveData-based testing instead wherever possible.
-
----
-
-## CI Integration
-
-GoDotTest supports CI execution via command line:
-
-```bash
-# Run all tests, exit on completion
-godot --run-tests --quit-on-finish
-
-# Run specific suite
-godot --run-tests=MoodSystemTest --quit-on-finish
-
-# Collect code coverage with coverlet
-coverlet "./.godot/mono/temp/bin/Debug" \
-  --target godot \
-  --targetargs "--run-tests --coverage --quit-on-finish" \
-  --format "opencover" \
-  --output "./coverage/coverage.xml" \
-  --exclude-by-file "**/test/**/*.cs"
-```
-
-The `--coverage` flag tells GoDotTest to force-exit the process (bypassing Godot's normal shutdown) so coverlet can collect coverage data correctly.
+The first bottleneck will be **tween count**, not AI computation. With 50 citizens, many will be in mid-tween simultaneously (walking to rooms, fading, resting). Godot's tween system handles this well, but the visual density of 50 capsules on a 24-segment ring may feel crowded. This is a design concern, not an architecture concern.
 
 ---
 
 ## Sources
 
-- [Chickensoft GoDotTest GitHub](https://github.com/chickensoft-games/GoDotTest) -- Test runner framework, TestClass API, test environment setup (MEDIUM confidence -- GitHub README, not yet verified in this project)
-- [Chickensoft GodotTestDriver GitHub](https://github.com/chickensoft-games/GodotTestDriver) -- Fixture management, input simulation, node drivers (MEDIUM confidence -- GitHub README)
-- [GoDotTest NuGet](https://www.nuget.org/packages/Chickensoft.GoDotTest/) -- Version 2.0.30, targets .NET 8+, GodotSharp >= 4.6.1 (HIGH confidence -- verified on NuGet)
-- [GodotTestDriver NuGet](https://www.nuget.org/packages/Chickensoft.GodotTestDriver/) -- Version 3.1.62, targets .NET 8+, GodotSharp >= 4.6.1 (HIGH confidence -- verified on NuGet)
-- Direct codebase analysis of all 40+ source files (HIGH confidence -- primary source for singleton testability matrix, reset APIs, and pure function inventory)
-- `project.godot` -- Autoload initialization order, confirmed 8 singletons with specific ordering (HIGH confidence)
-- `Scripts/Autoloads/*.cs` -- Singleton patterns, static Instance properties, StateLoaded guards, public reset APIs (HIGH confidence)
-- `Scripts/Happiness/MoodSystem.cs` -- POCO testability proof, pure C# class with no Node inheritance (HIGH confidence)
-- `Scripts/Ring/SegmentGrid.cs` -- POCO with pure static methods, ideal for unit testing (HIGH confidence)
-- `Scripts/Autoloads/SaveManager.cs` -- SaveData/SavedRoom/SavedCitizen POCOs, System.Text.Json serialization, version-gated restore (HIGH confidence)
+- Direct codebase inspection of all 40+ C# source files including GameEvents.cs (343 lines), CitizenNode.cs (1107 lines), CitizenManager.cs (423 lines), SaveManager.cs (538 lines), HousingManager.cs (525 lines), HappinessManager.cs (367 lines), EconomyManager.cs (366 lines), WishBoard.cs (407 lines), MoodSystem.cs (127 lines), and all Data/ resources (HIGH confidence)
+- [Game AI Pro Chapter 9: Introduction to Utility Theory](http://www.gameaipro.com/GameAIPro/GameAIPro_Chapter09_An_Introduction_to_Utility_Theory.pdf) -- utility scoring fundamentals, response curves (HIGH confidence)
+- [Game AI Pro 3 Chapter 13: Choosing Effective Utility-Based Considerations](http://www.gameaipro.com/GameAIPro3/GameAIPro3_Chapter13_Choosing_Effective_Utility-Based_Considerations.pdf) -- scoring factor design, weight tuning (HIGH confidence)
+- [Utility System - Wikipedia](https://en.wikipedia.org/wiki/Utility_system) -- utility AI overview, scoring patterns (MEDIUM confidence)
+- [GDQuest: Finite State Machine in Godot 4](https://www.gdquest.com/tutorial/godot/design-patterns/finite-state-machine/) -- enum state machine pattern for Godot (MEDIUM confidence)
+- [Medium: C# FSM Implementation in Godot](https://medium.com/codex/making-a-basic-finite-state-machine-godot4-c-fe5ccc0e8cd7) -- C# state machine patterns (MEDIUM confidence)
+- [GameDev Academy: Day Night Cycle in Godot 4](https://gamedevacademy.org/godot-day-night-cycle/) -- DirectionalLight tweening approach (MEDIUM confidence)
+- PROJECT.md and existing codebase patterns (HappinessConfig, HousingConfig, MoodSystem POCO) for config resource and testability patterns (HIGH confidence)
 
 ---
-*Architecture research for: Orbital Rings v1.3 -- Testing Infrastructure*
+*Architecture research for: Orbital Rings v1.4 -- Citizen AI, Day/Night Cycle, Utility Scoring*
 *Researched: 2026-03-07*

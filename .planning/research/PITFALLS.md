@@ -1,432 +1,409 @@
-# Pitfalls Research
+# Domain Pitfalls
 
-**Domain:** Adding GoDotTest + GodotTestDriver testing infrastructure to an existing Godot 4 C# game with 8 autoload singletons, event-driven architecture, and System.Text.Json save/load
+**Domain:** Adding utility-based citizen AI, trait system, day/night lighting cycle, and citizen state machines to an existing Godot 4 C# cozy space station builder (v1.3 -> v1.4)
 **Researched:** 2026-03-07
-**Confidence:** HIGH (derived from direct codebase analysis of 20+ source files, GoDotTest/GodotTestDriver documentation, and Godot C# testing community patterns)
+**Confidence:** HIGH (derived from direct analysis of 20+ source files in the codebase, Godot 4 documentation, utility AI literature, and community patterns)
+
+---
 
 ## Critical Pitfalls
 
-### Pitfall 1: Autoload Singleton State Leaking Between Test Suites
-
-**What goes wrong:**
-All 8 autoloads (GameEvents, EconomyManager, BuildManager, CitizenManager, WishBoard, HappinessManager, HousingManager, SaveManager) use the `static Instance` singleton pattern with state initialized in `_Ready()` or `_EnterTree()`. GoDotTest runs all test suites sequentially in a single Godot process. The autoloads are initialized ONCE when the test runner scene loads and persist for the entire test run. Test A modifies `EconomyManager.Instance.Credits` via `TrySpend()`, Test B expects the starting balance -- it gets Test A's leftover balance. Every test that touches a singleton is implicitly coupled to every previous test.
-
-This is the single most dangerous pitfall because it produces test failures that are ordering-dependent. Tests pass individually, fail when run together. Tests pass locally, fail in CI with a different suite ordering.
-
-**Why it happens:**
-The C# singleton pattern with static `Instance` properties means the object lives for the entire process lifetime. GoDotTest does not restart the Godot process between test suites -- it runs everything in one `_Ready()` call via `GoTest.RunTests()`. Unlike xUnit/NUnit which create fresh class instances per test, GoDotTest's `TestClass` instances are new but the global singletons they interact with are not.
-
-The codebase's singletons store mutable state in private fields:
-- `EconomyManager._credits`, `_citizenCount`, `_workingCitizens`, `_currentTierMultiplier`
-- `HappinessManager._lifetimeHappiness`, `_crossedMilestoneCount`, `_unlockedRooms`
-- `HousingManager._housingRoomCapacities`, `_roomOccupants`, `_citizenHomes`
-- `WishBoard._activeWishes`, `_placedRoomTypes`, `_segmentRoomIds`
-- `BuildManager._placedRooms`, `_mode`
-- `CitizenManager._citizens`
-- `SaveManager._pendingLoadFrames`, `PendingLoad`
-
-None of these have reset/clear methods designed for testing (some have partial ones like `ClearCitizens()` and `ClearAllRooms()` used by save/load, but they emit events with side effects).
-
-**How to avoid:**
-Create a `TestHelper` utility class with a `ResetAllSingletons()` method that restores every autoload to its initial state. Call this in `[Setup]` or `[Cleanup]` of every test suite that touches game state. The reset method must:
-
-1. Reset EconomyManager: restore credits to starting value, clear working citizens set, reset tier multiplier to 1.0.
-2. Reset HappinessManager: zero lifetime wishes, reset mood system, restore default unlocked rooms, zero milestone count.
-3. Reset HousingManager: clear all room capacities, occupants, citizen homes. Reset `StateLoaded` to false.
-4. Reset BuildManager: call `ClearAllRooms()` to remove all placed rooms, reset mode to Normal.
-5. Reset CitizenManager: call `ClearCitizens()` to free all citizen nodes, reset `StateLoaded` to false.
-6. Reset WishBoard: clear active wishes, placed room types, segment room IDs.
-7. Reset SaveManager: null out `PendingLoad`, stop debounce timer.
-8. Reset GameEvents: this one is subtle -- see Pitfall 2.
-
-Some singletons lack public reset APIs. You will need to add `internal` or `public` reset methods specifically for testing. Do NOT use reflection to set private fields -- it couples tests to implementation details and breaks on refactor. Instead, add explicit `ResetForTesting()` methods on each singleton, guarded by `#if DEBUG` or a `[Conditional]` attribute.
-
-**Warning signs:**
-- Tests pass when run individually via `--run-tests=MySuite.MyTest` but fail when run as a full suite.
-- Flaky tests that pass/fail depending on which test ran before them.
-- Tests that work on first run but fail on second run without restarting Godot.
-- Economy tests showing unexpected credit balances.
-
-**Phase to address:**
-Phase 1 (Framework Setup) -- the `ResetForTesting()` infrastructure must exist before ANY test is written. This is foundational. Every subsequent phase depends on reliable test isolation.
+Mistakes that cause rewrites, data loss, or broken saves.
 
 ---
 
-### Pitfall 2: C# Event Delegate Subscriber Accumulation Across Tests
+### Pitfall 1: Timer Replacement Race -- Unified Decision Timer vs. Visit/Home Timers
 
 **What goes wrong:**
-GameEvents uses pure C# `event Action<...>` delegates (not Godot signals). When a test creates a node (e.g., a mock listener or a real CitizenNode) and subscribes it to `GameEvents.Instance.WishFulfilled += handler`, that subscription persists on the GameEvents instance even after the test's `[Cleanup]` frees the node. C# delegates hold strong references to subscriber objects. If the subscriber node is freed via `QueueFree()`, the delegate still holds a reference to the now-disposed C# wrapper. The next time the event fires, it invokes the handler on a disposed object, causing `ObjectDisposedException: Cannot access a disposed object`.
+The current CitizenNode has three independent timers: `_visitTimer` (20-40s), `_homeTimer` (90-150s), and `_wishTimer` (30-60s). The v1.4 plan replaces the visit and home timers with a single unified decision timer (15-30s). If the replacement is done as a refactor-in-place (modify CitizenNode to use the new timer), there is a window where partially-converted code has both the old timer fields and new state machine logic trying to drive citizen behavior simultaneously. A citizen could be mid-tween from the old visit system when the new state machine tries to transition them to Evaluating state.
 
-This is especially dangerous because the codebase intentionally uses C# events instead of Godot signals (GameEvents.cs:17-20 documents this decision), meaning Godot's automatic signal disconnection on node free does NOT apply.
+The existing `_activeTween?.Kill()` pattern (CitizenNode.cs line 501, 839) catches most conflicts, but if the old timer fires a callback that sets `_isVisiting = true` while the state machine expects to own that flag, the citizen freezes: the state machine won't advance because `_isVisiting` is true, but no new tween will restore it because the old visit completion callback was killed.
 
 **Why it happens:**
-The existing codebase handles this correctly in production through the `SafeNode` pattern (SafeNode.cs) which pairs `_EnterTree` subscription with `_ExitTree` unsubscription. But test code creates nodes dynamically and may not follow this pattern. A test might:
-1. Create a node and manually subscribe to GameEvents.
-2. Run assertions.
-3. Call `node.QueueFree()` in cleanup.
-4. `QueueFree` is deferred -- the node isn't actually freed until the next frame.
-5. Between cleanup and the next test, an event fires and hits the pending-free node.
+CitizenNode is a 1107-line file with visit logic, home return logic, wish logic, and mesh management all interleaved. The boolean flags `_isVisiting`, `_isAtHome`, and `_walkingToHome` serve as an implicit state machine -- exactly the pattern v1.4 wants to replace with an explicit one. But during the conversion, both systems can be partially active.
 
-Even worse: if the test doesn't clean up at all (common first mistake), subscribers accumulate. By test 50, an event fires and invokes 49 stale handlers.
+**Consequences:**
+Citizens stuck invisible (faded out, never fade back in). Citizens walking through walls (radial position set by tween, never restored to walkway). Save/load restoring a citizen mid-visit with no tween to complete the sequence.
 
-**How to avoid:**
-1. Never manually subscribe to GameEvents in tests. If you need to observe events, create a purpose-built `EventSpy` helper class that subscribes in its constructor and unsubscribes in an explicit `Dispose()` method.
-2. The `ResetAllSingletons()` method from Pitfall 1 should also clear all event delegate subscriber lists on GameEvents. This requires adding a `ClearAllSubscribers()` method to GameEvents that sets every event field to null: `WishFulfilled = null; RoomPlaced = null;` etc. This is safe because `ResetAllSingletons()` also reinitializes all the singletons that were subscribed.
-3. After calling `ClearAllSubscribers()`, re-subscribe all singletons that need events (SaveManager, HousingManager, etc.) by calling their subscription methods. Alternatively, design the reset so each singleton re-subscribes itself during its own reset.
-4. For nodes created in tests, always use `GodotTestDriver.Fixture` to manage lifecycle -- it handles cleanup automatically.
+**Prevention:**
+1. Do NOT refactor CitizenNode incrementally. Extract the state machine as a separate POCO class (`CitizenStateMachine`) that completely owns state transitions. The POCO takes an `ICitizenActions` interface for "move to walkway," "start visit tween," etc.
+2. Delete the old `_visitTimer`, `_homeTimer`, `_isVisiting`, `_isAtHome`, `_walkingToHome` fields in a single commit. Replace them with `_stateMachine.CurrentState`. No co-existence period.
+3. The unified decision timer should be owned by the state machine, not CitizenNode directly. When the timer fires, the state machine evaluates its current state and decides the next transition.
+4. Test the state machine POCO in isolation (no tweens, no timers) before wiring it into CitizenNode. Each state transition should be a pure function of (currentState, input) -> (newState, action).
 
-**Warning signs:**
-- `ObjectDisposedException` during test runs, especially in later test suites.
-- Event handler invocation count increasing with each test (e.g., `WishFulfilled` fires once but 5 handlers run).
-- Autosave triggers during tests (SaveManager's debounce timer responding to stale event subscriptions).
-- Tests that "work" but leave GD.PrintErr warnings about accessing freed objects.
+**Detection:**
+Citizens that are invisible but still accumulating walkway angle (walking while "inside" a room). The `_Process` method runs but `_isVisiting` is true, so movement is skipped, but the state machine thinks the citizen is Walking.
 
-**Phase to address:**
-Phase 1 (Framework Setup) -- the `EventSpy` pattern and `ClearAllSubscribers()` must be designed alongside `ResetForTesting()`. These are inseparable concerns.
+**Phase to address:** Phase 1 (State Machine implementation) -- this is the foundational refactor that everything else builds on.
 
 ---
 
-### Pitfall 3: Scene Tree Lifecycle Mismatch in Test Environment
+### Pitfall 2: Save Format v3 -> v4 Migration Breaks Existing Saves
 
 **What goes wrong:**
-GoDotTest provides the test runner scene as a `Node` to each `TestClass` constructor. Tests can add child nodes to this scene to get them into the tree. But the test scene is NOT the game scene. It does not contain:
-- A `RingVisual` node (CitizenManager._Ready() searches for `Ring` via `GetTree().Root.FindChild("Ring")`)
-- A `Camera3D` (CitizenManager caches `GetViewport().GetCamera3D()`)
-- Any `CanvasLayer` for UI (HappinessManager creates one, CitizenManager creates one)
-- The segment grid, room visuals, or walkway mesh
+The save format must add new fields for v1.4: clock position (current period/time), citizen traits (Interest enum, Rhythm enum), and potentially citizen state. The current `SaveData` class defaults `Version` to `3`. If the developer bumps this to `4` but does not add version-gated restore logic in `SaveManager.ApplyState()`, v3 saves loaded by v4 code will:
 
-Singletons that search the scene tree in `_Ready()` will get null references. Some fail silently (null-conditional `?.` throughout the codebase), others crash. The autoloads were designed for the game scene, not a blank test scene.
+1. Deserialize `SavedCitizen` objects missing the new trait fields. System.Text.Json will set them to their C# defaults (0 for enums, null for nullable types). This is correct behavior IF the restore code handles "no traits" gracefully.
+2. The clock position field will be missing. If the restore code assumes it's always present and does `data.ClockTime / PeriodDuration`, it divides by a default 0 and gets NaN or Infinity, corrupting the clock state.
+3. If traits are stored as string enums (e.g., `"Interest": "Science"`) and the enum values change between versions, `JsonSerializer.Deserialize` throws `JsonException` on unknown enum values unless `JsonStringEnumConverter` with `JsonSerializerOptions.Converters` is configured for lenient parsing.
 
 **Why it happens:**
-The autoloads initialize before the game scene loads, but they expect the game scene to exist by the time `_Process` runs. In tests, the "game scene" is the test runner scene, which has none of the expected structure. The codebase uses lazy discovery in some places (CitizenManager._Process() retries finding RingVisual every frame), but this pattern still requires the actual node to eventually exist.
+The existing codebase has a proven version-gated pattern (v1 -> v2 -> v3), but each migration was simple (add nullable fields with safe defaults). v3 -> v4 is more complex because traits affect behavior, not just data. A citizen loaded from a v3 save with no traits must still function correctly -- they need default traits assigned, not null traits that cause NullReferenceException in utility scoring.
 
-**How to avoid:**
-Categorize tests into three tiers with different approaches:
+**Consequences:**
+Players lose their saves. Worse: saves load without error but citizens have null traits, causing NullReferenceException when utility scoring tries to read `citizen.Interest.AffinityBonus`. The game crashes on the first decision timer tick, which happens 15-30 seconds after load -- long enough that the autosave fires with corrupted state, overwriting the valid v3 save.
 
-**Tier 1 -- Pure Logic Tests (no scene tree needed):**
-Test POCOs and pure calculation methods directly without any Godot nodes:
-- `MoodSystem` (already a POCO, takes `HappinessConfig` in constructor)
-- `EconomyManager.CalculateRoomCost()`, `CalculateTickIncome()`, `CalculateDemolishRefund()`
-- `HousingManager.ComputeCapacity()`
-- `SaveData` serialization/deserialization round-trips
-- Tier promotion/demotion logic
-
-These tests should NOT touch singletons at all. Instantiate the POCO directly with test data.
-
-**Tier 2 -- Singleton Logic Tests (singletons needed, scene tree minimal):**
-For testing singleton behavior (e.g., "EconomyManager.TrySpend deducts credits"), ensure singletons are initialized by the autoload system but don't rely on scene tree nodes. Use `ResetForTesting()` before each test.
-
-**Tier 3 -- Integration Tests (scene tree needed):**
-For testing cross-system flows (e.g., "place room -> citizen visits -> wish fulfilled"), use GodotTestDriver fixtures to load minimal test scenes. Create stripped-down `.tscn` files that contain only the nodes needed for the specific test, not the full game scene.
-
-**Warning signs:**
-- NullReferenceException on `GetTree().Root.FindChild(...)` calls.
-- Tests hang waiting for a scene node that will never appear.
-- `_Process` methods running in tests and performing unexpected scene tree searches each frame.
-- Autoload Timers firing during tests (income timer, arrival timer, debounce timer).
-
-**Phase to address:**
-Phase 1 (Framework Setup) -- the test tier structure must be established upfront to prevent confusion about which approach to use for each test type.
-
----
-
-### Pitfall 4: Autoload Timers Firing During Tests
-
-**What goes wrong:**
-Three autoloads create child `Timer` nodes that tick continuously:
-- `EconomyManager._incomeTimer` (5.5s interval, triggers `OnIncomeTick` which modifies credits)
-- `HappinessManager._arrivalTimer` (60s interval, triggers citizen spawn attempts)
-- `SaveManager._debounceTimer` (0.5s one-shot, triggers `PerformSave` which writes to disk)
-
-GoDotTest runs tests in the Godot main loop, meaning `_Process` runs between test methods and Timers continue ticking. A test that sets credits to 100 and then waits a few seconds (e.g., for an async operation or frame delays) may find credits at 104 because the income timer fired. Worse, `SaveManager._debounceTimer` will write save files to disk during tests, corrupting any real save data.
-
-**Why it happens:**
-Timers are scene tree nodes that tick automatically when the tree is processing. The test runner scene processes normally. Autoloads are part of the scene tree root, so their child Timers process alongside test nodes.
-
-**How to avoid:**
-1. In `ResetForTesting()`, stop all autoload timers: `_incomeTimer.Stop()`, `_arrivalTimer.Stop()`, `_debounceTimer.Stop()`.
-2. For integration tests that need timers to fire, provide explicit `AdvanceTimer()` helper methods that manually trigger the timer callback without waiting for real time to pass.
-3. Consider setting `ProcessMode = ProcessModeEnum.Disabled` on autoloads during tests, then re-enabling only the ones under test. But this breaks `_Process`-based logic (HappinessManager mood decay), so use it selectively.
-4. For SaveManager specifically, either:
-   a. Override the save path to a temp directory during tests, OR
-   b. Stop the debounce timer and only call `PerformSave()` explicitly when testing save functionality.
-
-**Warning signs:**
-- Credits changing between test setup and assertion.
-- Random citizens spawning during test runs.
-- `user://save.json` being overwritten during tests, destroying real save data.
-- Tests that pass quickly but fail when CI is slow (more time for timers to fire).
-- Mood values drifting during test execution due to `_Process` decay.
-
-**Phase to address:**
-Phase 1 (Framework Setup) -- timer management must be part of `ResetForTesting()`. This is critical for test determinism.
-
----
-
-### Pitfall 5: Save/Load Tests Writing to Real User Directory
-
-**What goes wrong:**
-`SaveManager` writes to `user://save.json` via Godot's `FileAccess.Open()`. The `user://` prefix resolves to the OS-specific user data directory (e.g., `~/.local/share/godot/app_userdata/Orbital Rings/` on Linux). When tests exercise save/load paths, they read and write the player's real save file. A test could:
-1. Overwrite the player's save with test data.
-2. Read the player's save and get unexpected values that cause test failures.
-3. Delete the save file via `ClearSave()`.
-4. In CI, the `user://` path may not exist or may lack write permissions.
-
-**Why it happens:**
-`SavePath` is a `const string` (`"user://save.json"`) in SaveManager with no configuration point. There's no dependency injection or path override mechanism. The save system was designed for production use, not testability.
-
-**How to avoid:**
-Two approaches (use both):
-
-**Approach A -- Test-specific save path:**
-Add a `public static string SavePathOverride` property to SaveManager. In `ResetForTesting()`, set it to a temp path like `"user://test_save.json"`. Modify all `FileAccess.Open(SavePath, ...)` calls to use `SavePathOverride ?? SavePath`. In test cleanup, delete the test save file.
-
-**Approach B -- Bypass FileAccess entirely for unit tests:**
-For save/load round-trip tests, don't test through SaveManager at all. Test the serialization layer directly:
-```csharp
-var saveData = new SaveData { Credits = 500, Version = 3, ... };
-string json = JsonSerializer.Serialize(saveData);
-var loaded = JsonSerializer.Deserialize<SaveData>(json);
-Assert.Equal(500, loaded.Credits);
-```
-This tests the data contract without touching the filesystem. Reserve full SaveManager tests for integration tests that use an isolated temp path.
-
-**Warning signs:**
-- Real save file disappears after running tests.
-- Tests fail in CI with `FileAccess.Open returned null` errors.
-- Test data showing up in the real game after running tests.
-- Tests passing locally (save file exists) but failing in CI (no save file).
-
-**Phase to address:**
-Phase 1 (Framework Setup) -- the save path isolation must be configured before any save/load tests are written. Phase 2 or 3 (save/load test suite) uses this infrastructure.
-
----
-
-### Pitfall 6: SaveData Serialization Tests Missing Nullable/Default Edge Cases
-
-**What goes wrong:**
-System.Text.Json has specific behaviors with nullable types and default values that bite in round-trip testing:
-
-1. `SavedCitizen.HomeSegmentIndex` is `int?` (nullable). `JsonSerializer` serializes `null` as the JSON literal `null`, which deserializes back correctly. But if a test constructs a `SavedCitizen` without setting `HomeSegmentIndex`, it defaults to `null` implicitly -- the test appears to work but didn't actually test the null path explicitly.
-
-2. `SaveData.PlacedRoomTypes` is `Dictionary<string, int>` but unlike the `List<T>` fields, it is NOT initialized with `= new()` in the class definition. It IS initialized (`= new()`) in the current code, but a future developer might add a new dictionary field without the initializer. Old saves that lack the field would deserialize it as `null`, not empty.
-
-3. The `Version` field defaults to `3` in the class definition (`public int Version { get; set; } = 3`). If a test serializes a v1 save scenario but forgets to explicitly set `Version = 1`, it will silently use version 3, and the version-gated restore paths won't be exercised.
-
-**Why it happens:**
-System.Text.Json's default value handling is different from Newtonsoft.Json. Missing JSON properties get C# default values: 0 for int, null for nullable/reference types, false for bool. The codebase compensates with field initializers (`= new()`, `= 3`), but tests must verify these edge cases, not rely on them.
-
-**How to avoid:**
-1. Create explicit test fixtures for each save format version:
-   - `v1_save.json` -- real v1 format with `Happiness` field, no `LifetimeHappiness`/`Mood`/`MoodBaseline`, no `HomeSegmentIndex`.
-   - `v2_save.json` -- v2 format with mood fields, no `HomeSegmentIndex`.
-   - `v3_save.json` -- current format with all fields.
-2. Include a test that deserializes raw JSON strings (not round-tripped C# objects) to verify that missing fields produce correct defaults.
-3. Test the boundary explicitly: serialize with `Version = 1`, deserialize, verify `LifetimeHappiness == 0` and `Mood == 0` and `HomeSegmentIndex == null`.
-4. Add a "canary" test that verifies all `SaveData` properties have field initializers where expected -- this catches future fields added without initializers.
-
-**Warning signs:**
-- Save/load tests pass but actual old saves crash on load.
-- A NullReferenceException in `ApplySceneState` when loading a v2 save (missing `HomeSegmentIndex`).
-- Tests that construct `SaveData` with all fields set, which never exercises the default/missing path.
-
-**Phase to address:**
-Phase 2 or 3 (save/load test suite) -- the test fixtures for each version must be created as test data files, not generated programmatically.
-
----
-
-### Pitfall 7: Testing Event-Driven Chains Without Frame Advancement
-
-**What goes wrong:**
-The game's architecture uses event cascades: `RoomPlaced` -> `WishBoard.OnRoomPlaced` -> `NudgeCitizensForRoom` -> `WishNudgeRequested`. Some of these chains are synchronous (C# events invoke immediately), but the side effects may depend on frame processing. For example:
-- `SaveManager._Process` checks `_pendingLoadFrames` and waits 2 frames before calling `ApplySceneState`.
-- `CitizenManager._Process` retries finding `RingVisual` each frame.
-- `HappinessManager._Process` runs mood decay via `MoodSystem.Update()`.
-- Tweens advance in `_Process`.
-
-A test that calls `GameEvents.Instance.EmitRoomPlaced("bunk_pod", 5)` and immediately asserts that WishBoard tracked the room type will likely pass (synchronous chain). But a test that loads a save via `SaveManager.ApplyState()` and immediately checks if rooms are restored will fail -- the frame-delay pattern means `ApplySceneState` hasn't run yet.
-
-**Why it happens:**
-GoDotTest test methods are `async Task` and can `await` things, but there's no built-in "wait N frames" utility. GodotTestDriver provides `Fixture.WaitForFrames()` but only if you're using fixtures. Developers writing quick unit tests forget that some operations are deferred.
-
-**How to avoid:**
-1. Create a `TestHelper.WaitFrames(SceneTree tree, int count)` async utility that awaits `tree.ToSignal(tree, SceneTree.SignalName.ProcessFrame)` the specified number of times.
-2. Document which operations are synchronous (safe to assert immediately) and which are deferred (require frame advancement):
-   - **Synchronous:** Event emission and handler invocation, dictionary mutations, property changes.
-   - **Deferred (1+ frames):** `QueueFree` node removal, `SaveManager.ScheduleSceneRestore()` (2 frames), Tween progress, Timer timeouts, `_Process` updates.
-3. For save/load integration tests, always await at least 3 frames after `ScheduleSceneRestore()` before asserting scene state.
-4. Use GodotTestDriver's `Fixture` class for integration tests -- it handles frame management correctly.
-
-**Warning signs:**
-- Save/load tests pass sometimes and fail other times (race with frame processing).
-- Assertions on node state after `QueueFree` succeed because the node isn't freed yet (false positive).
-- Tests pass locally (fast machine, frames process quickly) but fail in CI (slower, timing differs).
-
-**Phase to address:**
-Phase 1 (Framework Setup) -- the `WaitFrames` helper is foundational. Phase 2+ uses it extensively.
-
----
-
-### Pitfall 8: Testing MoodSystem Decay Without Controlling Delta Time
-
-**What goes wrong:**
-`MoodSystem.Update(float delta, int lifetimeHappiness)` uses exponential smoothing with `alpha = 1 - exp(-decayRate * delta)`. In production, `delta` comes from `HappinessManager._Process(double delta)`, which is frame-time-dependent. In tests, if you call `MoodSystem.Update()` directly with a fabricated delta, the results depend on the exact delta value. If you let `_Process` run during tests (because the autoload is active), the delta is real wall-clock time, making decay amounts non-deterministic.
-
-A test like "mood should decay from 0.5 to below 0.45 after 10 seconds" will be flaky because the actual decay depends on frame rate, test execution speed, and whether the CI runner is under load.
-
-**Why it happens:**
-`MoodSystem` is a POCO that receives delta from its owner. This is actually good design for testability -- but only if tests bypass the `HappinessManager._Process` path and call `MoodSystem.Update()` directly with controlled deltas. The danger is that a developer writes an integration test that relies on real time passing.
-
-**How to avoid:**
-1. Test MoodSystem directly as a POCO (Tier 1 test). Construct it with a known `HappinessConfig`, call `Update()` with exact delta values, assert exact results:
+**Prevention:**
+1. New `SavedCitizen` fields must be nullable or have safe defaults:
    ```csharp
-   var config = new HappinessConfig();
-   var mood = new MoodSystem(config);
-   mood.OnWishFulfilled(); // mood jumps to 0.06
-   mood.Update(1.0f, 0);  // 1 second of decay
-   // Assert mood is between expected bounds
+   // SavedCitizen additions for v4
+   public string Interest { get; set; }  // null when loading v3 saves
+   public string Rhythm { get; set; }    // null when loading v3 saves
    ```
-2. Never test mood decay via wall-clock time. If you need to test the full HappinessManager pipeline, stop the autoload's processing and manually invoke `_Process` with controlled deltas.
-3. For the tier threshold tests (Quiet->Cozy at 0.2, Cozy->Lively at 0.4, etc.), set mood directly via `RestoreState()` to just above/below thresholds rather than trying to reach them through decay simulation.
+2. In `ApplySceneState`, after spawning citizens from save, check for missing traits:
+   ```csharp
+   if (string.IsNullOrEmpty(citizen.Interest))
+       assignedInterest = TraitAssigner.AssignRandomInterest();
+   ```
+3. Clock position: default to Morning (period 0, time 0) when loading v3 saves. This is the natural "fresh start" for the day/night cycle.
+4. Add `SaveData.Version = 4` only in the `CollectGameState()` method. Keep the version-gated restore pattern:
+   ```csharp
+   if (data.Version >= 4)
+   {
+       // Restore clock and traits from save
+   }
+   else
+   {
+       // Default clock to Morning, assign random traits
+   }
+   ```
+5. Add a v3 backward-compatibility test that loads hand-crafted v3 JSON (no trait fields, no clock fields) and verifies citizens get assigned traits and clock starts at Morning.
+6. Critically: suppress autosave during the trait assignment window. The `_isRestoring` pattern from HousingManager should be extended to cover the trait assignment phase.
 
-**Warning signs:**
-- Mood tests with exact equality assertions (`Assert.Equal(0.437f, mood.Mood)`) that fail due to floating-point drift.
-- Tests with `Thread.Sleep()` or `await Task.Delay()` to "wait for decay" -- these are always wrong.
-- Flaky CI failures in mood tests that pass locally.
+**Detection:**
+NullReferenceException in utility scoring 15-30 seconds after loading a v3 save. The stack trace will point to trait access on a citizen whose traits were never assigned.
 
-**Phase to address:**
-Phase 2 or 3 (mood system test suite) -- but the principle of "test POCOs directly with controlled inputs" should be established in Phase 1.
+**Phase to address:** Phase implementing save/load for new features -- must include v3 backward-compatibility test as acceptance criteria.
 
 ---
 
-## Technical Debt Patterns
+### Pitfall 3: Utility Scoring Returns Garbage When No Rooms or All Equal Scores
 
-| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
-|----------|-------------------|----------------|-----------------|
-| Testing singletons via static Instance instead of injected dependencies | No refactoring needed, tests work immediately | Tests are coupled to global state, can't run in parallel, require explicit reset between tests | Acceptable for this project -- 8 singletons, single-player game, sequential test runner. Dependency injection would be over-engineering |
-| Putting ResetForTesting() methods directly on production singletons | Clean API, easy to call | Test-only code in production classes, risk of accidentally calling in production | Acceptable with `#if DEBUG` guard or `[Conditional("DEBUG")]` attribute. The alternative (test-only subclasses) adds complexity for no real benefit |
-| Hardcoding JSON test fixtures as string literals in test files | Fast to write, no external files to manage | Long strings in test code are hard to read and maintain, duplicate the save format definition | Only in initial implementation. Move to embedded resource files once you have 3+ fixture strings |
-| Skipping integration tests for UI components (tooltip, info panel, HUD) | Faster test suite, fewer brittle tests | UI bugs not caught until manual testing | Acceptable for v1.3 -- focus on logic tests. UI integration tests are a v1.4+ concern |
-| Not mocking Godot API calls (ResourceLoader, FileAccess, GD.Randi) | No mocking framework complexity | Tests depend on res:// filesystem existing, random values are non-deterministic | Acceptable if: (a) pure logic tests avoid Godot APIs entirely, (b) integration tests accept non-determinism in GD.Randi by testing ranges not exact values, (c) ResourceLoader tests use real .tres files |
+**What goes wrong:**
+The utility scoring system evaluates all built rooms and picks the highest-scoring one for a citizen to visit. Three degenerate cases break naive implementations:
 
-## Integration Gotchas
+**Case A -- No rooms built:** The player hasn't built any rooms yet (early game or after mass demolition). The scoring function iterates an empty list and returns... what? If it returns null, the caller must handle null. If it returns a default segment index of 0, the citizen walks to segment 0 and tries to visit an empty segment, causing the visit tween to drift toward a non-existent room.
 
-| Integration Point | Common Mistake | Correct Approach |
-|-------------------|----------------|------------------|
-| GoDotTest + project.godot | Changing `run/main_scene` to the test scene permanently | Keep the game's main scene as default. Use command-line `--run-tests` flag detection in the main scene script to redirect to test scene. Or use a separate Godot project profile |
-| GoDotTest + Godot 4.4 exit codes | Godot prints ObjectDB leak warnings on exit that look like errors | These are cosmetic. Godot's shutdown prints "Leaked instance" for autoloads that outlive the test runner. Suppress in CI by checking test output, not exit code alone. Use `--coverage` flag which force-exits cleanly |
-| GodotTestDriver Fixture + autoload singletons | Using Fixture to load the full game scene for every test | Fixtures should load minimal test scenes. Full game scene pulls in all UI, audio, ring mesh -- 90% irrelevant to the test and slow to load |
-| GoDotTest TestClass + async tests | Forgetting that test methods must return `Task` (not `void`) to be properly awaited | All test methods with `[Test]` attribute must be `public async Task MethodName()`. If they return void, exceptions are swallowed silently |
-| SaveManager + test file paths | Tests calling `SaveManager.Instance.Load()` which reads the real save file | Either override save path for tests, or bypass SaveManager entirely by testing serialization directly with `JsonSerializer.Serialize/Deserialize` |
-| GameEvents + test assertions | Subscribing to events for assertions but forgetting to unsubscribe | Use a disposable `EventSpy<T>` wrapper that tracks invocations and unsubscribes on Dispose. Pattern: `using var spy = new EventSpy(() => GameEvents.Instance.CreditsChanged += spy.Handler, () => GameEvents.Instance.CreditsChanged -= spy.Handler);` |
+**Case B -- All rooms score identically:** With no traits (v3 save loaded without traits) or with a citizen whose trait has no room affinity, all rooms get the same base proximity score. The `>` comparison picks the first room in iteration order (same pitfall documented in the existing visit system). Citizens cluster at segment 0 instead of spreading naturally across the ring.
 
-## Performance Traps
+**Case C -- Only housing rooms built:** The player has only built housing. Housing rooms should be excluded from utility scoring for "visit" decisions (citizens go home via the rest state, not the visit state). If housing isn't excluded, citizens "visit" their own home room through the visit pathway instead of the rest pathway, bypassing the Zzz indicator and rest duration logic.
 
-| Trap | Symptoms | Prevention | When It Breaks |
-|------|----------|------------|----------------|
-| Loading full game scene in every integration test | Test suite takes 30+ seconds, CI timeout | Create minimal `.tscn` files for testing (just the nodes needed). Most tests need zero scene -- test POCOs directly | Immediately -- first test suite will be painfully slow |
-| Not stopping autoload Timers during test runs | Income timer fires dozens of times during a long test suite, economy tests become flaky | Stop all Timers in `ResetForTesting()`. Only start timers explicitly when testing timer-dependent behavior | After 10+ tests that each take 1+ second (cumulative timer firings) |
-| WishBoard loading all .tres templates from disk on every test reset | Each `_Ready()` call triggers filesystem scan of `res://Resources/Wishes/` | Don't re-initialize WishBoard between tests unless testing wish-related features. For wish tests, cache templates on first load | At 20+ test suites with full reset (disk I/O adds up) |
-| Creating and freeing dozens of CitizenNode instances per test without cleanup | Orphan nodes accumulate in scene tree, Godot logs "Leaked instance" warnings on exit | Use `QueueFree()` in `[Cleanup]` and await one frame for deferred deletion. Or use GodotTestDriver Fixture which handles this | After 100+ citizen node creations across all tests |
+**Why it happens:**
+The current visit system (CitizenNode.cs lines 429-488) has a simple proximity-based selection with a `VisitProximityThreshold` guard. The utility system replaces this with multi-factor scoring but may not replicate all the implicit guards. The wish-aware weighting (`WishMatchDistanceMultiplier = 0.3f`) is a multiplicative bonus -- if the base distance is 0 (citizen is standing at the room), the weighted distance is still 0, and all wish-matching rooms at the same location score identically.
 
-## Testing Anti-Patterns Specific to This Architecture
+**Consequences:**
+Case A: Citizens attempt to visit empty segments, drift to incorrect radial positions, get stuck. Case B: All citizens converge on the same room, breaking the "spread across the station" aesthetic. Case C: Rest behavior is bypassed, Zzz indicators never show, home timer and rest timer logic becomes dead code.
 
-### Anti-Pattern 1: Testing Cross-Singleton Chains as Unit Tests
+**Prevention:**
+1. The utility scorer must return a `RoomChoice?` (nullable struct), not a bare segment index. The caller (state machine Evaluating state) must handle null by transitioning to Walking instead of Visiting.
+2. Break ties with reservoir sampling (the existing `FindBestRoom` in HousingManager already does this correctly -- reuse the pattern):
+   ```csharp
+   if (score > bestScore) { bestScore = score; bestIndex = i; tieCount = 1; }
+   else if (score == bestScore) { tieCount++; if (GD.Randi() % tieCount == 0) bestIndex = i; }
+   ```
+3. Filter out housing rooms from the visit candidate list before scoring. The existing `RoomDefinition.RoomCategory` enum makes this a one-line check.
+4. Add a "recency penalty" factor that reduces scores for recently-visited rooms. This naturally breaks ties and prevents clustering even without traits.
+5. Normalize all scoring factors to 0.0-1.0 range before combining them. The proximity factor uses angular distance (0 to Pi radians), the trait affinity is an enum bonus, and the wish bonus is a multiplier -- these have completely different scales. Without normalization, the largest-scale factor dominates and the others are irrelevant.
 
-**What it looks like:**
-A test titled "test_room_placement_triggers_housing_assignment" that calls `BuildManager.Instance.PlaceRoom(...)`, then asserts `HousingManager.Instance.GetOccupantCount(segment) > 0`. This is testing the entire event chain: BuildManager -> GameEvents.RoomPlaced -> HousingManager.OnRoomPlaced -> AssignUnhousedCitizens.
+**Detection:**
+All citizens walking to the same room. Citizens visiting empty segments. Zero Zzz indicators despite citizens having homes.
 
-**Why it's bad:**
-If this test fails, you don't know which link in the chain broke. Is the event not firing? Is HousingManager not subscribed? Is the assignment algorithm wrong? Is the capacity not tracked? The test is an integration test pretending to be a unit test.
+**Phase to address:** Phase implementing utility scoring -- normalization and edge cases must be unit tested before integration.
 
-**Instead:**
-- Unit test HousingManager.FindBestRoom logic with controlled room capacity data.
-- Unit test that calling AssignCitizen updates all three data structures.
-- Integration test that the event chain works end-to-end (clearly labeled as integration).
+---
 
-### Anti-Pattern 2: Asserting Exact Floating-Point Values from Mood System
+### Pitfall 4: Day/Night Lighting Transition Causes Visual Artifacts in Existing Scene
 
-**What it looks like:**
-`Assert.Equal(0.06f, moodSystem.Mood)` after `OnWishFulfilled()`.
+**What goes wrong:**
+The game currently has a static lighting setup: a single `DirectionalLight3D` (or ambient), a `WorldEnvironment` with fixed settings, and room blocks using `StandardMaterial3D` with static `AlbedoColor`. Adding day/night transitions means tweening multiple properties simultaneously:
+- `DirectionalLight3D.light_energy` (brightness)
+- `DirectionalLight3D.light_color` (warm -> cool)
+- `WorldEnvironment.environment.ambient_light_color`
+- `WorldEnvironment.environment.ambient_light_energy`
+- Room `StandardMaterial3D.emission_enabled` + `emission_energy_multiplier` (windows glow at night)
 
-**Why it's bad:**
-`MoodSystem.OnWishFulfilled()` does `_mood = MathF.Min(1.0f, _mood + _config.MoodGainPerWish)`. If `_mood` was 0f and `MoodGainPerWish` is 0.06f, the result IS exactly 0.06f. But after any `Update()` call with decay, floating-point arithmetic makes exact equality unreliable.
+Several things go wrong:
 
-**Instead:**
-Use tolerance-based assertions: `Assert.InRange(moodSystem.Mood, 0.055f, 0.065f)`. For tier threshold tests, test the tier enum directly: `Assert.Equal(MoodTier.Quiet, moodSystem.CurrentTier)`.
+**Artifact 1 -- Emission glow conflict:** The existing citizen selection system (CitizenManager.cs lines 274-279) enables `EmissionEnabled = true` and sets `EmissionEnergyMultiplier = 2.5f` on the selected citizen's material for a bloom/glow effect. If the day/night system also modifies emission on room materials, and the WorldEnvironment glow threshold changes during transitions, selected citizens may lose their glow (threshold raised) or ALL emissive materials bloom uncontrollably (threshold lowered).
 
-### Anti-Pattern 3: Testing Save Round-Trip Through SaveManager Instead of Serialization
+**Artifact 2 -- Material instance sharing:** `RoomVisual.CreateRoomBlock()` creates a new `StandardMaterial3D` per room. But if the day/night system tries to modify materials by iterating room meshes and setting emission, it must ensure it's modifying the room's OWN material, not a shared resource. The `MaterialOverride` pattern used in the codebase is safe (each room gets its own instance), but any code that creates materials via `ResourceLoader.Load<StandardMaterial3D>()` would share instances.
 
-**What it looks like:**
-```csharp
-SaveManager.Instance.PerformSave(); // writes to disk
-var loaded = SaveManager.Instance.Load(); // reads from disk
-Assert.Equal(expectedCredits, loaded.Credits);
-```
+**Artifact 3 -- Transition popping:** Abrupt property changes between periods (Morning -> Day -> Evening -> Night) cause visible "pops" in lighting. A tween that interpolates `light_energy` from 1.0 to 0.3 over 2 seconds looks smooth, but if the environment `ambient_light_color` changes from warm to cool in the same 2 seconds, the combined effect can produce a muddy intermediate color that flashes on screen.
 
-**Why it's bad:**
-This tests the filesystem, JSON serialization, AND SaveManager orchestration all at once. If it fails, is it a serialization bug, a file permission issue, or a data collection bug? It also writes to the real save path (Pitfall 5).
+**Why it happens:**
+The existing scene was designed for a single static lighting state. Room materials use flat `AlbedoColor` with no emission. The WorldEnvironment's glow settings (if any) were tuned for the static case. Adding animated lighting requires coordinating changes across multiple nodes and materials that were never designed to be animated.
 
-**Instead:**
-- Test serialization directly: `JsonSerializer.Serialize(saveData)` -> `JsonSerializer.Deserialize<SaveData>(json)`.
-- Test `CollectGameState()` separately (set singleton state, verify the returned SaveData has correct values).
-- Test `ApplyState()`/`ApplySceneState()` separately (provide known SaveData, verify singletons have correct state after).
-- Reserve full round-trip for one integration test with isolated file path.
+**Consequences:**
+Ugly intermediate colors during transitions. Citizens' selection glow disappearing or rooms glowing too brightly. Player perceives the day/night cycle as "janky" rather than "cozy."
 
-## "Looks Done But Isn't" Checklist
+**Prevention:**
+1. Create a `LightingProfile` Resource class with all lighting parameters for each period (sun energy, sun color, ambient color, ambient energy, glow threshold, glow bloom). Transition by interpolating between two profiles, not by tweening individual properties independently.
+2. Separate glow channels: citizen selection glow should use a DIFFERENT technique than room window emission. Option: citizen glow uses `EmissionEnergyMultiplier` above the glow threshold, while room windows use values BELOW the threshold (just visible color, no bloom). Or use separate material properties (emission vs. albedo brightness).
+3. Use a single master tween for each transition that controls all properties in parallel with the same duration and easing curve. Never have lighting properties transition at different speeds.
+4. Keep the WorldEnvironment glow threshold constant. Change the emission intensity on emissive materials to cross/uncross the threshold, not the threshold itself. This prevents side effects on citizen selection glow.
+5. Test transitions by teleporting the clock (advance period instantly) and verifying no visual artifacts. Then test with normal transition speed.
 
-- [ ] **Test runner scene:** The `.tscn` file exists and `--run-tests` flag detection works -- verify it runs from BOTH command line AND editor play button
-- [ ] **Singleton reset:** ResetForTesting() clears ALL mutable state on ALL 8 singletons -- verify by printing state after reset, comparing to fresh-launch state
-- [ ] **Timer suppression:** All autoload Timers stopped during tests -- verify by checking `Timer.IsStopped()` in a test assertion
-- [ ] **Event cleanup:** GameEvents subscriber lists cleared between suites -- verify by checking that event invocations in test N+1 don't trigger handlers from test N
-- [ ] **Save path isolation:** Tests never touch `user://save.json` -- verify by checking file modification timestamp before and after test run
-- [ ] **v1 save compat:** Test loads actual v1-format JSON (not a v3 object serialized with Version=1) -- verify by hand-crafting JSON without v2/v3 fields
-- [ ] **v2 save compat:** Test loads actual v2-format JSON without HomeSegmentIndex -- verify citizens become unhoused (auto-assigned) on load
-- [ ] **CI readiness:** Tests run and pass in headless Godot (`--headless` flag) -- verify by running `godot --headless --run-tests` before pushing CI config
-- [ ] **Frame advancement:** All deferred operations have corresponding frame waits -- verify by removing waits and confirming tests fail (test the tests)
-- [ ] **Coverage collection:** `--coverage` flag works with coverlet and produces coverage report -- verify report includes game code namespaces, not just test code
+**Detection:**
+Sudden color flashes during period transitions. Citizens lose glow highlight when selected during evening/night. Room blocks that were blue (comfort category) now look purple because emission interacts with albedo.
 
-## Recovery Strategies
+**Phase to address:** Phase implementing day/night lighting -- must be prototyped visually before committing to a specific approach.
 
-| Pitfall | Recovery Cost | Recovery Steps |
-|---------|---------------|----------------|
-| Singleton state leaking between tests | LOW | Add ResetForTesting() methods, call in [Cleanup]. Can be done incrementally per singleton as tests are written |
-| Event subscriber accumulation | LOW | Add ClearAllSubscribers() to GameEvents, call in ResetForTesting(). All singletons re-subscribe in their own reset |
-| Scene tree mismatch crashes | LOW | Categorize failing tests into tiers, move scene-dependent tests to integration tier with minimal test scenes |
-| Timer interference making tests flaky | LOW | Add Timer.Stop() calls in ResetForTesting(). Immediate fix, no architectural change |
-| Save file corruption during tests | MEDIUM | Implement SavePathOverride. Requires modifying SaveManager (production code change), but small and safe |
-| Save format version tests incomplete | LOW | Add JSON fixture files for v1/v2/v3. Pure test-data work, no production code changes |
-| Frame advancement missing | MEDIUM | Audit all async test methods for operations that need frame waits. Add WaitFrames helper. May require rewriting some tests |
-| Mood tests flaky due to timing | LOW | Refactor to test MoodSystem POCO directly with controlled deltas. No production code change needed |
+---
 
-## Pitfall-to-Phase Mapping
+### Pitfall 5: State Machine Interrupt -- Citizen Visiting Room That Gets Demolished
 
-| Pitfall | Prevention Phase | Verification |
-|---------|------------------|--------------|
-| Singleton state leaking (Pitfall 1) | Phase 1: Framework Setup | Run full test suite 3 times consecutively -- all must pass |
-| Event subscriber accumulation (Pitfall 2) | Phase 1: Framework Setup | Add an assertion counting GameEvents subscribers at start of each suite -- must be baseline count |
-| Scene tree lifecycle mismatch (Pitfall 3) | Phase 1: Framework Setup | Document test tiers in test project README. Pure logic tests must not import Godot namespaces |
-| Timer interference (Pitfall 4) | Phase 1: Framework Setup | Assert all Timers are stopped at test suite start |
-| Save path isolation (Pitfall 5) | Phase 1: Framework Setup | CI run must not create/modify user://save.json |
-| Save format edge cases (Pitfall 6) | Phase 2-3: Save/Load Tests | v1, v2, v3 JSON fixtures all load without exceptions |
-| Frame advancement (Pitfall 7) | Phase 1: Framework Setup | WaitFrames helper exists and is documented |
-| MoodSystem timing (Pitfall 8) | Phase 2-3: Mood Tests | Zero use of Thread.Sleep or Task.Delay in mood tests |
+**What goes wrong:**
+The existing code handles room demolition during a home visit (CitizenNode.cs `OnRoomDemolished` -> `EjectFromHome`, lines 1022-1029). But the state machine introduces a new `Visiting` state where citizens visit non-home rooms. If a room is demolished while a citizen is in the Visiting state (invisible, inside the room during the visit tween):
+
+1. The visit tween is playing a `TweenInterval` (Phase 4 of `StartVisit`, line 568). The citizen is invisible (`Visible = false`).
+2. `GameEvents.Instance.RoomDemolished` fires.
+3. The citizen's current visit target segment matches the demolished room.
+4. The tween needs to be killed, the citizen made visible, restored to walkway position, and transitioned to Walking state.
+
+The existing `OnRoomDemolished` handler only checks `HomeSegmentIndex` (line 1025). It does NOT check if the citizen is visiting a non-home room that was demolished. The citizen remains invisible, the tween continues playing against a now-demolished room, and eventually completes -- restoring the citizen at the position of a room that no longer exists.
+
+**Why it happens:**
+The implicit state machine (boolean flags) only tracks home-related interrupts because that was the only case in v1.2-v1.3. The visit system didn't need demolish handling because visit durations are short (4-8s) and the cosmetic impact of completing a visit to a demolished room is minor. But with the explicit state machine and longer visit durations (potentially), this becomes a real issue.
+
+**Consequences:**
+Citizen briefly appears at the demolished room's position before snapping to the walkway. The `CitizenExitedRoom` event fires with the demolished room's segment index, which causes EconomyManager's `_workingCitizens` set to try removing the citizen from a room that no longer exists (this actually works because it uses set membership, not room lookup -- EconomyManager.cs line 269).
+
+**Prevention:**
+1. The state machine's `OnRoomDemolished` handler must check BOTH `HomeSegmentIndex` AND the current visit target:
+   ```csharp
+   if (currentState == State.Visiting && _visitTargetSegment == segmentIndex)
+       TransitionTo(State.Walking); // kills tween, restores visibility
+   ```
+2. The `TransitionTo(Walking)` logic must include the same restoration sequence as `AbortHomeReturn()`: kill tween, restore visibility, restore walkway position, restore mesh alpha.
+3. Factor the "restore citizen to walkway" logic into a single `RestoreToWalkway()` method shared by all interrupt handlers. Currently this logic is duplicated across `AbortHomeReturn()`, `EjectFromHome()`, and will need to be in the visit interrupt too.
+
+**Detection:**
+Citizen briefly visible at inner/outer radius after demolishing a room they were visiting. Citizen count in room tooltip shows 0 but a citizen is still "inside."
+
+**Phase to address:** Phase implementing the state machine -- interrupt handling for all states must be specified in the state transition table.
+
+---
+
+### Pitfall 6: Trait Assignment on Existing Citizens Creates Non-Deterministic Behavior
+
+**What goes wrong:**
+When loading a v3 save (no traits), each existing citizen needs traits assigned. If traits are assigned randomly using `GD.Randi()` or `GD.Randf()`, the assignment is non-deterministic: loading the same save twice produces different trait distributions. This means:
+
+1. Player saves, quits, reloads -- their citizens behave differently because traits were re-rolled.
+2. Bug reports are unreproducible because the trait assignment varies per load.
+3. If the random assignment happens to give all citizens the same Interest trait, the utility scoring degeneracy from Pitfall 3 Case B re-emerges.
+
+**Why it happens:**
+The codebase uses `GD.Randf()` and `GD.Randi()` for all randomness (citizen speed, direction, visit timing). These are stateful PRNGs that depend on Godot's global random seed, which changes every launch. There is no seeded randomness for deterministic behavior.
+
+**Consequences:**
+Player perception: "my citizens changed personality after I reloaded." This violates the cozy principle -- citizens should feel consistent and personal.
+
+**Prevention:**
+1. When assigning traits to a citizen without them (v3 save migration), seed the assignment deterministically from the citizen's name:
+   ```csharp
+   int seed = citizenName.GetHashCode();
+   var interest = (InterestTrait)(Math.Abs(seed) % interestCount);
+   var rhythm = (RhythmTrait)(Math.Abs(seed >> 16) % rhythmCount);
+   ```
+   This ensures the same citizen always gets the same traits on every load.
+2. Once traits are assigned and saved (v4 format), they persist normally. The deterministic assignment is only needed for the v3 -> v4 migration path.
+3. Ensure the trait distribution is reasonable: with 5 citizens and (say) 4 Interest types, name-seeded assignment might produce duplicates. Accept this -- it's better than random re-rolling. The player will get variety as new citizens arrive with random traits.
+4. Document the deterministic assignment as a locked decision so future developers don't "simplify" it to `GD.Randi()`.
+
+**Detection:**
+Citizens changing behavior after save/load cycle without any player action. Identical saves producing different citizen movement patterns.
+
+**Phase to address:** Phase implementing trait assignment -- the deterministic migration path must be tested with known citizen names.
+
+---
+
+## Moderate Pitfalls
+
+---
+
+### Pitfall 7: GameEvents Subscriber Explosion from New Events
+
+**What goes wrong:**
+v1.4 needs several new events on GameEvents: `ClockPeriodChanged`, `CitizenStateChanged`, `CitizenTraitsAssigned`, possibly `UtilityScoreComputed` (for debug UI). Each new event requires:
+1. A new `event Action<...>` field in GameEvents.
+2. An `EmitX()` method.
+3. Adding the field to `ClearAllSubscribers()`.
+4. Any singleton that subscribes must store a delegate reference for clean unsubscription.
+5. SaveManager must decide whether to autosave on this event.
+6. TestHelper.ResubscribeAllSingletons() may need updates.
+
+Missing ANY of these steps causes either stale subscribers (memory leak + ObjectDisposedException), missed autosaves (player progress lost on crash), or test state leaking.
+
+**Why it happens:**
+The event bus pattern scales linearly in boilerplate. With 8 singletons and 30+ events, it's easy to add an event field but forget to null it in `ClearAllSubscribers()` or forget to add it to SaveManager's subscription list.
+
+**Prevention:**
+1. Create a checklist for adding new events. Every new event must touch: GameEvents (field + emit), ClearAllSubscribers, SaveManager subscription (if state-changing), subscriber unsubscription.
+2. Only add events that are genuinely needed for cross-system communication. `CitizenStateChanged` might be useful for debug UI but if nothing subscribes to it, don't add it.
+3. The `ClockPeriodChanged` event should trigger autosave (period transitions represent meaningful state changes). `CitizenStateChanged` should NOT trigger autosave (too frequent, would cause save spam).
+4. Add a test that verifies `ClearAllSubscribers()` nulls ALL event fields. Use reflection to find all `event Action` fields and assert they're null after clearing.
+
+**Phase to address:** Each phase that adds new events -- the checklist should be enforced at PR review time.
+
+---
+
+### Pitfall 8: Clock Period Duration Mismatch with Decision Timer
+
+**What goes wrong:**
+The station clock has four periods (Morning/Day/Evening/Night). The citizen decision timer fires every 15-30 seconds. If a period lasts 60 seconds and the decision timer is 25 seconds, a citizen makes approximately 2-3 decisions per period. This means schedule weighting (e.g., "Citizens prefer social rooms in the Evening") has very few samples to express itself. The player won't perceive a pattern because the random variation in individual decisions overwhelms the schedule bias.
+
+Conversely, if periods are too long (300 seconds = 5 minutes), the day/night cycle feels sluggish. At 25 second decisions, a citizen makes ~12 decisions per period, which is enough for the schedule to be visible, but the player has to wait 20 minutes for a full day cycle.
+
+**Why it happens:**
+The decision timer and period duration are independently configurable parameters. Without calibration, they can be set to values where the schedule system has no visible effect or where the day/night cycle feels wrong for a "cozy" game.
+
+**Prevention:**
+1. Calibrate together: aim for 4-6 decisions per period. If decision timer is 20s average, periods should be ~100s each (400s full day = ~6.5 minutes).
+2. Make both configurable from a single config resource so they can be tuned together in the Inspector.
+3. Add a debug overlay that shows "decisions this period: N, schedule distribution: {Social: 3, Rest: 2, Work: 1}" to validate that the schedule is expressing itself.
+4. Consider the "cozy" pacing: the game has no time pressure. A 5-8 minute full day cycle is appropriate. Shorter feels frantic, longer feels static.
+
+**Phase to address:** Phase implementing the clock system -- must be tuned before schedule templates are wired up.
+
+---
+
+### Pitfall 9: Citizen State Machine Doesn't Pause During Build Mode
+
+**What goes wrong:**
+The current code suppresses citizen clicks during build mode (`BuildManager.Instance?.CurrentMode != BuildMode.Normal`, CitizenManager.cs line 199). But citizens continue walking, visiting rooms, and going home during build mode. With the state machine, citizens will also be making utility-scored decisions during build mode. If the player is placing a room and a citizen decides to visit the segment where the room is being placed, the citizen walks to an empty segment (room not yet placed), looks broken.
+
+More subtly: the day/night clock should continue during build mode (it's a cosmetic system), but citizen decisions should factor in the room currently being placed (if any) -- or explicitly NOT factor it in. The current visit system doesn't have this problem because room visits only target occupied segments.
+
+**Prevention:**
+1. Keep citizen behavior running during build mode -- pausing would make the station feel "frozen" which is anti-cozy.
+2. The utility scorer should only consider actually-placed rooms (not placement previews). This is already how the current visit system works (checks `_grid.IsOccupied()`), so preserve this behavior.
+3. Do NOT add special-case code for build mode in the state machine. The state machine should be build-mode-agnostic. Build mode is a UI concern, not a citizen AI concern.
+
+**Phase to address:** Non-issue if the utility scorer uses the same `BuildManager.GetPlacedRoom()` / `SegmentGrid.IsOccupied()` pattern as the current visit system.
+
+---
+
+### Pitfall 10: Emissive Room Windows Interact Badly with Transparency Mode
+
+**What goes wrong:**
+Citizens use `SetMeshTransparencyMode(true/false)` (CitizenNode.cs lines 1039-1059) to toggle `BaseMaterial3D.TransparencyEnum.Alpha` during fade-in/out animations. If room materials also get transparency mode toggled for day/night transitions (e.g., windows become translucent at night to show interior glow), and a citizen walks past a room during a lighting transition, the render order between transparent citizen and transparent room window can produce Z-fighting or incorrect draw order.
+
+Godot 4's rendering pipeline sorts transparent objects by distance to camera, but annular sectors (ring segments) have complex geometry where the "center" distance is ambiguous. Citizens are small capsules that may sort behind a room wall despite being in front of it.
+
+**Why it happens:**
+The existing codebase avoids this by keeping room materials opaque at all times. Room blocks use `StandardMaterial3D` with `Transparency = Disabled` (RoomVisual.cs line 52). Only ghost previews use alpha transparency. Introducing emissive windows with potential transparency creates a new render-order concern.
+
+**Prevention:**
+1. Do NOT use alpha transparency for room window emission. Use additive emission on opaque materials instead: set `EmissionEnabled = true` and increase `EmissionEnergyMultiplier` to make windows "glow" without making the material transparent.
+2. If a window glow effect requires transparency (e.g., to show light through walls), use a separate child mesh for the window that has a higher render priority (`material.render_priority`), not the room's main material.
+3. Test citizen fade-in/out animations at all four lighting periods. The transparency mode toggle should work identically regardless of lighting state because room materials remain opaque.
+
+**Phase to address:** Phase implementing day/night lighting -- test with citizen visit animations at each period.
+
+---
+
+## Minor Pitfalls
+
+---
+
+### Pitfall 11: Clock UI Shows Wrong Period After Save/Load
+
+**What goes wrong:**
+If the clock position is saved as a float (accumulated time within the current period) but the period is saved as an enum, deserialization might restore the time within the period but not the period itself, or vice versa. The UI shows "Morning" but the lighting is set to "Night" because the clock state and the environment state were restored in different order.
+
+**Prevention:**
+Save the clock as a single float (total elapsed time since the cycle started) and derive the current period from it. This eliminates the two-field desync issue. On load, set both the clock time and immediately apply the corresponding lighting profile without a transition animation.
+
+**Phase to address:** Phase implementing clock save/load.
+
+---
+
+### Pitfall 12: Trait Display in CitizenInfoPanel Overflows Layout
+
+**What goes wrong:**
+The existing `CitizenInfoPanel` shows citizen name and home room. Adding trait labels ("Interest: Science", "Rhythm: Night Owl") may cause the panel to overflow its bounds, especially with long trait names. The panel is positioned at mouse click position (CitizenManager.cs line 283), which means it can overflow off-screen if clicked near an edge AND has extra content.
+
+**Prevention:**
+Design trait display with maximum string lengths in mind. Use short trait labels (single word or icon + word). Test panel at all four screen edges with the longest possible content.
+
+**Phase to address:** Phase implementing trait UI.
+
+---
+
+### Pitfall 13: Schedule Template Configuration Complexity
+
+**What goes wrong:**
+Schedule templates define per-period activity weights (e.g., Morning: {Work: 0.4, Social: 0.3, Rest: 0.3}). With 4 periods, 5 room categories, and multiple traits, the configuration matrix grows to 4 * 5 * N_traits entries. If stored as Godot Resources, this requires many .tres files or deeply nested export properties that are tedious to tune.
+
+**Prevention:**
+1. Keep it simple: define 2-3 schedule templates (not one per trait combination). Traits modify the base schedule, not replace it. E.g., "Night Owl" template has higher Evening/Night activity, "Early Bird" has higher Morning/Day activity.
+2. Store schedules as simple C# dictionaries in code, not as .tres resources. The number of schedules is small and fixed. Inspector tuning adds complexity for minimal benefit.
+3. Weights don't need to sum to 1.0. The utility scorer normalizes them. This avoids the "oops, my weights sum to 0.7" configuration error.
+
+**Phase to address:** Phase implementing schedule templates.
+
+---
+
+### Pitfall 14: Test Infrastructure Needs Expansion for New Singletons
+
+**What goes wrong:**
+v1.4 adds a new singleton (StationClock or similar) and new state on existing singletons (traits on CitizenData, state machine state on CitizenNode). The existing `TestHelper.ResetAllSingletons()` and `TestHelper.ResubscribeAllSingletons()` must be updated to include the new singleton. If forgotten, tests leak clock state between suites -- the clock is at Night in test 1, Morning is expected in test 2, test 2 fails.
+
+**Prevention:**
+1. Every new singleton must have a `Reset()` method and a `SubscribeToEvents()` method following the established pattern.
+2. Add the new singleton to `TestHelper.ResetAllSingletons()` and `TestHelper.ResubscribeAllSingletons()` in the same commit that creates the singleton.
+3. Add the new events to `GameEvents.ClearAllSubscribers()` in the same commit that adds them to GameEvents.
+4. Run the full test suite after adding the singleton to verify no test contamination.
+
+**Phase to address:** Phase implementing the clock singleton -- must update test infrastructure in the same commit.
+
+---
+
+## Phase-Specific Warnings
+
+| Phase Topic | Likely Pitfall | Mitigation |
+|-------------|---------------|------------|
+| Station Clock singleton | Clock period saved/loaded out of sync with lighting (Pitfall 11) | Save as single elapsed-time float, derive period on load |
+| Day/night lighting | Emission conflicts with citizen selection glow (Pitfall 4, Artifact 1) | Keep glow threshold constant, separate emission channels |
+| Day/night lighting | Transparent windows Z-fight with citizen fade animation (Pitfall 10) | Use additive emission on opaque materials, no transparency |
+| Citizen traits | v3 save loads citizens without traits, NullRef in scoring (Pitfall 2) | Nullable trait fields, deterministic name-seeded assignment (Pitfall 6) |
+| Citizen traits | Re-rolling traits on every load of v3 save (Pitfall 6) | Seed from citizen name hash, not GD.Randi() |
+| Utility scoring | All rooms score identically, citizens cluster (Pitfall 3, Case B) | Reservoir sampling tie-break + recency penalty |
+| Utility scoring | No rooms built, scorer returns garbage (Pitfall 3, Case A) | Return nullable, state machine handles null by staying in Walking |
+| Utility scoring | Housing rooms scored for visits (Pitfall 3, Case C) | Filter housing from visit candidates before scoring |
+| State machine | Timer replacement race condition (Pitfall 1) | Delete old timers atomically, extract state machine as POCO |
+| State machine | Room demolished while citizen visiting (Pitfall 5) | State machine OnRoomDemolished checks visit target, not just home |
+| State machine | _isVisiting / _isAtHome flags conflict with state enum (Pitfall 1) | Replace all boolean flags with single state enum, no co-existence |
+| Schedule templates | Config matrix too complex to tune (Pitfall 13) | 2-3 templates with trait modifiers, not per-trait-per-period configs |
+| Save format v4 | v3 saves crash on load (Pitfall 2) | Version-gated restore, nullable new fields, suppress autosave during migration |
+| New GameEvents | Missing ClearAllSubscribers entry (Pitfall 7) | Checklist for every new event, reflection-based test to verify |
+| Test infrastructure | New singleton not in ResetAllSingletons (Pitfall 14) | Update TestHelper in same commit as singleton creation |
+| Clock + Decision timer | Schedule bias not visible due to timing mismatch (Pitfall 8) | Calibrate together: 4-6 decisions per period |
 
 ## Sources
 
-- [GoDotTest GitHub repository](https://github.com/chickensoft-games/GoDotTest) -- test runner architecture, TestClass lifecycle, command-line flags
-- [GodotTestDriver GitHub repository](https://github.com/chickensoft-games/GodotTestDriver) -- Fixture class, input simulation, test driver pattern
-- [GoDotTest README](https://github.com/chickensoft-games/GoDotTest/blob/main/README.md) -- [Setup]/[Cleanup] attributes, sequential execution, --run-tests flag
-- [Godot Forum: Using GUT to test autoload singletons](https://forum.godotengine.org/t/using-gut-to-test-instantiating-scenes-via-autoload-singleton-event-bus-rootscene/86974) -- nodes not in tree during tests, explicit add_child required
-- [Godot Forum: C# Event Handlers ObjectDisposedException](https://forum.godotengine.org/t/c-event-handlers-triggering-unhandled-exception-system-objectdisposedexception-cannot-access-a-disposed-object/17794) -- disposed node event handler invocation
-- [Godot GitHub Issue #66319](https://github.com/godotengine/godot/issues/66319) -- signal delegates not disconnecting on node free
-- [Godot GitHub Issue #74984](https://github.com/godotengine/godot/issues/74984) -- signal trying to access freed listeners
-- [DEV Community: Don't use Singleton Pattern in your unit tests](https://dev.to/bacarpereira/don-t-use-singleton-pattern-in-your-unit-tests-8p7) -- state leaking between tests
-- [Understanding tree order (Godot 4 Recipes)](https://kidscancode.org/godot_recipes/4.x/basics/tree_ready_order/index.html) -- _EnterTree vs _Ready lifecycle
-- [Godot Documentation: Node Lifecycle](https://deepwiki.com/godotengine/godot-docs/5.4-node-lifecycle-and-processing) -- _EnterTree, _Ready, _Process order
-- Direct codebase analysis of all 8 autoload singletons: GameEvents.cs, EconomyManager.cs, BuildManager.cs, CitizenManager.cs, WishBoard.cs, HappinessManager.cs, HousingManager.cs, SaveManager.cs
-- Direct codebase analysis of MoodSystem.cs (POCO testability pattern), SafeNode.cs (event lifecycle pattern), SaveData/SavedCitizen/SavedRoom (serialization contracts)
+- Direct codebase analysis of CitizenNode.cs (1107 lines), CitizenManager.cs, SaveManager.cs, HousingManager.cs, HappinessManager.cs, EconomyManager.cs, GameEvents.cs, RoomVisual.cs, RingVisual.cs, MoodSystem.cs, CitizenData.cs, SaveData/SavedCitizen/SavedRoom POCOs, TestHelper.cs, GameTestClass.cs, SaveDataTests.cs
+- [Utility AI Tutorial for Godot 4 (Minoqi)](https://minoqi.vercel.app/posts/godot-4-tutorials/utility-ai-godot-4-tutorial/) -- score normalization requirement, tie-breaking omission, missing availability handling
+- [Game Programming Patterns: State](https://gameprogrammingpatterns.com/state.html) -- state machine interrupt handling, concurrent state transitions
+- [AI Decision-Making with Utility Scores (Forty Years of Code)](https://mcguirev10.com/2019/01/03/ai-decision-making-with-utility-scores-part-1.html) -- tie-breaking mechanisms, secondary criteria
+- [An Introduction to Utility Theory (Game AI Pro)](http://www.gameaipro.com/GameAIPro/GameAIPro_Chapter09_An_Introduction_to_Utility_Theory.pdf) -- normalization across different-scale inputs
+- [Standard Material 3D Documentation (Godot)](https://docs.godotengine.org/en/stable/tutorials/3d/standard_material_3d.html) -- emission, transparency, render priority
+- [Godot Forum: Emission Material Glow](https://godotforums.org/d/36272-emission-material-doesnt-have-glow-around-it) -- WorldEnvironment glow threshold interaction
+- [Godot Tween Documentation](https://docs.godotengine.org/en/stable/classes/class_tween.html) -- kill() behavior, fire-and-forget lifecycle
+- [System.Text.Json Nullable Annotations (Microsoft)](https://learn.microsoft.com/en-us/dotnet/standard/serialization/system-text-json/nullable-annotations) -- missing field default behavior
+- [Godot Forum: State Machine Best Practice](https://forum.godotengine.org/t/state-machine-best-practice/108704) -- POCO vs Node-based state machines
 
 ---
-*Pitfalls research for: Orbital Rings v1.3 Testing Infrastructure*
+*Pitfalls research for: Orbital Rings v1.4 Citizen AI & Day/Night Cycle*
 *Researched: 2026-03-07*

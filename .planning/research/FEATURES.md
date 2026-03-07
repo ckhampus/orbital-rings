@@ -1,185 +1,383 @@
-# Feature Landscape
+# Feature Research
 
-**Domain:** Testing infrastructure for a Godot 4 C# game (cozy space station builder)
+**Domain:** Citizen AI traits, utility-based decision making, day/night cycle, and schedule-driven behavior for a cozy space station builder
 **Researched:** 2026-03-07
-**Confidence:** HIGH -- GoDotTest and GodotTestDriver documentation verified via NuGet and official GitHub READMEs. Architecture analysis based on direct codebase inspection of all 8 autoload singletons, config resources, and POCO classes.
+**Confidence:** HIGH -- Patterns verified across RimWorld, Dwarf Fortress, Stardew Valley, Animal Crossing, and Oxygen Not Included. Utility AI theory confirmed via Game AI Pro (Dave Mark), The Shaggy Dev, and colony sim prototype implementations. Architecture grounded in direct inspection of existing 11,380 LOC codebase (8 singletons, 10 room types, 12 wish templates, existing CitizenNode state logic).
 
 ---
 
-## Context: What We Are Testing
+## Context: What Exists and What's Changing
 
-Orbital Rings is a 9,500+ LOC Godot 4.4 / C# / .NET 8 game with:
-- 8 Autoload singletons (GameEvents, EconomyManager, BuildManager, CitizenManager, WishBoard, HappinessManager, SaveManager, HousingManager)
-- Pure C# event delegates (not Godot signals) for all cross-system communication
-- 1 POCO class (MoodSystem) explicitly designed for testability in isolation
-- 3 Godot Resource config classes (HappinessConfig, EconomyConfig, HousingConfig) with `new()` constructors
-- Save/load across 3 format versions (v1, v2, v3) using System.Text.Json
-- Pure calculation methods on singletons (CalculateTickIncome, CalculateRoomCost, ComputeCapacity)
+The current CitizenNode has implicit behavior embedded in flat timers:
+- **Walking:** Continuous angle-based polar movement at random speed
+- **Room visiting:** 20-40s timer fires, finds nearest occupied room within proximity threshold, plays drift-fade animation, checks wish fulfillment on exit
+- **Home return:** 90-150s timer fires, walks to home segment, rests 8-15s with Zzz indicator
+- **Wish generation:** 30-60s timer fires, random wish from WishBoard, badge displayed
 
-The testing milestone does NOT introduce new gameplay. It adds the framework and critical path coverage to catch regressions as the codebase grows.
+v1.4 replaces this with observable, personality-driven behavior:
+- A **state machine** (Walking/Evaluating/Visiting/Resting) replaces the overlapping timer/boolean soup
+- **Traits** (1 Interest + 1 Rhythm) create visible behavioral differences between citizens
+- **Utility scoring** makes room selection intelligent (affinity, proximity, recency, wish bonus)
+- **Schedule templates** tie behavior to a station clock with four time periods
+- A **day/night cycle** provides visual rhythm through lighting and atmosphere changes
+
+### Existing Room Map (for trait-room affinity design)
+
+| Room | Category | RoomId | Notes |
+|------|----------|--------|-------|
+| Bunk Pod | Housing (0) | bunk_pod | 1-2 seg, capacity 2 |
+| Sky Loft | Housing (0) | sky_loft | 1-3 seg, capacity 4 |
+| Air Recycler | LifeSupport (1) | air_recycler | 1-2 seg |
+| Garden Nook | LifeSupport (1) | garden_nook | 1-3 seg |
+| Workshop | Work (2) | workshop | 1-2 seg |
+| Craft Lab | Work (2) | craft_lab | 1-3 seg |
+| Star Lounge | Comfort (3) | star_lounge | 1-2 seg |
+| Reading Nook | Comfort (3) | reading_nook | 1-3 seg |
+| Storage Bay | Utility (4) | storage_bay | 1-2 seg |
+| Comm Relay | Utility (4) | comm_relay | 1-3 seg |
+
+### Existing Wish Categories -> Room Mappings
+
+| Wish Category | Example Wishes | Fulfilling Rooms |
+|---------------|----------------|------------------|
+| Social (0) | hangout, stargaze, comm | star_lounge, garden_nook, comm_relay |
+| Comfort (1) | reading, rest, loft | reading_nook, bunk_pod, sky_loft |
+| Curiosity (2) | observe, tinker, craft | workshop, craft_lab, air_recycler, garden_nook |
+| Variety (3) | garden, explore, relay | garden_nook, storage_bay, comm_relay |
 
 ---
 
-## Table Stakes
+## Feature Landscape
 
-Features that any testing infrastructure for this codebase must have. Missing any of these means the testing milestone fails to provide confidence.
+### Table Stakes (Players Expect These)
+
+Features that define the "alive station" promise. Without these, the milestone fails to deliver on its stated goal of making citizens feel alive with observable daily routines.
 
 | Feature | Why Expected | Complexity | Dependencies | Notes |
 |---------|--------------|------------|--------------|-------|
-| Test runner scene | GoDotTest requires a dedicated scene to discover and run test classes via reflection | Low | GoDotTest NuGet package | Single .tscn with a C# script calling `GoTest.RunTests()` |
-| Command-line test execution | CI/CD and headless runs need `--run-tests --quit-on-finish` | Low | Test runner scene, Godot CLI | GoDotTest provides this out of the box via command-line args |
-| Unit tests for pure calculations | EconomyManager.CalculateRoomCost, CalculateTickIncome, HousingManager.ComputeCapacity are pure functions -- testing them is free | Low | Config resources with `new()` constructors | These methods accept config + inputs, return outputs. No Godot tree needed. |
-| MoodSystem POCO unit tests | MoodSystem was explicitly designed as a POCO for isolated testing (documented in code comments). Decay, tier transitions, hysteresis, wish gain, and restore all testable without any Godot node | Low | HappinessConfig with `new()` | Most valuable unit test target. Covers exponential decay math, 5-tier state machine, hysteresis dead-band, and boundary conditions |
-| Save/load round-trip tests | 3 format versions with backward compatibility is the highest-risk code path. Serialize SaveData to JSON, deserialize, verify fields survive | Low-Med | System.Text.Json, SaveData/SavedRoom/SavedCitizen POCOs | POCOs are plain C# -- no Godot types. Can test JSON round-trip without engine |
-| Save format version migration tests | v1 saves missing LifetimeHappiness/Mood/MoodBaseline must deserialize with defaults. v2 saves missing HomeSegmentIndex must deserialize with null | Med | SaveData POCO, version-gated logic in ApplyState | Test that v1 JSON missing v2 fields deserializes correctly, v2 JSON missing v3 fields deserializes correctly |
-| Test isolation (no cross-test state leakage) | GoDotTest runs tests sequentially in-process. Static Instance singletons leak state between test suites if not cleaned up | Med | [Setup]/[Cleanup] lifecycle hooks | Must reset or mock singleton state between tests. Critical for correctness. |
-| Assertion library | GoDotTest provides no built-in assertions. Tests need a way to assert expected vs actual | Low | Shouldly NuGet package | Shouldly gives readable `.ShouldBe()` syntax. Lightweight, well-maintained, no Godot conflicts |
-| Exclude test code from release builds | Test files must not ship in the exported game | Low | .csproj `DefaultItemExcludes` with `ExportRelease` condition | Standard GoDotTest pattern: conditional exclude of test/ directory |
-| Housing assignment logic tests | Fewest-occupants-first with capacity scaling is algorithmic -- verify assignment, displacement on demolish, reassignment, stale reference handling | Med | HousingManager internal logic, BuildManager room data | Needs either integration with scene or extraction of assignment logic into testable methods |
-| Economy formula verification | Income formula (base + sqrt scaling + work bonus) * tier multiplier has specific calibrated values. Tests lock the spreadsheet math | Low | EconomyConfig `new()`, pure CalculateTickIncome | Parameterized tests across all 5 mood tiers confirm multiplier values match config |
+| Station clock with four periods | Players of any sim expect a visible time progression. RimWorld, Stardew, ONI all have time periods that structure behavior. Without it, "daily routine" is meaningless | LOW | New ClockManager autoload (9th singleton) | Four periods (Morning/Day/Evening/Night) with configurable duration per period. Total cycle ~8-12 min real time. GameEvents.PeriodChanged event notifies all systems |
+| Day/night lighting transitions | Visual atmosphere is the primary way players perceive time passing. Stardew Valley's tinting, Animal Crossing's gradual sky changes -- these are baseline expectations for any game claiming a day/night cycle | MEDIUM | ClockManager, WorldEnvironment, ProceduralSkyMaterial | Tween ambient_light_color, sky_top_color, sky_horizon_color, and DirectionalLight3D energy/color between period presets. The existing ProceduralSkyMaterial already supports all needed properties |
+| Citizen traits visible in info panel | If citizens have traits, players must be able to see them. Animal Crossing shows personality type, Stardew shows liked gifts. Orbital Rings already has a CitizenInfoPanel -- traits must appear there | LOW | CitizenData extended with trait fields, CitizenInfoPanel UI update | Add Interest + Rhythm display below existing name/body/home fields. Use readable labels ("Tinkerer", "Early Bird") not enum values |
+| Citizen state machine (Walking/Evaluating/Visiting/Resting) | The current CitizenNode has 5+ booleans (_isVisiting, _isAtHome, _walkingToHome) and overlapping timer guards. This is already fragile. Adding schedule-awareness to the current system would create unmaintainable spaghetti. A proper state machine is table stakes for correctness | MEDIUM | Replaces CitizenNode's current timer/boolean logic | Four states with explicit transitions. Each state owns its own enter/exit behavior. Eliminates the boolean soup and makes behavior observable/debuggable |
+| Schedule templates with period-weighted activities | Citizens must do different things at different times. "Working during Day, socializing during Evening, resting at Night" is the minimum expectation for schedule-driven behavior. RimWorld's Work/Recreation/Sleep blocks, ONI's schedule grid, Stardew's time-based NPC locations all establish this | MEDIUM | ClockManager, citizen state machine, trait system | Template defines activity weights per period. Activities: Work, Relax, Socialize, Rest, Wander. Weights shift based on period (Day favors Work, Evening favors Socialize, Night favors Rest) |
+| Utility scoring for room selection | Current system picks the nearest occupied room. That produces random-looking visits with no personality. Utility scoring makes citizen behavior readable: "The tinkerer heads to the workshop" is meaningful; "citizen #3 visits whatever is closest" is not | MEDIUM | Trait affinity scores, ClockManager for schedule context, room visit history (recency) | Score = (traitAffinity * affinityWeight) + (proximity * proxWeight) + (recency * recencyWeight) + (wishBonus * wishWeight). Normalized 0-1 per factor, multiplicative combination. Highest-scoring room wins with small random jitter for variety |
+| Clock UI in HUD | Players need to know what time period it is. Sun/moon icon or labeled indicator. Without it, the day/night visual changes are confusing rather than informative | LOW | ClockManager | Icon + period label in corner of HUD. Existing MoodHUD pattern: Label node updated on PeriodChanged event |
+| Save/load for clock and traits (v4 format) | If clock position and traits are not saved, players lose their station's time state and citizen identity on reload. Backward compatibility with v1/v2/v3 is mandatory per established pattern | MEDIUM | SaveManager extension, CitizenData trait fields, ClockManager state | Add ClockPosition (float 0-1), CitizenTrait fields to SavedCitizen. Version-gated restore: v1-v3 saves get random traits and clock at Morning start. Follow existing nullable pattern |
 
----
+### Differentiators (What Makes Orbital Rings Special)
 
-## Differentiators
-
-Features that go beyond minimum viability. Not required for the milestone to succeed, but significantly increase testing value. Build these if time permits.
+Features that create the "cozy observation" experience unique to this game. Not required for functional completeness, but they're what makes players smile.
 
 | Feature | Value Proposition | Complexity | Dependencies | Notes |
 |---------|-------------------|------------|--------------|-------|
-| Integration tests with GodotTestDriver | Scene-based tests that load actual game scenes, simulate input, and verify system interactions (wish fulfillment loop, room placement triggering housing assignment) | High | GodotTestDriver NuGet, Fixture API, test scene setup | Highest-value differentiator. Validates the event-driven singleton coordination that unit tests cannot reach |
-| Code coverage collection | Coverlet integration to measure which code paths are exercised by tests. Identifies untested risk areas | Med | coverlet CLI tool, `--coverage` flag, coverage XML output | GoDotTest documents this workflow. Useful for identifying blind spots but not blocking |
-| CI pipeline integration | GitHub Actions or similar running tests on every push/PR | Med | Godot headless mode, test runner, coverage | Requires Godot installed in CI. Chickensoft provides reference GH Actions workflows |
-| Custom test drivers for game-specific nodes | GodotTestDriver custom drivers for CitizenNode, RingSegment, BuildPanel that abstract away implementation details | High | GodotTestDriver driver pattern, game scene structure | Makes integration tests robust to UI refactors. Investment pays off over time |
-| Event bus verification tests | Tests that verify GameEvents.Instance emits the correct events in the correct order when system operations occur | Med | GameEvents singleton, event subscription in tests | Subscribe to events in [Setup], assert event was fired with correct args. Validates the wiring |
-| Snapshot testing for save data | Golden-file comparisons: serialize a known game state, compare against a stored JSON snapshot. Detect unintended save format drift | Med | Known-state SaveData, JSON file comparison | Catches accidental field additions/removals/renames before they corrupt user saves |
-| Parameterized tests for tier boundaries | Test all 5 tier thresholds, hysteresis boundaries, and edge cases using parameterized/data-driven patterns | Low-Med | MoodSystem POCO, HappinessConfig | GoDotTest does not have built-in parameterized test support. Use loops or manual repetition |
-| Wish fulfillment end-to-end test | Load game scene, place a room that fulfills a citizen's wish, verify happiness increments and mood updates | High | Full scene load, GodotTestDriver, multiple singleton coordination | The core game loop. Most complex test but validates the most critical path |
-| Debug launch configurations | VSCode launch.json entries for "Debug Tests", "Debug Current Test", "Play Game" | Low | .vscode/launch.json, GODOT env variable | GoDotTest documents exact configs. Developer QoL feature |
-| Stale save reference handling tests | Verify that loading a save where HomeSegmentIndex points to a no-longer-existing room gracefully marks citizen as unhoused | Med | SaveData with stale references, HousingManager.RestoreFromSave | Documented in Phase 19 audit. Three code paths in RestoreFromSave need coverage |
+| Trait-based behavioral personality (Interest + Rhythm) | Unlike RimWorld's 30+ traits that are hard to track, or Dwarf Fortress's invisible personality facets, Orbital Rings uses exactly 2 readable traits per citizen. Interest determines WHERE they prefer to go (Tinkerer -> Workshop/Craft Lab). Rhythm determines WHEN they're most active (Early Bird -> Morning/Day, Night Owl -> Evening/Night). This is legible at a glance and creates observable individuality | LOW | CitizenData extended, trait enum definitions | Interest categories: Tinkerer (Work rooms), Socializer (Comfort+social rooms), Naturalist (LifeSupport rooms), Explorer (Utility rooms). Rhythm categories: Early Bird (active morning/day), Night Owl (active evening/night), Steady (uniform). 2 traits = 12 combinations, enough variety for 5-20 citizens |
+| Room window emissives responding to day/night | Windows on room segments that glow warm at night and dim during day. Creates the "cozy station in space" feeling -- seeing little lit windows from the camera is the visual payoff of the day/night system | MEDIUM | ClockManager, RoomVisual shader or material update | Emission intensity animated inverse to ambient light. Night = bright warm windows. Day = dim windows. The Environment already has glow_enabled=true so emission will bloom naturally |
+| Visible routine patterns (player learns citizen habits) | After watching for a few cycles, players notice "Luna always visits the Workshop in the morning" and "Nova hangs out at the Star Lounge at night." This creates attachment without any narrative system. Animal Crossing's NPC schedules create the same effect | LOW | Utility scoring + trait system working together | This is an emergent property of trait affinity + schedule weighting, not a separate feature. But it must be tuned so patterns are visible and consistent, not drowned in randomness |
+| Room tooltip showing current visitors | Hovering a room shows who's inside. Creates a "where is everyone?" discovery moment. Players checking on their citizens builds attachment | LOW | GameEvents.CitizenEnteredRoom/ExitedRoom already exist, SegmentTooltip UI | Track visitor names per segment. Show in tooltip below room name. Clear on exit. Events already exist -- this is pure UI work |
+| Evaluating state with visible "thinking" indicator | When a citizen pauses to decide where to go next, a brief thought-bubble or "..." indicator appears. Makes the AI decision process legible to the player. Differentiates from "random wandering" that plagues most colony sims | LOW | Citizen state machine Evaluating state, small visual indicator | 0.5-1.5s evaluation pause between Walking and Visiting. During this time, utility scoring runs. Optional: tiny "..." label or subtle head-turn animation |
 
----
+### Anti-Features (Commonly Requested, Often Problematic)
 
-## Anti-Features
+Features that seem natural for this milestone but would undermine the cozy philosophy, add disproportionate complexity, or conflict with existing design decisions.
 
-Features to explicitly NOT build for this milestone. These add complexity without proportional testing value for a game of this scope.
-
-| Anti-Feature | Why Avoid | What to Do Instead |
-|--------------|-----------|-------------------|
-| Parallel test execution | GoDotTest explicitly does not support parallel tests and has no plans to. Parallel tests cause race conditions with Godot's scene tree and singleton state | Run tests sequentially. Execution time is not a concern at 9.5K LOC |
-| Full mocking framework (Moq-style) | The codebase uses static singleton instances (GameEvents.Instance, etc.) which are not interface-abstracted. Retrofitting interfaces for mocking would be a major refactor that changes production code | Test pure functions directly. For integration tests, use real singletons within GodotTestDriver fixtures that properly set up and tear down the scene tree |
-| Performance/benchmark testing | The game runs at 60fps with procedural mesh generation. There are no performance concerns to benchmark | Focus on correctness testing. Performance testing is premature |
-| Visual regression testing (screenshot comparison) | The game uses procedural geometry with no static sprites. Screenshot comparison is brittle and low-value | Test behavior and state, not visuals |
-| Mutation testing | Adds significant tooling complexity for a solo-developer game project | Use code coverage to identify gaps instead |
-| Test generation from code | Auto-generated tests from reflection or code analysis produce low-quality tests that verify implementation, not behavior | Write intentional tests for critical paths |
-| xUnit/NUnit test adapter | These require running tests outside of Godot's process, which means no access to the scene tree, Resource loading, or Godot APIs. GoDotTest runs inside Godot which is essential for integration tests | Use GoDotTest as the sole test runner. It runs inside Godot where all APIs are available |
-| Separate test project (.csproj) | Splitting tests into a separate assembly breaks access to `internal` members and complicates Godot's build pipeline | Keep tests in the same project under a `test/` directory, excluded from release builds via .csproj condition |
-| Testing procedural mesh/audio generation | Procedural geometry is a rendering concern, not a logic concern. There is no meaningful assertion to make about generated vertices | Test the math inputs to procedural generation (segment angles, room placement indices) not the mesh output |
+| Feature | Why Requested | Why Problematic | Alternative |
+|---------|---------------|-----------------|-------------|
+| Citizen needs (hunger, energy, fun) | RimWorld/ONI have needs bars. Seems like the obvious next step for citizen AI | Needs create fail states and management pressure. Citizens with depleting bars require the player to maintain supply chains. This directly contradicts the "no fail state" constraint and "cozy" philosophy. Dwarf Fortress's needs are famously opaque and stressful | Use trait-driven preferences instead of needs. Citizens prefer certain rooms but never suffer from unmet needs. Wishes already serve the "citizen wants something" role without punishment |
+| Citizen mood penalties from unmet schedules | If a Night Owl is forced to be active during Day, penalize their mood | Mood penalties create optimization anxiety, which is explicitly anti-cozy (PROJECT.md: "raw mood float in player UI -- optimization anxiety is anti-cozy"). Players would feel obligated to min-max trait-schedule alignment | Trait affinity boosts the utility score for preferred rooms/times but never penalizes. A Night Owl visits rooms less frequently during Day but is never unhappy about it. Positive-only reinforcement |
+| Player-configurable citizen schedules | RimWorld lets players assign Work/Sleep/Recreation per hour per pawn | Player-configurable schedules turn a cozy builder into a spreadsheet optimizer. The beauty of Orbital Rings is watching emergent behavior, not micromanaging it. Already in Out of Scope: "Player-managed room assignments -- fully automatic, no micromanagement" | Schedules are automatic templates assigned by Rhythm trait. The player observes, they don't control |
+| Complex trait interactions (trait combos, trait conflicts) | Dwarf Fortress has 50+ personality facets that interact in complex ways | More than 2 traits per citizen makes the info panel unreadable and the behavior unpredictable. The cozy aesthetic requires legibility. Animal Crossing uses exactly 1 personality type per villager for good reason | Exactly 2 traits (Interest + Rhythm). No interactions between them. Interest affects WHERE, Rhythm affects WHEN. Orthogonal dimensions, zero emergent complexity |
+| Time-of-day affecting economy (night shift bonuses) | Seems natural -- rooms producing more at certain times | Adds optimization pressure. Players would feel compelled to build rooms matching their citizens' active periods for maximum income. Breaks "build what feels right" ethos | Economy remains time-independent. Day/night affects visuals and citizen behavior patterns, not production or income |
+| Realistic day/night with actual darkness | Space station in orbit should have realistic shadow transitions | Full darkness makes the station hard to see and stops the game feeling cozy. The station is in space -- there's no natural sun cycle. The "day/night" is station lighting atmosphere, not realistic orbital mechanics | Treat day/night as station ambient mood lighting. Night dims but never darkens. Think "cozy evening" not "pitch black." Minimum ambient energy at Night should keep all rooms visible |
+| Sleep requirements tied to Housing | Citizens must sleep in their assigned home during Night period | Creates a constraint that punishes players who don't have enough housing. Unhoused citizens would be "stuck" unable to sleep. Currently unhoused citizens are handled gracefully with no penalty | Resting at home is more frequent during Night period (schedule weight) but not mandatory. Citizens without homes simply wander more at night. No punishment |
+| Citizen relationships or social graphs | Citizens who visit the same room at the same time build friendships | Already in Out of Scope. Adds massive state to track, save/load complexity, and UI requirements. The 2-trait system plus wish system already creates enough personality without relationships | Defer to future milestone. The trait + schedule system lays groundwork for social features later without requiring them now |
+| Fast-forward / time speed controls | Players want to speed up slow periods | Adds UI complexity and requires all tween durations and timer intervals to respect a time scale multiplier. Every existing timer (visit, wish, home) would need modification. Creates bugs when time scale changes mid-tween | Defer entirely. Tune the base cycle duration (8-12 min) to feel right at 1x speed. If the cycle feels too slow, shorten it globally rather than adding speed controls |
 
 ---
 
 ## Feature Dependencies
 
 ```
-Test Runner Scene
-  |
-  +-> Unit Test Suites (no scene tree needed)
-  |     |
-  |     +-> MoodSystem POCO tests
-  |     +-> Economy calculation tests
-  |     +-> Housing capacity computation tests
-  |     +-> Save/load JSON round-trip tests
-  |     +-> Save format migration tests (v1->v2->v3)
-  |
-  +-> Integration Test Suites (scene tree needed)
-        |
-        +-> GodotTestDriver Fixture setup
-        |     |
-        |     +-> Singleton lifecycle tests (GameEvents wiring)
-        |     +-> Housing assignment flow tests
-        |     +-> Mood tier change -> economy multiplier tests
-        |     +-> Wish fulfillment loop tests
-        |
-        +-> Custom test drivers (optional, for robustness)
+ClockManager (autoload singleton)
+    |
+    +---> PeriodChanged event
+    |       |
+    |       +---> Day/Night Lighting Transitions (WorldEnvironment, DirectionalLight3D tweens)
+    |       |
+    |       +---> Room Window Emissives (RoomVisual emission intensity)
+    |       |
+    |       +---> Clock UI (HUD indicator)
+    |       |
+    |       +---> Schedule Templates (period-weighted activity selection)
+    |               |
+    |               +---> Citizen State Machine
+    |                       |
+    |                       +---> Utility Scoring (room selection during Evaluating state)
+    |                       |       |
+    |                       |       +---> Trait Affinity Scores (Interest trait -> room category preference)
+    |                       |       +---> Proximity Factor (angular distance on ring)
+    |                       |       +---> Recency Factor (avoid re-visiting same room)
+    |                       |       +---> Wish Bonus (existing wish-matching behavior preserved)
+    |                       |
+    |                       +---> Evaluating "thinking" indicator
+    |
+    +---> Save/Load v4 (clock position persisted)
+
+Citizen Traits (Interest + Rhythm)
+    |
+    +---> CitizenData extension (new enum fields)
+    |       |
+    |       +---> Citizen Info Panel (trait display)
+    |       +---> Save/Load v4 (traits persisted per citizen)
+    |
+    +---> Schedule Template Selection (Rhythm determines which template)
+    |
+    +---> Utility Scoring (Interest determines room affinity weights)
+
+Room Tooltip Visitors
+    |
+    +---> CitizenEnteredRoom / CitizenExitedRoom events (already exist)
+    +---> SegmentTooltip UI (already exists, needs visitor list)
 ```
 
-Key dependency chains:
-- All test suites depend on the test runner scene existing
-- Unit tests for POCOs and pure functions have ZERO dependencies on the scene tree
-- Integration tests require GodotTestDriver's Fixture to manage node lifecycle
-- Housing assignment integration tests depend on BuildManager and CitizenManager state being set up in the fixture
-- Save/load round-trip tests can be pure unit tests (SaveData is a plain C# class serialized with System.Text.Json)
+### Dependency Notes
+
+- **ClockManager must exist before anything else:** All schedule, lighting, and UI features depend on knowing the current period. This is the foundational building block.
+- **Citizen state machine must replace timers before utility scoring:** Utility scoring runs during the Evaluating state. Without a state machine, there's no clean place to invoke it.
+- **Traits are data-only until state machine + schedule exist:** Adding trait fields to CitizenData is trivial. The traits become meaningful only when the state machine uses them for utility scoring and schedule selection.
+- **Day/night visuals are independent of citizen AI:** Lighting transitions depend only on ClockManager, not on traits or schedules. Can be built in parallel with citizen AI work.
+- **Room tooltip visitors are low-hanging fruit:** Events already exist. This is pure UI work with no AI dependencies.
+- **Save/load v4 should come last:** Requires all new fields (clock position, traits) to be finalized before defining the save format.
 
 ---
 
-## Testability Assessment of Existing Code
+## MVP Definition
 
-### Highly Testable (unit tests, no Godot tree)
+### Phase 1: Foundation (Clock + State Machine)
 
-| Component | Why | Test Strategy |
-|-----------|-----|---------------|
-| MoodSystem | POCO class, no Node inheritance, constructor-injected config | Instantiate with `new HappinessConfig()`, call methods, assert results |
-| EconomyManager.CalculateRoomCost | Pure function, takes config + inputs, returns int | Call directly on instance with known config values |
-| EconomyManager.CalculateTickIncome | Pure function, reads only internal state set via SetCitizenCount/SetMoodTier | Set state, call method, assert result |
-| EconomyManager.CalculateDemolishRefund | Pure function, one multiplication | Trivial test |
-| HousingManager.ComputeCapacity | Static pure function | `ComputeCapacity(def, segmentCount).ShouldBe(expected)` |
-| SaveData / SavedRoom / SavedCitizen | Plain C# POCOs with no Godot types | JSON serialize/deserialize round-trip |
-| HappinessConfig / EconomyConfig / HousingConfig | Godot Resources but have parameterless constructors with coded defaults | `new HappinessConfig()` gives predictable test values |
+- [x] **ClockManager autoload** -- Four periods, configurable timing, PeriodChanged event. Everything else builds on this.
+- [x] **Citizen state machine** -- Walking/Evaluating/Visiting/Resting states replacing boolean soup. Clean transition logic. Each state owns its own behavior.
+- [x] **Clock UI** -- Sun/moon icon + period label in HUD. Immediate visual feedback that time exists.
 
-### Moderately Testable (needs scene tree or careful setup)
+### Phase 2: Citizen Intelligence (Traits + Utility + Schedules)
 
-| Component | Challenge | Test Strategy |
-|-----------|-----------|---------------|
-| EconomyManager (full lifecycle) | Node subclass, creates Timer child, subscribes to GameEvents | Use GodotTestDriver Fixture to add to tree. Set state via public API, verify income ticks |
-| HousingManager (assignment flow) | Reads BuildManager.Instance and CitizenManager.Instance | Integration test with fixture that sets up all three singletons |
-| SaveManager (ApplyState/ApplySceneState) | Orchestrates all singletons, frame-delay pattern | Integration test that sets up full scene, calls ApplyState, waits frames, verifies state |
-| WishBoard (wish tracking) | Loads .tres resources from filesystem, subscribes to events | Integration test with fixture, or mock template loading |
-| HappinessManager (progression) | Owns MoodSystem, subscribes to events, spawns Timer | Test MoodSystem in isolation for math. Integration test for event wiring |
+- [x] **Trait enums and assignment** -- Interest (Tinkerer/Socializer/Naturalist/Explorer) + Rhythm (EarlyBird/NightOwl/Steady) on CitizenData. Random assignment at creation.
+- [x] **Schedule templates** -- Period-weighted activity pools. Three templates (one per Rhythm type). Template determines activity weights per period.
+- [x] **Utility scoring** -- Multi-factor room selection in Evaluating state. TraitAffinity + Proximity + Recency + WishBonus. Replaces nearest-room selection.
+- [x] **Trait display in info panel** -- Show Interest and Rhythm in CitizenInfoPanel.
 
-### Hard to Test (not worth testing directly)
+### Phase 3: Visual Polish (Atmosphere + UI)
 
-| Component | Why | Alternative |
-|-----------|-----|-------------|
-| CitizenNode (visual behavior) | Walking, Zzz animations, mesh rendering | Test the data flow (assignment, wish state) not the visuals |
-| OrbitalCamera | Input-driven 3D camera | Skip -- visual/input concern |
-| BuildPanel / HUD | UI rendering | Test underlying state, not UI display |
-| Procedural mesh/audio | Rendering pipeline | Not testable, not worth testing |
+- [x] **Day/night lighting transitions** -- Tween Environment and DirectionalLight3D properties between period presets.
+- [x] **Room window emissives** -- Emission intensity inversely correlated with ambient light.
+- [x] **Room tooltip visitors** -- Show current visitor names on room hover.
+- [x] **Evaluating state indicator** -- Brief "thinking" visual during room selection.
+
+### Phase 4: Persistence
+
+- [x] **Save/load v4** -- Clock position, citizen traits. Version-gated backward compatibility for v1-v3 saves.
+
+### Defer to Later Milestones
+
+- [ ] **Citizen relationships** -- The trait system creates a foundation but relationships are explicitly out of scope
+- [ ] **Time speed controls** -- Tune base cycle speed instead
+- [ ] **Additional trait types** -- 2 traits is sufficient for v1.4. More traits are future expansion
+- [ ] **Period-specific room effects** -- Rooms behaving differently at different times adds complexity without proportional value
+- [ ] **Tier change notifications** -- Already deferred in PROJECT.md
 
 ---
 
-## MVP Recommendation
+## Feature Prioritization Matrix
 
-Prioritize these features for the testing milestone, in this order:
+| Feature | Player Value | Implementation Cost | Priority | Notes |
+|---------|------------|---------------------|----------|-------|
+| Station clock (ClockManager) | HIGH | LOW | P1 | Foundational for all other features |
+| Citizen state machine | HIGH | MEDIUM | P1 | Correctness prerequisite -- current boolean soup cannot absorb new behavior |
+| Clock UI | MEDIUM | LOW | P1 | Immediate player feedback, pairs with clock implementation |
+| Citizen traits (data + assignment) | HIGH | LOW | P1 | Data foundation for utility scoring and schedules |
+| Day/night lighting transitions | HIGH | MEDIUM | P1 | Primary visual payoff of the entire milestone. Players will judge success by this |
+| Schedule templates | HIGH | MEDIUM | P1 | Without schedules, traits are invisible. Schedules make routines observable |
+| Utility scoring | HIGH | MEDIUM | P1 | Without this, citizens visit random rooms. Trait affinity is meaningless without scoring |
+| Trait display in info panel | MEDIUM | LOW | P1 | Players must see traits to understand behavior patterns |
+| Room window emissives | MEDIUM | LOW-MEDIUM | P2 | Visual polish. High impact per line of code but not functionally necessary |
+| Room tooltip visitors | MEDIUM | LOW | P2 | Discovery feature. Events already exist, minimal effort |
+| Evaluating state indicator | LOW-MEDIUM | LOW | P2 | Subtle polish. Makes AI legible but citizens already pause during evaluation |
+| Save/load v4 | HIGH | MEDIUM | P1 | Must ship -- losing traits/clock on reload breaks persistence contract |
 
-### Phase 1: Framework Setup (must ship first)
-1. **Test runner scene** -- unblocks all other test work
-2. **Assertion library (Shouldly)** -- unblocks writing assertions
-3. **Debug launch configurations** -- developer workflow for running/debugging tests
-4. **Release build exclusion** -- tests must not ship in exports
+---
 
-### Phase 2: Unit Test Suites (highest ROI, lowest complexity)
-1. **MoodSystem POCO tests** -- decay, tier transitions, hysteresis, wish gain, restore. Most valuable single test suite
-2. **Economy calculation tests** -- room cost formula, income formula, demolish refund, tier multipliers
-3. **Housing capacity computation tests** -- ComputeCapacity for all segment sizes
-4. **Save/load JSON round-trip tests** -- SaveData survives serialize/deserialize across all 3 format versions
+## Competitor Feature Analysis
 
-### Phase 3: Integration Test Suites (highest value, highest complexity)
-1. **Housing assignment flow** -- fewest-occupants-first, demolish displacement, reassignment
-2. **Mood tier -> economy multiplier** -- verify SetMoodTier propagation through event chain
-3. **Save format version migration** -- v1/v2 saves load correctly with default values for missing fields
+| Feature | RimWorld | Dwarf Fortress | Stardew Valley | Animal Crossing | Orbital Rings Approach |
+|---------|----------|----------------|----------------|-----------------|------------------------|
+| **Trait count per citizen** | 1-3 traits + passions + backstory | 50+ personality facets + values + beliefs | 0 (NPCs have fixed scripts) | 1 personality type | **2 traits (Interest + Rhythm).** Legible like AC, meaningful like RimWorld, without DF's opacity |
+| **Schedule system** | Player-configured 24h grid per pawn | Emergent from needs | Fixed per-NPC authored paths | Real-time clock, fixed per villager | **Automatic templates per Rhythm trait.** Player observes, never manages |
+| **Room selection AI** | Work priority system + hauling AI | Need-driven + job assignment | N/A (NPCs don't choose) | N/A | **Utility scoring with 4 factors.** Closest to RimWorld's priority system but simpler and positive-only |
+| **Day/night visual** | Light level changes, sleep pressure | No visual cycle | Gradual sky color + lighting tint | Real-time sky + seasonal | **Period-based atmosphere presets.** Tween between 4 mood-lighting states. Cozy, never dark |
+| **Fail states from AI** | Starvation, mental breaks, death | Tantrum spirals, insanity | None | None | **None.** Positive-only trait effects. No needs, no penalties, no death |
+| **Behavior legibility** | Need bars + activity log visible | Virtually unreadable | Predictable authored paths | Personality dialogue differences | **Observable via watching.** Trait affinity makes patterns visible after 1-2 cycles |
 
-### Defer
-- **Wish fulfillment end-to-end** -- requires full scene setup with citizen spawning, wish template loading, and room placement. Defer to after the foundation is solid
-- **Code coverage collection** -- useful but not blocking. Add after tests exist
-- **CI pipeline** -- valuable but can be added independently after tests pass locally
-- **Custom test drivers** -- only needed if integration tests become brittle due to implementation coupling
+### Key Insight from Competitor Analysis
+
+The cozy games (Animal Crossing, Stardew) and the colony sims (RimWorld, DF) solve the same problem differently:
+
+- **Colony sims** give players control (schedules, priorities, job assignment) and punish mistakes (needs, death, mood breaks). This creates engagement through management stress.
+- **Cozy games** give players observation (watch NPCs, learn their habits) and reward attention (noticing a villager's schedule feels like discovery). No punishment for ignoring it.
+
+Orbital Rings should be firmly in the cozy camp. The trait + utility + schedule system creates emergent behavior that players discover by watching, not a management system they must optimize. The key design constraint: **traits always help, never hurt. Schedules always suggest, never force.**
+
+---
+
+## Detailed Feature Specifications
+
+### Citizen Trait Design
+
+**Interest Trait** (1 per citizen -- determines WHERE they prefer to go):
+
+| Interest | Preferred Room Categories | Specific Affinity Rooms | Flavor |
+|----------|--------------------------|-------------------------|--------|
+| Tinkerer | Work (2) | workshop, craft_lab | "Always has a project going" |
+| Socializer | Comfort (3) | star_lounge, reading_nook | "Happiest in a crowd" |
+| Naturalist | LifeSupport (1) | garden_nook, air_recycler | "Finds peace in growing things" |
+| Explorer | Utility (4) | storage_bay, comm_relay | "Curious about everything" |
+
+**Rhythm Trait** (1 per citizen -- determines WHEN they're most active):
+
+| Rhythm | Morning Weight | Day Weight | Evening Weight | Night Weight | Flavor |
+|--------|---------------|------------|----------------|--------------|--------|
+| Early Bird | HIGH activity | HIGH activity | MEDIUM activity | LOW activity (prefers rest) | "Up with the lights" |
+| Night Owl | LOW activity (prefers rest) | MEDIUM activity | HIGH activity | HIGH activity | "Comes alive after dark" |
+| Steady | MEDIUM activity | MEDIUM activity | MEDIUM activity | MEDIUM activity | "Keeps a regular rhythm" |
+
+**Why 2 traits, not more:**
+- 4 Interest x 3 Rhythm = 12 combinations. With 5-20 citizens, most combinations appear, creating visible diversity.
+- 2 traits fit on one line in the info panel. 3+ traits require a scrolling list or cramped layout.
+- Each trait has a clear, orthogonal effect. Interest = spatial preference. Rhythm = temporal preference. No interaction complexity.
+
+### Utility Scoring Formula
+
+When a citizen enters the Evaluating state, score every non-Housing room on the station:
+
+```
+Score(room) = (A * traitAffinity) + (P * proximity) + (R * recency) + (W * wishBonus)
+```
+
+Where:
+- **traitAffinity** (0.0 - 1.0): 1.0 if room category matches Interest trait's preferred category, 0.3 for adjacent categories, 0.0 for non-preferred. Creates visible preference without exclusion.
+- **proximity** (0.0 - 1.0): Inverse angular distance normalized to ring circumference. `1.0 - (angularDist / PI)`. Nearby rooms score higher. Preserves the "citizens visit nearby rooms" behavior from current system.
+- **recency** (0.0 - 1.0): 1.0 if never visited or visited long ago, decreasing toward 0.0 for recently visited rooms. Prevents repetitive visits to the same room. Simple timer-based decay per room.
+- **wishBonus** (0.0 or 1.0): 1.0 if room fulfills active wish, 0.0 otherwise. Preserves existing wish-matching behavior. Binary, not weighted.
+
+**Suggested weights (tunable via config resource):**
+- A (affinity weight) = 0.35
+- P (proximity weight) = 0.25
+- R (recency weight) = 0.15
+- W (wish weight) = 0.25
+
+**Selection:** Pick highest-scoring room, with small random jitter (multiply final score by rand(0.9, 1.1)) to prevent robotic determinism.
+
+**Why multiplicative jitter on final score rather than weighted random selection:**
+Weighted random creates too much behavioral noise in a cozy game. Players need to be able to predict "the Tinkerer goes to the Workshop" after watching one cycle. Jitter introduces just enough variety that the Tinkerer occasionally visits the Garden Nook, which feels like discovery rather than randomness.
+
+### Schedule Template Design
+
+Three templates, one per Rhythm:
+
+```
+EarlyBird Template:
+  Morning: { Work: 0.4, Wander: 0.3, Socialize: 0.2, Rest: 0.1 }
+  Day:     { Work: 0.4, Socialize: 0.3, Wander: 0.2, Rest: 0.1 }
+  Evening: { Socialize: 0.3, Wander: 0.3, Rest: 0.3, Work: 0.1 }
+  Night:   { Rest: 0.6, Wander: 0.2, Socialize: 0.1, Work: 0.1 }
+
+NightOwl Template:
+  Morning: { Rest: 0.5, Wander: 0.3, Socialize: 0.1, Work: 0.1 }
+  Day:     { Wander: 0.3, Socialize: 0.3, Work: 0.2, Rest: 0.2 }
+  Evening: { Work: 0.4, Socialize: 0.3, Wander: 0.2, Rest: 0.1 }
+  Night:   { Work: 0.3, Socialize: 0.3, Wander: 0.3, Rest: 0.1 }
+
+Steady Template:
+  Morning: { Wander: 0.3, Work: 0.3, Socialize: 0.2, Rest: 0.2 }
+  Day:     { Work: 0.3, Socialize: 0.3, Wander: 0.2, Rest: 0.2 }
+  Evening: { Socialize: 0.3, Wander: 0.3, Work: 0.2, Rest: 0.2 }
+  Night:   { Rest: 0.4, Wander: 0.3, Socialize: 0.2, Work: 0.1 }
+```
+
+**Activity -> State Machine Mapping:**
+- Work -> Evaluating (utility scores Work-category rooms higher)
+- Socialize -> Evaluating (utility scores Comfort-category rooms higher)
+- Wander -> Walking (continue walking the ring)
+- Rest -> Resting (go home if housed, otherwise keep walking)
+
+**How it works:** When the state machine finishes an action and needs the next one, it rolls against the current period's activity weights. The selected activity biases the utility scoring or directly selects a state.
+
+### State Machine Design
+
+```
+         +----------+
+         | Walking  |<---------+
+         +----+-----+          |
+              |                 |
+    (schedule timer fires)      |
+              |                 |
+         +----v-----+          |
+         |Evaluating|          |
+         +----+-----+          |
+              |                 |
+     +--------+--------+       |
+     |        |        |       |
+     v        v        v       |
+ +-------+ +------+ +-------+ |
+ |Visiting| |Resting| |Walking| |
+ +---+---+ +--+---+ +---+---+ |
+     |         |         |     |
+     +---------+---------+-----+
+        (action complete)
+```
+
+**States:**
+- **Walking:** Default state. Citizen walks the ring. After a random interval (tuned by Rhythm -- Early Birds have shorter intervals in morning), transitions to Evaluating.
+- **Evaluating:** Brief pause (0.5-1.5s). Rolls schedule activity for current period. If Work/Socialize, runs utility scoring on rooms, transitions to Visiting. If Wander, returns to Walking. If Rest and housed, transitions to Resting. If Rest and unhoused, returns to Walking.
+- **Visiting:** Walks to target room, drift-fade enter, waits inside, drift-fade exit. On completion, returns to Walking. Existing visit animation sequence preserved.
+- **Resting:** Walks to home room, drift-fade enter, Zzz indicator, waits, drift-fade exit. On completion, returns to Walking. Existing home-return animation preserved.
+
+**Key difference from current system:** Currently, visit and home-return are timer-initiated and independent. In the new system, the state machine is the single authority for what happens next. No competing timers.
+
+### Day/Night Lighting Presets
+
+Four atmosphere presets (all values tunable via a config resource):
+
+| Property | Morning | Day | Evening | Night |
+|----------|---------|-----|---------|-------|
+| sky_top_color | (0.55, 0.65, 0.85) | (0.45, 0.55, 0.75) | (0.35, 0.30, 0.55) | (0.10, 0.08, 0.20) |
+| sky_horizon_color | (0.95, 0.75, 0.55) | (0.85, 0.65, 0.50) | (0.90, 0.50, 0.35) | (0.20, 0.15, 0.25) |
+| ambient_light_color | (1.0, 0.95, 0.85) | (1.0, 0.95, 0.90) | (0.95, 0.80, 0.70) | (0.60, 0.55, 0.75) |
+| ambient_light_energy | 0.35 | 0.30 | 0.25 | 0.15 |
+| DirectionalLight energy | 0.6 | 0.8 | 0.5 | 0.1 |
+| DirectionalLight color | (1.0, 0.9, 0.7) | (1.0, 0.95, 0.9) | (0.95, 0.7, 0.5) | (0.4, 0.4, 0.7) |
+| Room emission intensity | 0.3 | 0.1 | 0.6 | 1.0 |
+
+**Design constraint:** Night ambient_light_energy never drops below 0.1. The station must always be visible. Warm room emission at night compensates for lower ambient, creating the "cozy windows in space" effect.
+
+**Transition approach:** On PeriodChanged, create a Tween interpolating all properties from current values to target values over 3-5 seconds. Kill previous tween if period changes early. Godot's Tween system handles this cleanly.
 
 ---
 
 ## Sources
 
-- [Chickensoft GoDotTest GitHub](https://github.com/chickensoft-games/GoDotTest) -- test runner, lifecycle hooks, CLI args, coverage workflow
-- [Chickensoft GodotTestDriver GitHub](https://github.com/chickensoft-games/GodotTestDriver) -- fixture API, input simulation, custom drivers, event waiting
-- [GoDotTest NuGet v2.0.30](https://www.nuget.org/packages/Chickensoft.GoDotTest/) -- latest version, .NET 8 compatible, published Feb 2026
-- [GodotTestDriver NuGet v3.1.62](https://www.nuget.org/packages/Chickensoft.GodotTestDriver/) -- latest version, targets Godot 4.6.1+, published Feb 2026
-- [Chickensoft GodotGame template](https://github.com/chickensoft-games/GodotGame) -- reference project with testing, coverage, CI/CD
-- Direct codebase inspection of all 8 autoload singletons, 7 data classes, and MoodSystem POCO
+- [RimWorld Wiki: Traits](https://rimworldwiki.com/wiki/Traits) -- Trait categories, spectrum system, behavioral effects (HIGH confidence)
+- [Dwarf Fortress Wiki: Personality trait](https://dwarffortresswiki.org/index.php/DF2014:Personality_trait) -- Facet system, behavioral influence, opacity concerns (HIGH confidence)
+- [Stardew Valley Wiki: Schedule data](https://stardewcommunitywiki.com/Modding:Schedule_data) -- Time-based NPC scheduling format (HIGH confidence)
+- [Animal Crossing Personality Types](https://www.ourmental.health/personality/animal-crossing-new-horizons-villager-personality-types-guide) -- 8 personality types, cozy design philosophy (MEDIUM confidence)
+- [Game AI Pro Ch.9: Introduction to Utility Theory](http://www.gameaipro.com/GameAIPro/GameAIPro_Chapter09_An_Introduction_to_Utility_Theory.pdf) -- Utility scoring fundamentals, curve design (HIGH confidence)
+- [The Shaggy Dev: Introduction to Utility AI](https://shaggydev.com/2023/04/19/utility-ai/) -- Scoring formulas, consideration normalization, bucketing, weighting (HIGH confidence)
+- [Colony Sim AI Prototype](https://johncjensen.com/colonysim/) -- Goal-priority scoring with personality modifiers, threshold-based selection (MEDIUM confidence)
+- [AI Decision-Making with Utility Scores](https://mcguirev10.com/2019/01/03/ai-decision-making-with-utility-scores-part-1.html) -- Multi-factor scoring combination patterns (MEDIUM confidence)
+- [Seaotter Games: Setting a Mood with Day/Night Cycle](https://seaotter.games/blog/setting-a-mood-with-a-day-night-cycle) -- Cozy lighting design principles (MEDIUM confidence)
+- [RimWorld Schedule Discussions](https://steamcommunity.com/app/294100/discussions/0/3365901687364934508/) -- Work/Recreation/Sleep period design, need thresholds (MEDIUM confidence)
+- [ONI Schedule Strategies](https://forums.kleientertainment.com/forums/topic/95151-schedule-strategies/) -- Duplicant schedule block design (MEDIUM confidence)
+- [Godot 4 Day/Night Cycle Tutorial](https://gamedevacademy.org/godot-day-night-cycle/) -- DirectionalLight3D + Environment transitions (MEDIUM confidence)
+- Direct codebase inspection: CitizenNode.cs (1106 lines), CitizenManager.cs (422 lines), GameEvents.cs (343 lines), CitizenData.cs, RoomDefinition.cs, WishTemplate.cs, all 10 room .tres files, all 12 wish .tres files, DefaultEnvironment.tres
+
+---
+*Feature research for: Citizen AI traits, utility-based decision making, day/night cycle, and schedule-driven behavior*
+*Researched: 2026-03-07*
