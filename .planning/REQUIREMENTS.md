@@ -17,11 +17,11 @@ Requirements for the Testing milestone. Each maps to roadmap phases.
 
 ### Unit Tests — Mood System
 
-- [ ] **MOOD-01**: MoodSystem decay math produces correct values over time
-- [ ] **MOOD-02**: MoodSystem tier transitions fire at correct thresholds
-- [ ] **MOOD-03**: MoodSystem hysteresis prevents rapid tier oscillation near boundaries
-- [ ] **MOOD-04**: MoodSystem wish gain increments mood correctly
-- [ ] **MOOD-05**: MoodSystem restore reconstructs state from saved values
+- [x] **MOOD-01**: MoodSystem decay math produces correct values over time
+- [x] **MOOD-02**: MoodSystem tier transitions fire at correct thresholds
+- [x] **MOOD-03**: MoodSystem hysteresis prevents rapid tier oscillation near boundaries
+- [x] **MOOD-04**: MoodSystem wish gain increments mood correctly
+- [x] **MOOD-05**: MoodSystem restore reconstructs state from saved values
 
 ### Unit Tests — Economy
 
@@ -86,11 +86,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FRMW-03 | Phase 20 | Complete |
 | FRMW-04 | Phase 20 | Complete |
 | FRMW-05 | Phase 20 | Complete |
-| MOOD-01 | Phase 22 | Pending |
-| MOOD-02 | Phase 22 | Pending |
-| MOOD-03 | Phase 22 | Pending |
-| MOOD-04 | Phase 22 | Pending |
-| MOOD-05 | Phase 22 | Pending |
+| MOOD-01 | Phase 22 | Complete |
+| MOOD-02 | Phase 22 | Complete |
+| MOOD-03 | Phase 22 | Complete |
+| MOOD-04 | Phase 22 | Complete |
+| MOOD-05 | Phase 22 | Complete |
 | ECON-01 | Phase 23 | Pending |
 | ECON-02 | Phase 23 | Pending |
 | ECON-03 | Phase 23 | Pending |

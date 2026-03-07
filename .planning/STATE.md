@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Testing
 status: completed
-stopped_at: Phase 22 context gathered
-last_updated: "2026-03-07T13:16:53.510Z"
-last_activity: 2026-03-07 — Completed Phase 21 (Integration Test Infrastructure)
+stopped_at: Completed 22-01-PLAN.md
+last_updated: "2026-03-07T13:39:30.346Z"
+last_activity: 2026-03-07 — Completed Phase 22 Plan 01 (Mood System Unit Tests)
 progress:
   total_phases: 6
-  completed_phases: 2
-  total_plans: 4
-  completed_plans: 4
+  completed_phases: 3
+  total_plans: 5
+  completed_plans: 5
   percent: 100
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-07)
 
 **Core value:** The wish-driven building loop: citizens express wishes, the player builds rooms to fulfill them, happiness rises, new citizens arrive, new wishes emerge.
-**Current focus:** v1.3 Testing — Phase 21 (Integration Test Infrastructure) in progress
+**Current focus:** v1.3 Testing — Phase 22 (Mood System Unit Tests) complete
 
 ## Current Position
 
-Phase: 21 of 25 (Integration Test Infrastructure)
-Plan: 2 of 2
-Status: Phase 21 complete
-Last activity: 2026-03-07 — Completed Phase 21 (Integration Test Infrastructure)
+Phase: 22 of 25 (Mood System Unit Tests)
+Plan: 1 of 1
+Status: Phase 22 complete
+Last activity: 2026-03-07 — Completed Phase 22 Plan 01 (Mood System Unit Tests)
 
 Progress: [██████████] 100%
 
@@ -51,6 +51,8 @@ All v1.0, v1.1, and v1.2 decisions logged in PROJECT.md Key Decisions table with
 - [Phase 21]: Singleton Reset() pattern: clears mutable state + stops timers, preserves Instance/Config/caches
 - [Phase 21]: SingletonResetTests extends TestClass (not GameTestClass) to avoid auto-reset hiding reset infrastructure bugs
 - [Phase 21]: Verification tests use only public APIs to dirty/verify state -- validates actual public contract
+- [Phase 22]: Corrected wish promotion sequence for float32 precision: 5*0.06f < 0.30f so Lively promotion at wish 6
+- [Phase 22]: POCO unit test pattern: CreateMoodSystem() helper, RestoreState pre-seeding, ShouldBe(expected, 0.001f) tolerance
 
 ### Pending Todos
 
@@ -76,6 +78,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-07T13:16:53.499Z
-Stopped at: Phase 22 context gathered
-Next: Phase 21 complete. Proceed to next phase.
+Last session: 2026-03-07T13:39:25.743Z
+Stopped at: Completed 22-01-PLAN.md
+Next: Phase 22 complete. Proceed to Phase 23 (Economy System Unit Tests).
