@@ -1,5 +1,196 @@
 # Project Research Summary
 
+**Project:** Orbital Rings v1.3 — Testing Infrastructure Milestone
+**Domain:** Testing infrastructure for Godot 4 C# game (autoload singleton architecture)
+**Researched:** 2026-03-07
+**Confidence:** HIGH
+
+## Executive Summary
+
+Orbital Rings is a 9,500+ LOC Godot 4.6 / C# / .NET 10 cozy space station builder with a mature event-driven singleton architecture. The v1.3 testing milestone adds a GoDotTest + GodotTestDriver foundation to catch regressions as the codebase grows. The recommended approach is the Chickensoft ecosystem — GoDotTest 2.0.30 as the in-process test runner, GodotTestDriver 3.1.62 for scene lifecycle management, and Shouldly 4.3.0 for readable assertions. This stack is the de facto standard for Godot C# testing and is verified compatible with the project's Godot 4.6.1 / .NET 10 target. No mocking framework is needed: the existing code has well-separated pure logic (MoodSystem POCO, economy formulas, housing capacity) that can be tested directly without interface extraction or DI refactoring.
+
+The fundamental challenge is that all 8 autoload singletons use static `Instance` properties and run continuously inside the Godot process that GoDotTest shares. Tests that mutate singleton state will corrupt each other unless defensive infrastructure is built first. Every pitfall identified traces back to this single root cause: GoDotTest runs all tests in one long-lived process, meaning singletons, their child Timers, and their C# event subscriptions all persist across test suites. The solution is a `TestHelper.ResetAllSingletons()` utility and a `GameEvents.ClearAllSubscribers()` method that must be called in `[SetupAll]` for any test suite that touches game state.
+
+The codebase already exhibits the key testability property needed to make the milestone tractable: MoodSystem is a POCO, SaveData/SavedCitizen/SavedRoom are plain C# types, and EconomyManager's income/cost formulas are pure functions. These targets yield the highest-value tests at the lowest implementation cost. The save/load system (3 format versions, backward compatibility, nullable HomeSegmentIndex) is the highest-severity risk area and should be the focus of dedicated serialization tests that bypass the filesystem entirely. Integration tests with the actual scene tree should be scoped narrowly to housing assignment flow and mood tier transitions.
+
+## Key Findings
+
+### Recommended Stack
+
+See `.planning/research/STACK.md` for full details and version verification.
+
+The project needs three NuGet packages added to `Orbital Rings.csproj`, plus `nuget.org` added to `NuGet.Config` (currently only has the local GodotSharp source). All packages target `netstandard2.1` or `net8.0`, which is forward-compatible with the project's `net10.0` target. The test runner uses Pattern A — a dedicated `test/TestRunner.tscn` scene run with F6 or `godot --run-tests --quit-on-finish` — rather than modifying the TitleScreen entry point.
+
+**Core technologies:**
+- `Chickensoft.GoDotTest 2.0.30`: In-process test runner — the only C#-native runner designed to run inside Godot's scene tree; required for any test touching Godot APIs
+- `Chickensoft.GodotTestDriver 3.1.62`: Scene lifecycle management — provides `Fixture.AutoFree()`, `Fixture.Cleanup()`, and frame-waiting helpers for integration tests
+- `Shouldly 4.3.0`: Assertion library — MIT licensed, readable `.ShouldBe()` syntax, zero Godot coupling; preferred over FluentAssertions (license concerns) and raw exceptions (unreadable failures)
+
+**Critical NuGet.Config change required:** Add `https://api.nuget.org/v3/index.json` as a package source. Without this, `dotnet restore` cannot find any of the testing packages.
+
+### Expected Features
+
+See `.planning/research/FEATURES.md` for full testability assessment of all 40+ production classes.
+
+**Must have (table stakes):**
+- Test runner scene with CLI execution — unblocks all test work; gates the entire milestone
+- Unit tests for MoodSystem POCO — decay, tier transitions, hysteresis, wish gain/restore; most valuable single suite
+- Economy formula tests — CalculateTickIncome, CalculateRoomCost, CalculateDemolishRefund across all 5 mood tiers
+- Save/load round-trip tests — v1, v2, v3 format serialization; null vs 0 HomeSegmentIndex distinction
+- Save format version migration tests — v1/v2 JSON missing fields must deserialize with correct defaults
+- Test isolation via singleton reset — foundational requirement; without it all subsequent tests are unreliable
+- Release build exclusion — test code must not ship in exported game builds
+
+**Should have (competitive):**
+- Housing assignment integration tests — fewest-occupants-first algorithm, demolish displacement, reassignment
+- Mood tier transition integration tests — verify SetMoodTier propagation through event chain
+- Event bus verification tests — confirm GameEvents emits correct events with correct args
+- Stale save reference handling — three code paths in RestoreFromSave that cover unhoused citizens on load
+- Debug launch configurations — VSCode entries for "Debug Tests" and "Debug Current Test"
+
+**Defer (v2+):**
+- Wish fulfillment end-to-end test — requires full scene with citizen spawning and wish template loading
+- Code coverage collection — useful but not blocking; the `--coverage` flag is available when ready
+- CI pipeline — can be added independently after local tests pass
+- Custom test drivers for game-specific nodes — only needed if integration tests become brittle
+
+### Architecture Approach
+
+See `.planning/research/ARCHITECTURE.md` for full component specs, data flow diagrams, and implementation code.
+
+The architecture classifies tests into three tiers by dependency level. Tier 1 (pure C# tests in `test/Unit/`) covers POCOs and pure functions with zero engine deps — instant, reliable, highest ROI. Tier 2 (singleton-aware tests in `test/Integration/`) covers singleton behavior with controlled state using `TestHelper.ResetAllSingletons()` in `[SetupAll]`. Tier 3 (scene tests in `test/System/`) covers full save/load round-trips and multi-singleton flows using GodotTestDriver `Fixture` for managed node lifecycle. The three-tier classification must be established upfront; mixing tiers creates cascading setup overhead.
+
+**Major components:**
+1. `test/TestRunner.cs + TestRunner.tscn` — GoDotTest entry point; minimal Node2D scene that calls `GoTest.RunTests(Assembly.GetExecutingAssembly(), this)` in `_Ready()`
+2. `test/Helpers/TestHelper.cs` — `ResetAllSingletons()` and `WaitFrames()` utilities; must be built before any Tier 2/3 tests; calls existing public APIs (RestoreCredits, ClearCitizens, RestoreActiveWishes, etc.)
+3. `test/Helpers/SaveDataBuilder.cs` — Fluent builder for SaveData test fixtures with version-specific factory methods (CreateV1/V2/V3); eliminates repetitive POCO construction
+4. `test/Helpers/Assert.cs` (or Shouldly) — Assertion library; Shouldly is recommended for richer failure messages
+5. `test/Unit/` — Five test classes covering MoodSystem, SegmentGrid, save serialization, economy formulas, housing capacity
+6. `test/Integration/` — Three test classes covering EconomyManager, HousingManager, HappinessManager with singleton reset pattern
+7. `test/System/` — SaveLoadRoundTripTest covering v1/v2/v3 format compatibility with SaveDataBuilder fixtures
+
+**BuildManager limitation:** `ClearAllRooms()` and `RestorePlacedRoom()` require a non-null `_ringVisual` reference that does not exist in the test runner scene. Workaround: test room-related behavior via SaveData construction rather than placement API, and reserve full scene loading for explicit Tier 3 integration tests only.
+
+### Critical Pitfalls
+
+See `.planning/research/PITFALLS.md` for full prevention strategies and recovery costs.
+
+1. **Singleton state leaking between test suites** — All 8 autoloads persist for the entire test process; state from Test A contaminates Test B. Prevention: build `TestHelper.ResetAllSingletons()` before writing any test; some singletons need `#if DEBUG`-guarded `ResetForTesting()` methods added since not all reset APIs currently exist.
+
+2. **C# event delegate subscriber accumulation** — GameEvents uses `event Action<T>` delegates (not Godot signals), so Godot's automatic signal disconnection on node free does NOT apply. Freed nodes remain as stale subscribers and throw `ObjectDisposedException` when events fire. Prevention: add `GameEvents.ClearAllSubscribers()` called in `ResetAllSingletons()`; use a disposable `EventSpy<T>` helper for event observation in tests.
+
+3. **Autoload Timers firing during tests** — Three autoloads create child Timers (income: 5.5s, arrival: 60s, save debounce: 0.5s). These fire continuously during the test run, causing credit amounts to drift and real save files to be overwritten. Prevention: stop all Timers in `ResetAllSingletons()`; add `SaveManager.SavePathOverride` to redirect writes to a temp path during tests.
+
+4. **Scene tree lifecycle mismatch** — The test runner scene lacks RingVisual, Camera3D, segment grid, and walkway mesh. Singletons that search the tree in `_Ready()` get null references. Prevention: enforce the three-tier classification strictly; Tier 1 tests must never import Godot namespaces; BuildManager-dependent tests require the game scene via GodotTestDriver Fixture.
+
+5. **Save format edge cases missing from tests** — System.Text.Json silently defaults missing fields to zero/null, meaning a test that constructs a `SaveData` object with all fields set never exercises the actual v1/v2 backward-compatibility paths. Prevention: test deserialization from hand-crafted raw JSON strings that genuinely omit v2/v3 fields, not from programmatically constructed objects.
+
+## Implications for Roadmap
+
+Based on all four research files, the build order is tightly constrained. Infrastructure work must precede all test writing because of the singleton-isolation requirement — writing tests on a shaky foundation produces unreliable results that undermine confidence in the entire milestone.
+
+### Phase 1: Framework Wiring
+
+**Rationale:** All subsequent phases depend on a working test runner and reliable singleton isolation. The #1 pitfall (state leakage) and #3 pitfall (timer interference) must be resolved before the first test is written. "Prove infrastructure works" is the gate criterion.
+**Delivers:** `godot --run-tests --quit-on-finish` runs, discovers 0 tests, exits with code 0. Timer suppression confirmed. Event cleanup in place.
+**Addresses:** Test runner scene, CLI execution, release build exclusion, debug launch configs
+**Avoids:** Pitfalls 1 (singleton state), 2 (event accumulation), 3 (scene tree mismatch), 4 (timer interference), 5 (save file corruption), 7 (frame advancement)
+**Changes required:** Add `nuget.org` to NuGet.Config; add 3 PackageReferences to .csproj; create `test/TestRunner.cs` + `test/TestRunner.tscn`; create `test/Helpers/TestHelper.cs` (with `ResetAllSingletons()`, `WaitFrames()`); create `test/Helpers/Assert.cs` or confirm Shouldly works; add `#if DEBUG`-guarded `ResetForTesting()` methods to singletons that lack full reset APIs; add `GameEvents.ClearAllSubscribers()`; add `SaveManager.SavePathOverride`
+
+### Phase 2: Test Helpers and Pure C# Test Suites
+
+**Rationale:** Tier 1 tests have zero engine dependency risk — they run instantly and can only fail if the logic is wrong. These tests deliver maximum coverage per line of test code. SaveDataBuilder must be built alongside these tests because save serialization tests depend on it.
+**Delivers:** ~15 passing tests covering MoodSystem, economy formulas, housing capacity, and save serialization. Confidence that core game math is regression-proof.
+**Uses:** Shouldly assertions, HappinessConfig/EconomyConfig/HousingConfig constructors, MoodSystem POCO, SaveData POCOs
+**Implements:** `test/Helpers/SaveDataBuilder.cs`; `test/Unit/MoodSystemTest.cs` (decay, tier transitions, hysteresis, boundary conditions); `test/Unit/EconomyFormulaTest.cs` (CalculateRoomCost, CalculateTickIncome, CalculateDemolishRefund, all 5 tier multipliers); `test/Unit/HousingCapacityTest.cs` (ComputeCapacity for all segment sizes); `test/Unit/SaveDataSerializationTest.cs` (raw JSON fixtures for v1/v2/v3, null HomeSegmentIndex, missing-field defaults)
+**Avoids:** Pitfall 6 (save format edge cases) by deserializing from raw JSON strings, not round-tripped objects
+**Research flag:** Standard patterns — no phase research needed
+
+### Phase 3: Save/Load Round-Trip Tests
+
+**Rationale:** Save corruption is the highest-severity failure mode in the game. A serialization bug silently destroys player progress. These tests are the milestone's most valuable safety net for future changes. Separated from Phase 2 because save round-trip tests are System-tier (may involve ApplyState/ApplySceneState with frame advancement), requiring TestHelper infrastructure proven in Phase 1.
+**Delivers:** Confidence that v1, v2, and v3 saves load with correct field values and defaults. Null HomeSegmentIndex reference handling verified. Backward-compat regression-proof.
+**Uses:** SaveDataBuilder, TestHelper.WaitFrames(), GodotTestDriver Fixture (if testing full ApplySceneState path)
+**Implements:** `test/System/SaveLoadRoundTripTest.cs` covering V3 full round-trip, V2 missing HomeSegmentIndex, V1 missing mood fields, stale housing reference handling
+**Avoids:** Pitfall 5 (real save file) via SavePathOverride; Pitfall 7 (frame advancement) via WaitFrames helper
+**Research flag:** Standard patterns — no phase research needed
+
+### Phase 4: Singleton Integration Tests
+
+**Rationale:** These tests exercise the singleton coordination that is hardest to verify manually. Highest complexity tier because they depend on singletons being properly reset and autoloads being available. Deferred until after Tier 1 tests confirm that pure logic is correct — no point debugging integration failures caused by wrong formulas.
+**Delivers:** EconomyManager spend/earn/income with state verified. HousingManager assignment/capacity flow verified. HappinessManager tier transitions via event chain verified.
+**Uses:** TestHelper.ResetAllSingletons(), public singleton APIs, GameEvents event subscription
+**Implements:** `test/Integration/EconomyManagerTest.cs`; `test/Integration/HousingManagerTest.cs`; `test/Integration/HappinessManagerTest.cs`
+**Avoids:** Pitfall 1 (singleton leakage) via ResetAllSingletons in [SetupAll]; Pitfall 2 (event accumulation) via ClearAllSubscribers; Anti-Pattern 1 (cross-singleton chains labeled as unit tests)
+**Research flag:** Standard patterns — no phase research needed; singleton reset pattern is documented
+
+### Phase Ordering Rationale
+
+- Phase 1 before all others: The singleton isolation infrastructure (ResetAllSingletons, ClearAllSubscribers, SavePathOverride, Timer suppression) is a prerequisite for every subsequent phase. Tests written without it produce unreliable results that erode confidence rather than building it.
+- Phase 2 before Phase 3: Pure C# tests have zero engine risk; if they fail, the logic is wrong. Running them first builds baseline confidence before moving to filesystem-touching tests.
+- Phase 3 before Phase 4: Save/load correctness is foundational to the game's data integrity. Singleton integration tests depend on knowing the data layer is reliable.
+- Phase 4 last: Highest complexity, highest setup requirements. Depends on both the isolation infrastructure (Phase 1) and confirmed-correct pure logic (Phase 2).
+
+### Research Flags
+
+Phases with standard patterns (skip research-phase):
+- **All phases:** GoDotTest and GodotTestDriver documentation is thorough and verified. The Chickensoft ecosystem has established patterns for all three test tiers. No domain-specific research needed during planning — implementation details are documented in ARCHITECTURE.md with working code examples.
+
+Phases that may need investigation before execution:
+- **Phase 1 (Framework Wiring):** The Godot 4.6 / .NET 10 combination has an open issue (godotengine/godot#112701) about shared framework assembly probing on Windows. Flag for validation during initial NuGet restore. Workaround: testing packages do not depend on `Microsoft.Extensions.*`, so this issue likely does not affect them.
+- **Phase 4 (Singleton Integration):** BuildManager's `_ringVisual` dependency makes housing assignment integration tests non-trivial. May need additional investigation on the cleanest workaround (SaveData-based testing vs. loading a minimal game scene with RingVisual).
+
+## Confidence Assessment
+
+| Area | Confidence | Notes |
+|------|------------|-------|
+| Stack | HIGH | All three package versions verified against NuGet flatcontainer API on 2026-03-07. Compatibility with net10.0 confirmed by TFM forward-compatibility rules. One open Godot issue flagged for validation but unlikely to block. |
+| Features | HIGH | Based on direct codebase inspection of all 8 autoload singletons, 7 data classes, and MoodSystem POCO. Feature priorities derived from actual code structure, not assumptions. |
+| Architecture | MEDIUM-HIGH | GoDotTest/GodotTestDriver APIs verified against NuGet and GitHub READMEs. Singleton testing patterns derived from direct codebase analysis. Some integration patterns (particularly BuildManager workaround) inferred from framework design rather than verified in production. |
+| Pitfalls | HIGH | 8 pitfalls identified through direct analysis of 20+ source files, GoDotTest documentation, and documented Godot C# testing community failures. Recovery costs assessed as LOW to MEDIUM for all pitfalls. |
+
+**Overall confidence:** HIGH
+
+### Gaps to Address
+
+- **BuildManager RingVisual dependency:** The cleanest approach for housing assignment integration tests is unresolved. Three options documented in ARCHITECTURE.md (SaveData-based testing, load game scene, add test-only API). Decision should be made in Phase 4 planning with a preference for option 1 (least production code impact).
+- **Singleton reset APIs:** Not all 8 singletons have complete public reset APIs. The TestHelper implementation in ARCHITECTURE.md uses the available public APIs, but some singletons may need `#if DEBUG`-guarded `ResetForTesting()` methods added. Exact scope of production code changes needed for complete isolation is TBD until Phase 1 implementation.
+- **GoDotTest v2.0.x stability:** NuGet tracking shows 101 versions. Verify no breaking API changes between the version documented in Chickensoft's README and 2.0.30 during initial setup.
+
+## Sources
+
+### Primary (HIGH confidence)
+- NuGet flatcontainer API for GoDotTest, GodotTestDriver, Shouldly — version numbers verified 2026-03-07
+- Direct codebase analysis: all 8 autoload singletons, MoodSystem.cs, SegmentGrid.cs, SaveData/SavedCitizen/SavedRoom, SafeNode.cs, project.godot
+- `Orbital Rings.csproj` — confirmed Godot.NET.Sdk 4.6.1, net10.0 target, EnableDynamicLoading=true
+- `project.godot` — confirmed autoload initialization order and count
+
+### Secondary (MEDIUM confidence)
+- [Chickensoft GoDotTest GitHub README](https://github.com/chickensoft-games/GoDotTest) — TestClass API, lifecycle hooks, CLI flags, coverage workflow
+- [Chickensoft GodotTestDriver GitHub README](https://github.com/chickensoft-games/GodotTestDriver) — Fixture API, input simulation, custom drivers
+- [DeepWiki GoDotTest Running Tests](https://deepwiki.com/chickensoft-games/GoDotTest/4-running-tests) — complete test runner configuration
+- [Chickensoft GodotGame template](https://github.com/chickensoft-games/GodotGame) — reference project with testing, coverage, CI/CD
+
+### Tertiary (supporting context)
+- [Godot Forum: Using GUT with autoload singletons](https://forum.godotengine.org/t/using-gut-to-test-instantiating-scenes-via-autoload-singleton-event-bus-rootscene/86974) — nodes not in tree during tests
+- [Godot Forum: C# Event Handlers ObjectDisposedException](https://forum.godotengine.org/t/c-event-handlers-triggering-unhandled-exception-system-objectdisposedexception-cannot-access-a-disposed-object/17794) — disposed node event handler invocation
+- [Godot GitHub Issue #112701](https://github.com/godotengine/godot/issues/112701) — .NET 10 shared framework assembly probing (Windows-specific, low risk for testing packages)
+- [DEV Community: Don't use Singleton Pattern in your unit tests](https://dev.to/bacarpereira/don-t-use-singleton-pattern-in-your-unit-tests-8p7) — state leaking between tests
+
+---
+*Research completed: 2026-03-07*
+*Ready for roadmap: yes*
+
+---
+
+---
+
+# V1.2 Housing System Research Summary
+
+*Preserved from 2026-03-05. Covers the v1.2 Housing System milestone research.*
+
+---
+
 **Project:** Orbital Rings v1.2 -- Housing System
 **Domain:** Godot 4.4 C# cozy space station builder -- citizen housing assignment and return-home behavior
 **Researched:** 2026-03-05
@@ -406,5 +597,5 @@ The most critical pitfalls are all addressable at project setup time: C# signal 
 
 ---
 
-*Research completed: 2026-03-05 (v1.2 update) | 2026-03-04 (v1.1 update) | 2026-03-02 (v1.0 foundation)*
+*Research completed: 2026-03-07 (v1.3 update) | 2026-03-05 (v1.2 update) | 2026-03-04 (v1.1 update) | 2026-03-02 (v1.0 foundation)*
 *Ready for roadmap: yes*

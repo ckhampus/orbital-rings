@@ -1,341 +1,347 @@
-# Technology Stack: v1.2 Housing System
+# Technology Stack: Testing Infrastructure
 
-**Project:** Orbital Rings
-**Researched:** 2026-03-05
-**Scope:** Stack additions for citizen housing assignment, return-home behavior, HousingManager autoload, HousingConfig resource, room tooltip residents, and save/load housing data
-**Confidence:** HIGH -- all recommendations based on patterns already working in production code within this codebase
+**Project:** Orbital Rings v1.3 Testing Milestone
+**Researched:** 2026-03-07
+**Focus:** GoDotTest + GodotTestDriver integration for existing Godot 4 C# game
 
----
+## Current Project Stack (Verified from .csproj and project.godot)
 
-## Verdict: Zero New Dependencies
+| Technology | Version | Notes |
+|------------|---------|-------|
+| Godot Engine | 4.6 | config/features in project.godot |
+| Godot.NET.Sdk | 4.6.1 | From .csproj |
+| .NET Target | net10.0 | From .csproj TargetFramework |
+| NuGet Sources | Local GodotSharp only | `/usr/local/bin/GodotSharp/Tools/nupkgs` |
 
-The housing system requires **no new libraries, packages, or external dependencies**. Every feature maps directly onto existing Godot 4.4 C# APIs and project patterns already validated in v1.0/v1.1. This is a feature addition, not a technology change.
+**Important:** The milestone context references Godot 4.4 / .NET 8, but the actual project has evolved to Godot 4.6 / .NET 10.0. All package recommendations below are verified compatible with this stack.
 
----
+## Recommended Test Stack
 
-## Recommended Stack (Additions Only)
+### Core Testing Packages
 
-### New Autoload Singleton: HousingManager
+| Package | Version | Purpose | Why |
+|---------|---------|---------|-----|
+| Chickensoft.GoDotTest | 2.0.30 | Test runner, discovery, execution | The only C#-native test runner designed to run inside Godot's scene tree. Uses reflection to find TestClass subclasses, runs tests sequentially (no race conditions), supports CLI flags for CI. Chickensoft is the de facto standard for Godot C# testing. |
+| Chickensoft.GodotTestDriver | 3.1.62 | Integration test utilities | Provides Fixture lifecycle management, input simulation, frame-waiting helpers, and pre-built node drivers. Essential for testing anything that touches the scene tree (housing assignment UI, citizen nodes, save/load round-trips). Same Chickensoft ecosystem as GoDotTest. |
+| Shouldly | 4.3.0 | Assertion library | Readable assertion syntax (`result.ShouldBe(expected)`) with clear failure messages. Lightweight, zero dependencies, no Godot coupling. Preferred over FluentAssertions (heavier, licensing changes in 2024) and over raw `if/throw` (unreadable, poor error messages). |
 
-| Component | Technology | Version | Purpose | Why |
-|-----------|-----------|---------|---------|-----|
-| HousingManager | Godot `Node` (C#) | Godot 4.4 | Citizen-to-room assignment mapping, reassignment on build/demolish, resident queries | Follows the exact pattern of all 7 existing autoloads. New singleton because housing assignment is a distinct concern from mood/happiness (PRD recommendation). Keeps HappinessManager focused on mood math, not room-citizen bookkeeping. |
+### Why NOT These Alternatives
 
-**Registration:** Add to Project > Autoloads in project.godot, ordered **after HappinessManager, before SaveManager**. HousingManager needs GameEvents and BuildManager (both load earlier). SaveManager must load last to subscribe to all state-change events including housing events.
+| Category | Rejected | Why Not |
+|----------|----------|---------|
+| Test Runner | gdUnit4 | GDScript-first design, heavier plugin installation (Godot addon + NuGet), adds editor UI panels this project does not need. GoDotTest is lighter and C#-native. |
+| Test Runner | xUnit/NUnit via dotnet test | Cannot run inside Godot's scene tree. Tests needing SceneTree, nodes, or Godot APIs would fail. GoDotTest solves this by running tests as a Godot scene. |
+| Assertions | FluentAssertions | License changed to paid for commercial use in late 2024. Shouldly is MIT, lighter, and the assertion syntax is comparable. |
+| Assertions | GoDotTest built-in | GoDotTest provides NO assertions by design -- it is only a test runner. An assertion library is required. |
+| Mocking | LightMock.Generator (1.2.3) | Source generator for compile-time mocks. NOT needed for this milestone. The test targets are POCO classes (MoodSystem), Autoload singletons (concrete classes), and data round-trips (SaveManager). None of these require mocking -- they can be tested directly by constructing instances or calling methods. Adding mocking infrastructure adds complexity with no benefit for these test suites. Revisit if future milestones need interface-based testing. |
+| Mocking | Moq | Reflection-based mocking has known compatibility issues with Godot's AOT-hostile assembly loading. Also overkill for this milestone's scope. |
+| Integration | Separate test .csproj | Some teams create a second .csproj for tests. This adds build complexity and makes it harder to access internal types. Since GoDotTest runs in the same assembly, a single .csproj with tests in a `test/` folder is simpler and sufficient for a project this size (~9.5K LOC). |
 
-**Namespace:** `OrbitalRings.Autoloads` -- same as all other autoloads.
+## NuGet Configuration Change Required
 
-**Instance pattern:** Static singleton `HousingManager.Instance` set in `_EnterTree()`, matching GameEvents pattern. Include `StateLoaded` guard to skip initialization on save restore, matching HappinessManager/CitizenManager pattern.
+The current `NuGet.Config` only has a local GodotSharp source. The testing packages live on nuget.org and require adding the official NuGet source.
 
-**File location:** `Scripts/Autoloads/HousingManager.cs`
+**Updated NuGet.Config:**
 
-### New Config Resource: HousingConfig
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <packageSources>
+    <add key="godot-local" value="/usr/local/bin/GodotSharp/Tools/nupkgs" />
+    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+  </packageSources>
+</configuration>
+```
 
-| Component | Technology | Version | Purpose | Why |
-|-----------|-----------|---------|---------|-----|
-| HousingConfig | Godot `Resource` (`[GlobalClass]`) | Godot 4.4 | Inspector-tunable timing constants for return-home cycle | Follows HappinessConfig and EconomyConfig pattern exactly. Resource file at `res://Resources/Housing/default_housing.tres`. Loaded in HousingManager._Ready() with fallback to code defaults. |
+## .csproj Changes Required
 
-**Exported fields (all `[Export]`):**
+Add to the existing `Orbital Rings.csproj`:
 
-| Field | Type | Default | Rationale |
-|-------|------|---------|-----------|
-| `HomeTimerMin` | `float` | `90.0f` | Lower bound of return-home cycle (PRD spec: 90-150s) |
-| `HomeTimerMax` | `float` | `150.0f` | Upper bound of return-home cycle |
-| `RestDurationMin` | `float` | `8.0f` | Min time "inside" home room (PRD: 8-15s, intentionally longer than regular 4-8s visits to feel like sleeping) |
-| `RestDurationMax` | `float` | `15.0f` | Max time inside home room |
-| `ZzzFontSize` | `int` | `14` | Smaller than standard FloatingText (18) per PRD "subtle" requirement |
+```xml
+<ItemGroup>
+  <PackageReference Include="Chickensoft.GoDotTest" Version="2.0.30" />
+  <PackageReference Include="Chickensoft.GodotTestDriver" Version="3.1.62" />
+  <PackageReference Include="Shouldly" Version="4.3.0" />
+</ItemGroup>
+```
 
-**File locations:**
-- `Scripts/Data/HousingConfig.cs` (follows `HappinessConfig.cs` pattern)
-- `Resources/Housing/default_housing.tres` (follows `Resources/Happiness/default_happiness.tres` pattern)
+**No other .csproj changes needed.** The project already targets `net10.0` which is forward-compatible with these packages (they target `netstandard2.1` or `net8.0`). The `EnableDynamicLoading` is already `true`.
 
-**Resource loading pattern** (identical to HappinessManager):
+## Test Runner Scene Setup
+
+GoDotTest requires a dedicated test scene with a script that bootstraps test discovery and execution. Two setup patterns exist:
+
+### Pattern A: Separate Test Scene (Recommended for This Project)
+
+Create `test/Tests.tscn` with a `Node2D` root and attach this script:
+
 ```csharp
-if (Config == null)
-    Config = ResourceLoader.Load<HousingConfig>("res://Resources/Housing/default_housing.tres");
-if (Config == null)
+using System.Reflection;
+using Godot;
+using GoDotTest;
+
+public partial class Tests : Node2D
 {
-    GD.PushWarning("HousingManager: No HousingConfig found. Using code defaults.");
-    Config = new HousingConfig();
+    public override async void _Ready()
+        => await GoTest.RunTests(Assembly.GetExecutingAssembly(), this);
 }
 ```
 
----
+Run tests by playing this scene directly (F6 in editor) or from CLI:
 
-## Godot APIs Used (All Existing in 4.4, All Validated in This Codebase)
-
-### Timer (Godot.Timer) -- Return-Home Cycle
-
-**Used for:** Per-citizen periodic return-home timer on CitizenNode.
-
-**Pattern:** Identical to existing `_visitTimer` and `_wishTimer` in CitizenNode:
-- Create `new Timer()`, configure `OneShot = true`, set `WaitTime` from random range, connect `Timeout`, call `AddChild()`, start in `_Ready()`
-- Re-arm with new random interval in timeout handler
-- One-shot timer that re-arms itself (same as `_wishTimer`)
-
-**Why Timer, not `_Process` accumulator:** The project uses Timer nodes for all periodic behavior (visit checks at 20-40s, wish generation at 30-60s, arrival checks at 60s, autosave debounce at 0.5s). Timer nodes automatically pause with the scene tree (`ProcessMode.Pausable`), handle object lifetime correctly via the scene tree, and add zero per-frame overhead when not firing.
-
-**Priority interaction with visit/wish timers:** The home timer fires independently of visit/wish timers. When home timer fires during an active visit or wish pursuit, it simply resets (no interruption). This is implemented as a guard at the top of the handler:
-```csharp
-if (_isVisiting) { ResetHomeTimer(); return; }
-if (_currentWish != null) { ResetHomeTimer(); return; }
+```bash
+$GODOT --run-tests --quit-on-finish
 ```
 
-**Confidence: HIGH** -- Timer pattern used in 6+ places across the codebase. Exact same configuration and lifecycle.
+### Pattern B: Conditional Main Scene (For CI/CD)
 
-### Tween (Godot.Tween) -- Return-Home Animation
-
-**Used for:** Return-home animation sequence (walk to home segment, drift to room edge, fade out, rest inside, fade in, drift back).
-
-**Pattern:** Structurally identical to `StartVisit()` in CitizenNode. The return-home animation is the same tween chain with three differences:
-1. Target segment comes from `_homeSegmentIndex` instead of proximity search
-2. Rest duration is 8-15s instead of 4-8s (from HousingConfig)
-3. Zzz floater spawns before fade-out
-
-The existing `StartVisit()` tween chain has 8 phases. The return-home chain will have 9 (inserting Zzz spawn):
-1. `TweenMethod` -- angular walk to home segment mid-angle
-2. `TweenCallback` -- update `_currentAngle`
-3. `TweenMethod` -- radial drift to room edge
-4. `TweenCallback` -- spawn Zzz floater
-5. `TweenMethod` -- fade out (alpha 0)
-6. `TweenCallback` -- hide + emit `CitizenEnteredRoom`
-7. `TweenInterval` -- rest duration (8-15s, from HousingConfig)
-8. `TweenCallback` -- show + emit `CitizenExitedRoom`
-9. `TweenMethod` -- fade in (alpha 1)
-10. `TweenMethod` -- drift back to walkway
-11. `TweenCallback` -- restore state, resume walking, reset home timer
-
-**Kill-before-create pattern:** Reuses existing `_activeTween?.Kill()` before creating new tween (pitfall #7 from v1.0). A single `_activeTween` field governs both visit and home-return tweens since they cannot overlap.
-
-**Confidence: HIGH** -- Tween chain pattern proven in CitizenNode.StartVisit() with ~80 lines of working code.
-
-### FloatingText (OrbitalRings.UI.FloatingText) -- Zzz Floater
-
-**Used for:** Subtle "Zzz" text appearing when citizen enters home room.
-
-**Pattern:** Same as arrival text in HappinessManager.SpawnArrivalText():
-- `new FloatingText()`, add to CanvasLayer, call `Setup(text, color, position)`
-- Self-destructs after animation (~1.1s)
-
-**Screen-space positioning from 3D world position:**
-```csharp
-var camera = GetViewport().GetCamera3D();
-Vector2 screenPos = camera.UnprojectPosition(citizen.GlobalPosition);
-floater.Setup("Zzz", new Color(0.75f, 0.70f, 0.85f, 0.7f), screenPos + new Vector2(15, -30));
-```
-
-**Why FloatingText (2D), not Sprite3D (3D):**
-
-| Approach | Pros | Cons |
-|----------|------|------|
-| FloatingText (2D Label) with UnprojectPosition | Zero new code, self-destructs, proven system | Screen-space position won't track if camera moves during 0.9s float |
-| Sprite3D "Zzz" badge (like wish badges) | Stays in 3D world, visually consistent with badges | Requires texture creation, manual lifecycle, more complex |
-
-**Decision: FloatingText.** The Zzz appears for <1 second. The camera almost never moves in that window (orbit is player-initiated). The PRD says "same style as existing FloatingText but smaller and lighter colored" -- so the spec itself directs FloatingText reuse.
-
-**Visual tuning:** Font size 14 (vs standard 18), muted lavender color `Color(0.75f, 0.70f, 0.85f)` for subtlety per PRD.
-
-**Confidence: HIGH** -- FloatingText is battle-tested in production. UnprojectPosition is standard Godot 4.4 Camera3D API.
-
-### C# Event Delegates (System.Action) -- Housing Events
-
-**Used for:** New events on GameEvents signal bus for housing state changes.
-
-**New events on GameEvents:**
-
-| Event | Signature | Emitted By | Consumed By |
-|-------|-----------|------------|-------------|
-| `CitizenHoused` | `Action<string, int>` (citizenName, segmentIndex) | HousingManager | SaveManager (autosave trigger) |
-| `CitizenUnhoused` | `Action<string>` (citizenName) | HousingManager | SaveManager (autosave trigger) |
-
-**Why only two new events:** Housing assignment/unassignment are the only new cross-system state mutations. The existing `RoomPlaced`, `RoomDemolished`, and `CitizenArrived` events already fire at the right times -- HousingManager subscribes to these as triggers. The new events propagate assignment *results* to SaveManager for autosave triggering.
-
-**Pattern:** Identical to all existing GameEvents: `public event Action<...>`, `public void Emit...()` with `?.Invoke()`. SaveManager adds stored delegate references for these events in its subscription list.
-
-**Confidence: HIGH** -- C# event delegate pattern used for all 20+ existing events without issue.
-
-### Dictionary<string, int> -- Citizen-to-Room Mapping
-
-**Used for:** Internal assignment map in HousingManager (`citizenName -> anchorSegmentIndex`).
-
-**Why citizen name as key:** Citizen names are unique (enforced by `CitizenNames.GetNextName()` which draws from a pool without replacement). Using names avoids object references that break across save/load cycles. The existing save system already keys `ActiveWishes` by citizen name (`Dictionary<string, string>` in WishBoard), validating this approach.
-
-**Reverse lookup (room to residents, for tooltip):** Iterate the mapping filtered by segment index. With max ~30-50 citizens in a typical game, linear scan of a Dictionary is negligible. No bidirectional map needed.
-
-**Sentinel value:** `-1` means unhoused. Do not use `0` because `0` is a valid segment index (Outer position 0).
-
-**Confidence: HIGH** -- Same collection types and keying strategy as existing WishBoard tracking.
-
----
-
-## Data Model Changes
-
-### SavedCitizen (Add Field)
+Modify the existing main scene entry point to detect test flags and branch:
 
 ```csharp
-public class SavedCitizen
+public partial class Main : Node
 {
-    // ... existing fields unchanged ...
-    public int HomeSegmentIndex { get; set; } = -1;  // NEW: -1 = unhoused
-}
-```
-
-**Serialization behavior:** System.Text.Json will write `-1` for unhoused citizens. When deserializing v2 saves that lack this field, the JSON default for `int` is `0` -- but the version gate handles this (see below).
-
-### SaveData (Version Bump)
-
-```csharp
-public class SaveData
-{
-    public int Version { get; set; } = 3;  // bumped from 2
-    // ... all existing fields unchanged ...
-}
-```
-
-**Version-gated restore in SaveManager:**
-```csharp
-// In ApplySceneState, after restoring citizens:
-if (data.Version >= 3)
-{
-    // Restore housing assignments from saved HomeSegmentIndex values
-    foreach (var citizen in data.Citizens)
+    public override async void _Ready()
     {
-        if (citizen.HomeSegmentIndex >= 0)
-            HousingManager.Instance?.AssignFromSave(citizen.Name, citizen.HomeSegmentIndex);
+        var environment = TestEnvironment.From(OS.GetCmdlineArgs());
+
+        if (environment.ShouldRunTests)
+        {
+            await GoTest.RunTests(Assembly.GetExecutingAssembly(), this, environment);
+        }
+        else
+        {
+            GetTree().ChangeSceneToFile("res://Scenes/TitleScreen/TitleScreen.tscn");
+        }
     }
 }
-else
+```
+
+**Recommendation: Use Pattern A.** The project launches from `TitleScreen.tscn` directly, and modifying the launch flow adds risk to the shipped game. A separate test scene is isolated, can be run with F6, and avoids touching production code. Pattern B can be adopted later if CI/CD integration needs a single entry point.
+
+## Test Class Structure
+
+```csharp
+using Godot;
+using GoDotTest;
+using Shouldly;
+
+public class MoodSystemTest : TestClass
 {
-    // v2 saves: no housing data, run fresh assignment for all citizens
-    HousingManager.Instance?.AssignAllUnhoused();
+    public MoodSystemTest(Node testScene) : base(testScene) { }
+
+    [SetupAll]
+    public void SetupAll()
+    {
+        // One-time setup before all tests in this class
+    }
+
+    [Setup]
+    public void Setup()
+    {
+        // Runs before each [Test] method
+    }
+
+    [Test]
+    public void MoodDecaysOverTime()
+    {
+        var mood = new MoodSystem();
+        mood.AddMood(1.0f);
+        mood.Update(10.0f); // simulate 10 seconds
+        mood.CurrentMood.ShouldBeLessThan(1.0f);
+    }
+
+    [Cleanup]
+    public void Cleanup()
+    {
+        // Runs after each [Test] method
+    }
+
+    [CleanupAll]
+    public void CleanupAll()
+    {
+        // One-time cleanup after all tests in this class
+    }
 }
 ```
 
-**Backward compatibility matrix:**
+### Available Test Attributes
 
-| Save Version | Loaded By v1.2 Code | Behavior |
-|-------------|---------------------|----------|
-| v1 | Existing v1 restore path, then fresh housing assignment | Works |
-| v2 | Existing v2 restore path, then fresh housing assignment | Works |
-| v3 | Full restore including housing assignments | Works |
+| Attribute | When It Runs | Use For |
+|-----------|-------------|---------|
+| `[SetupAll]` | Once before first test | Creating shared fixtures, loading configs |
+| `[Setup]` | Before each `[Test]` | Resetting state for isolation |
+| `[Test]` | The test itself | Assertions, the actual test logic |
+| `[Cleanup]` | After each `[Test]` | Freeing nodes, resetting singletons |
+| `[CleanupAll]` | Once after last test | Disposing shared resources |
+| `[Failure]` | When any test fails | Collecting debug info on failure |
 
-| Save Version | Loaded By v1.1 Code (forward compat) | Behavior |
-|-------------|--------------------------------------|----------|
-| v3 | `HomeSegmentIndex` silently ignored by System.Text.Json | Works (housing data lost but no crash) |
+### Execution Order
 
-**Confidence: HIGH** -- Version-gated restore already proven in v1-to-v2 migration. System.Text.Json missing/extra field behavior validated in production.
+Tests run **sequentially in declaration order** within a class. No parallelism, no randomization. This is intentional -- Godot is not thread-safe, and deterministic ordering prevents flaky tests.
 
----
+## GodotTestDriver Usage for Integration Tests
 
-## Integration Points
+GodotTestDriver provides `Fixture` for managing node lifecycle in tests:
 
-### HousingManager Subscribes To (Existing Events)
-
-| Event | Source | HousingManager Response |
-|-------|--------|------------------------|
-| `RoomPlaced` | BuildManager via GameEvents | Check if Housing category via BuildManager.GetPlacedRoom(). If yes, assign unhoused citizens (oldest first, even-spread by lowest occupancy). |
-| `RoomDemolished` | BuildManager via GameEvents | If demolished room was housing (check _housingRoomCapacities in HappinessManager or track separately), unhouse its residents, attempt reassignment to other housing rooms. |
-| `CitizenArrived` | CitizenManager via GameEvents | Assign new citizen to housing room with fewest occupants. Ties broken randomly. |
-
-### HousingManager Reads From (Existing Singletons)
-
-| Singleton | API | Purpose |
-|-----------|-----|---------|
-| `BuildManager.Instance` | `GetPlacedRoom(segmentIndex)` | Get room definition and category to verify housing rooms |
-| `CitizenManager.Instance` | `Citizens` list | Iterate citizens for reassignment after demolish |
-
-### HousingManager Provides To (Existing Systems)
-
-| Consumer | API | Purpose |
-|----------|-----|---------|
-| `CitizenNode` | `GetHomeSegment(citizenName)` | Return home segment index for return-home animation target |
-| `CitizenInfoPanel` | `GetHomeRoomName(citizenName)` | Display "Home: Bunk Pod (Outer 3)" |
-| `SegmentTooltip` | `GetResidents(segmentIndex)` | Display "Residents: Pip, Nova" in room hover tooltip |
-| `SaveManager` | Consumes `CitizenHoused`/`CitizenUnhoused` events | Triggers debounced autosave |
-
-### BuildManager API Change Needed
-
-`BuildManager.GetPlacedRoom()` currently returns `(RoomDefinition Definition, int AnchorIndex, int Cost)?`. HousingManager needs segment count for size-scaled capacity calculation (`BaseCapacity + segmentCount - 1`).
-
-**Change:** Add `SegmentCount` to the return tuple:
 ```csharp
-// Before:
-public (RoomDefinition Definition, int AnchorIndex, int Cost)? GetPlacedRoom(int flatIndex)
+using Godot;
+using GoDotTest;
+using GodotTestDriver;
+using Shouldly;
 
-// After:
-public (RoomDefinition Definition, int AnchorIndex, int SegmentCount, int Cost)? GetPlacedRoom(int flatIndex)
+public class SaveLoadIntegrationTest : TestClass
+{
+    private Fixture _fixture = default!;
+
+    public SaveLoadIntegrationTest(Node testScene) : base(testScene) { }
+
+    [SetupAll]
+    public void SetupAll()
+    {
+        _fixture = new Fixture(TestScene.GetTree());
+    }
+
+    [CleanupAll]
+    public async Task CleanupAll()
+    {
+        await _fixture.Cleanup();
+    }
+
+    [Test]
+    public async Task SaveAndLoadPreservesHousing()
+    {
+        // Fixture auto-frees nodes after test
+        var node = _fixture.AutoFree(new Node());
+        TestScene.AddChild(node);
+
+        // ... test save/load round-trip
+    }
+}
 ```
 
-**Impact:** Only HappinessManager.OnRoomPlaced() and HappinessManager.OnRoomDemolished() call this method externally. Both need the added field anyway (to compute size-scaled capacity). The change is additive -- add the field to destructuring at each call site.
+**Key GodotTestDriver capabilities relevant to this project:**
 
-**Confidence: HIGH** -- Return type is internal to the codebase with only 2 external callers identified.
+| Feature | Use Case in Orbital Rings |
+|---------|--------------------------|
+| `Fixture.AutoFree()` | Prevent node leaks in tests that add nodes to scene tree |
+| `Fixture.Cleanup()` | Ensure all test-created nodes are freed between suites |
+| Frame waiting (`WithinSeconds()`) | Wait for async citizen behaviors, debounced save |
+| Input simulation | Future: testing segment clicking, build panel interaction |
 
----
+## CLI Arguments Reference
 
-## Existing Systems Modified (Minimal Changes)
+| Flag | Purpose | When to Use |
+|------|---------|-------------|
+| `--run-tests` | Enable test mode | Always |
+| `--run-tests=SuiteName` | Run single suite | Debugging one test class |
+| `--run-tests=Suite.Method` | Run single test | Debugging one test method |
+| `--quit-on-finish` | Exit Godot after tests | CI/CD, batch runs |
+| `--stop-on-error` | Halt on first failure | Debugging failures |
+| `--sequential` | Skip remaining tests in suite on failure | When tests depend on prior test state |
+| `--coverage` | Enable coverlet integration | CI/CD coverage reports |
 
-| System | Change | Estimated LOC |
-|--------|--------|--------------|
-| **CitizenNode** | Add `_homeSegmentIndex` field, `_homeTimer` Timer, `StartHomeVisit()` method (mirrors `StartVisit()`), Zzz floater spawn, `SetHomeSegment()` setter for HousingManager | ~80 |
-| **CitizenInfoPanel** | Add `_homeLabel` Label showing "Home: Bunk Pod (Outer 3)" or "Home: ---" in VBoxContainer | ~15 |
-| **SegmentTooltip** (via SegmentInteraction) | Append resident names when hovering housing room: query HousingManager.GetResidents() | ~20 |
-| **SaveManager** | Add `HomeSegmentIndex` to SavedCitizen serialization, bump Version to 3, version-gated restore, subscribe to new housing events | ~25 |
-| **GameEvents** | Add `CitizenHoused` and `CitizenUnhoused` events with emit methods | ~10 |
-| **BuildManager** | Add `SegmentCount` to `GetPlacedRoom()` return tuple | ~5 |
+## VSCode Debug Configuration
 
-**Architecture unchanged:** No new design patterns, no new node types, no scene changes. All modifications follow existing code conventions exactly.
+Add to `.vscode/launch.json` for test debugging:
 
----
+```json
+{
+    "name": "Debug Tests",
+    "type": "coreclr",
+    "request": "launch",
+    "preLaunchTask": "build",
+    "program": "${env:GODOT}",
+    "args": [
+        "--run-tests",
+        "--quit-on-finish",
+        "--path",
+        "${workspaceFolder}"
+    ],
+    "cwd": "${workspaceFolder}",
+    "stopAtEntry": false
+}
+```
+
+## Recommended Directory Structure
+
+```
+test/
+  Tests.tscn              # Test runner scene (Pattern A)
+  Tests.cs                 # Test runner script
+  SaveLoadTest.cs          # Save/load round-trip tests
+  HousingTest.cs           # Housing assignment tests
+  EconomyTest.cs           # Economy calculation tests
+  MoodSystemTest.cs        # Mood decay and tier tests
+  WishFulfillmentTest.cs   # Wish loop tests
+  Fixtures/                # Shared test data/helpers (if needed)
+```
+
+**Why `test/` at project root (not `Tests/` or inside `Scripts/`):**
+- Mirrors Chickensoft conventions
+- Keeps test code visually separate from production code
+- Still in the same assembly (single .csproj) so tests can access all types
+- Lowercase `test/` follows Chickensoft convention
 
 ## What NOT to Add
 
-| Technology | Why Not | Use Instead |
-|------------|---------|-------------|
-| **NavigationAgent3D** | Citizens use polar coordinate movement on a 1D circular walkway. Return-home uses the same angular walk as room visits. Navigation mesh is massive overkill for angle-based movement. | Existing `TweenMethod` angular interpolation in `StartVisit()` pattern |
-| **Godot Signals (`[Signal]`)** | Project-wide locked decision: pure C# event delegates avoid marshalling overhead and IsConnected bugs (GitHub #76690, #72994). Validated across 9+ phases. | `System.Action` delegates on GameEvents |
-| **Any NuGet package** | Zero external dependencies needed. System.Text.Json (in .NET 8) handles serialization. All game logic uses Godot built-in types. | Built-in .NET 8 and Godot 4.4 APIs |
-| **State machine library** | Citizen behavior states (walking, visiting, resting-at-home) are simple enough for boolean flags and tween chains. Four states do not justify a formal FSM framework. | `_isVisiting` bool + `_activeTween` null check (existing pattern) |
-| **Observable collections** | The GameEvents event bus already provides change notification. Adding reactive wrappers creates a second notification mechanism with no benefit. | GameEvents `CitizenHoused`/`CitizenUnhoused` events |
-| **Separate .tscn scene for HousingManager** | All autoloads are pure C# scripts registered in project.godot with no associated scene. | Script-only autoload registration |
-| **Database / SQLite** | Housing data is one `int` per citizen added to existing JSON save. No query patterns, no relational data, no volume justifying a database. | `System.Text.Json` POCO serialization (already in use) |
-| **Unit test framework** | Not in scope for this milestone. Worth adding later but should be a separate effort with its own research. | Manual testing in-engine |
+| Do NOT Add | Why |
+|------------|-----|
+| Separate test .csproj | Adds build complexity, prevents access to internal types, overkill for ~10K LOC project |
+| Moq or NSubstitute | Reflection-based mocking has Godot compatibility issues. Not needed -- test targets are concrete classes. |
+| LightMock.Generator | Source-gen mocking is the right approach IF you need mocks. This milestone tests POCOs and singletons directly. Add later if needed. |
+| FluentAssertions | License concerns (commercial use restrictions since late 2024). Shouldly covers the same ground with MIT license. |
+| Code coverage tooling (coverlet) | Nice-to-have but not in scope for v1.3. The `--coverage` flag is available when ready to add it. |
+| gdUnit4 | Plugin-based, GDScript-first, adds editor panels and complexity. GoDotTest is leaner for C#-only projects. |
+| Test parallelization | GoDotTest intentionally runs sequentially. Godot is not thread-safe. Do not try to work around this. |
+| xUnit/NUnit attributes | GoDotTest has its own attribute system (`[Test]`, `[Setup]`, etc.). Do not mix test frameworks. |
 
----
+## Package Version Confidence
 
-## Capacity Tracking: HousingManager vs HappinessManager
+| Package | Version | Confidence | Source |
+|---------|---------|------------|--------|
+| Chickensoft.GoDotTest | 2.0.30 | HIGH | NuGet API flatcontainer index verified 2026-03-07 (101 versions tracked, 2.0.30 is latest) |
+| Chickensoft.GodotTestDriver | 3.1.62 | HIGH | NuGet API flatcontainer index verified 2026-03-07 (67 versions tracked, 3.1.62 is latest) |
+| Shouldly | 4.3.0 | HIGH | NuGet API flatcontainer index verified 2026-03-07 (latest stable) |
 
-Housing capacity tracking (`_housingCapacity`, `_housingRoomCapacities`) currently lives in HappinessManager because it gates citizen arrivals there. The PRD raised whether to move it.
+## Compatibility Notes
 
-**Decision: Keep capacity tracking in HappinessManager.** HousingManager owns only the citizen-to-room *mapping*.
+1. **net10.0 target:** All three packages target `netstandard2.1` or `net8.0`, which are forward-compatible with `net10.0`. No TFM issues expected.
 
-**Rationale:**
-- Capacity tracking gates arrivals in `HappinessManager.OnArrivalCheck()`. Moving it to HousingManager would force HappinessManager to call `HousingManager.Instance.CalculateHousingCapacity()` on every arrival check -- adding a cross-singleton dependency to a hot path.
-- Size-scaled capacity (`BaseCapacity + segmentCount - 1`) affects the capacity count, which is already computed in HappinessManager.OnRoomPlaced(). The formula change is a one-line edit there.
-- HousingManager needs to know room capacity only for assignment (how many citizens can live in a room). It queries BuildManager for this, not HappinessManager.
+2. **Godot.NET.Sdk 4.6.1:** GoDotTest 2.x works with Godot 4.x. The 2.0.x line removed Godot-version-specific prerelease tags (those were in the 1.x line), indicating version-agnostic compatibility with Godot 4.x.
 
-This keeps responsibilities clean: HappinessManager owns "can citizens arrive?" (capacity gate), HousingManager owns "where does each citizen live?" (assignment mapping).
+3. **NuGet source:** The project MUST add `nuget.org` to `NuGet.Config`. Without this, `dotnet restore` will fail to find the testing packages since the project currently only has a local GodotSharp source.
 
----
+4. **Single assembly:** Tests and game code live in the same .csproj. This is the intended GoDotTest pattern -- it uses `Assembly.GetExecutingAssembly()` to discover test classes in the running assembly.
+
+5. **Known Godot 4.6 / .NET 10 concern:** There is an open issue (godotengine/godot#112701) about Godot 4.5-mono failing to probe shared framework assemblies on .NET 10 on Windows. This affects `Microsoft.Extensions.*` assemblies specifically, not standalone NuGet packages like the ones recommended here. The testing packages do not depend on `Microsoft.Extensions.*`, so this issue should not block adoption. Flag for validation during initial setup.
+
+## Installation Commands
+
+```bash
+# Add nuget.org source (required -- project currently only has local GodotSharp)
+dotnet nuget add source https://api.nuget.org/v3/index.json --name nuget.org --configfile NuGet.Config
+
+# Add testing packages
+dotnet add "Orbital Rings.csproj" package Chickensoft.GoDotTest --version 2.0.30
+dotnet add "Orbital Rings.csproj" package Chickensoft.GodotTestDriver --version 3.1.62
+dotnet add "Orbital Rings.csproj" package Shouldly --version 4.3.0
+
+# Verify restore succeeds
+dotnet restore "Orbital Rings.csproj"
+```
 
 ## Sources
 
-All findings based on direct codebase analysis with HIGH confidence:
-- `Scripts/Autoloads/GameEvents.cs` -- event bus pattern, C# delegate conventions
-- `Scripts/Citizens/CitizenNode.cs` -- Timer lifecycle, Tween chain pattern, visit animation pipeline
-- `Scripts/Citizens/CitizenManager.cs` -- citizen spawning, singleton pattern, save/load API
-- `Scripts/Autoloads/HappinessManager.cs` -- housing capacity tracking, arrival gating, config resource loading
-- `Scripts/Autoloads/SaveManager.cs` -- version-gated save format, System.Text.Json serialization, debounced autosave
-- `Scripts/Data/HappinessConfig.cs` -- [GlobalClass] Resource pattern, [Export] fields with defaults
-- `Scripts/Data/EconomyConfig.cs` -- same Resource pattern, establishing convention for config files
-- `Scripts/Data/RoomDefinition.cs` -- BaseCapacity field, RoomCategory enum
-- `Scripts/UI/FloatingText.cs` -- self-destructing floating text, Setup() API
-- `Scripts/UI/CitizenInfoPanel.cs` -- programmatic UI panel, VBoxContainer labels
-- `Scripts/UI/SegmentTooltip.cs` -- tooltip text composition pattern
-- `Scripts/Build/BuildManager.cs` -- GetPlacedRoom() API, room tracking dictionary
-- `Scripts/Ring/SegmentGrid.cs` -- flat index mapping, ToIndex/FromIndex
-- `docs/prd-housing.md` -- feature requirements, design decisions, timing constants
+- [Chickensoft GoDotTest GitHub](https://github.com/chickensoft-games/GoDotTest) - Test runner documentation, setup guide, CLI flags
+- [Chickensoft GodotTestDriver GitHub](https://github.com/chickensoft-games/GodotTestDriver) - Fixture, drivers, input simulation
+- [GoDotTest NuGet](https://www.nuget.org/packages/Chickensoft.GoDotTest/) - Version 2.0.30 (latest stable)
+- [GodotTestDriver NuGet](https://www.nuget.org/packages/Chickensoft.GodotTestDriver/) - Version 3.1.62 (latest stable)
+- [Shouldly NuGet](https://www.nuget.org/packages/Shouldly/) - Version 4.3.0 (latest stable)
+- [DeepWiki GoDotTest Running Tests](https://deepwiki.com/chickensoft-games/GoDotTest/4-running-tests) - Complete test runner configuration
+- [LightMock.Generator NuGet](https://www.nuget.org/packages/LightMock.Generator) - Version 1.2.3 (evaluated, not recommended for this milestone)
+- [Godot .NET 10 Issue](https://github.com/godotengine/godot/issues/112701) - Shared framework assembly probing issue on Windows
 
 ---
 
-*Stack research for: Orbital Rings v1.2 -- Housing system*
-*Researched: 2026-03-05*
+*Stack research for: Orbital Rings v1.3 -- Testing infrastructure*
+*Researched: 2026-03-07*

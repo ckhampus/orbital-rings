@@ -1,211 +1,301 @@
 # Pitfalls Research
 
-**Domain:** Adding citizen housing assignment and return-home behavior to an existing Godot 4 C# cozy space station builder with event-driven autoload architecture
-**Researched:** 2026-03-05
-**Confidence:** HIGH (derived from direct codebase analysis of 15+ source files, not external sources)
+**Domain:** Adding GoDotTest + GodotTestDriver testing infrastructure to an existing Godot 4 C# game with 8 autoload singletons, event-driven architecture, and System.Text.Json save/load
+**Researched:** 2026-03-07
+**Confidence:** HIGH (derived from direct codebase analysis of 20+ source files, GoDotTest/GodotTestDriver documentation, and Godot C# testing community patterns)
 
 ## Critical Pitfalls
 
-### Pitfall 1: Event Ordering Race Between RoomDemolished Handlers
+### Pitfall 1: Autoload Singleton State Leaking Between Test Suites
 
 **What goes wrong:**
-Both HappinessManager and the new HousingManager subscribe to `GameEvents.RoomDemolished`. HappinessManager already decrements `_housingCapacity` and removes from `_housingRoomCapacities` in its `OnRoomDemolished` handler (HappinessManager.cs:386-397). If HousingManager also subscribes to `RoomDemolished` to evict citizens from a demolished room, the execution order of these two handlers is determined by C# delegate invocation order (subscription order), which depends on Autoload initialization order in project.godot. If HousingManager tries to query HappinessManager's housing capacity during its own demolish handler, it may see pre- or post-decrement values depending on who fires first.
+All 8 autoloads (GameEvents, EconomyManager, BuildManager, CitizenManager, WishBoard, HappinessManager, HousingManager, SaveManager) use the `static Instance` singleton pattern with state initialized in `_Ready()` or `_EnterTree()`. GoDotTest runs all test suites sequentially in a single Godot process. The autoloads are initialized ONCE when the test runner scene loads and persist for the entire test run. Test A modifies `EconomyManager.Instance.Credits` via `TrySpend()`, Test B expects the starting balance -- it gets Test A's leftover balance. Every test that touches a singleton is implicitly coupled to every previous test.
+
+This is the single most dangerous pitfall because it produces test failures that are ordering-dependent. Tests pass individually, fail when run together. Tests pass locally, fail in CI with a different suite ordering.
 
 **Why it happens:**
-C# multicast delegates invoke subscribers in subscription order, but developers rarely reason about this. The existing codebase has never had two singletons both reacting to the same event with interdependent state mutations. Adding HousingManager as an 8th autoload creates this cross-handler dependency for the first time.
+The C# singleton pattern with static `Instance` properties means the object lives for the entire process lifetime. GoDotTest does not restart the Godot process between test suites -- it runs everything in one `_Ready()` call via `GoTest.RunTests()`. Unlike xUnit/NUnit which create fresh class instances per test, GoDotTest's `TestClass` instances are new but the global singletons they interact with are not.
+
+The codebase's singletons store mutable state in private fields:
+- `EconomyManager._credits`, `_citizenCount`, `_workingCitizens`, `_currentTierMultiplier`
+- `HappinessManager._lifetimeHappiness`, `_crossedMilestoneCount`, `_unlockedRooms`
+- `HousingManager._housingRoomCapacities`, `_roomOccupants`, `_citizenHomes`
+- `WishBoard._activeWishes`, `_placedRoomTypes`, `_segmentRoomIds`
+- `BuildManager._placedRooms`, `_mode`
+- `CitizenManager._citizens`
+- `SaveManager._pendingLoadFrames`, `PendingLoad`
+
+None of these have reset/clear methods designed for testing (some have partial ones like `ClearCitizens()` and `ClearAllRooms()` used by save/load, but they emit events with side effects).
 
 **How to avoid:**
-HousingManager should own its own citizen-to-room mapping and NOT depend on HappinessManager's `_housingCapacity` value during the same event frame. When `RoomDemolished` fires, HousingManager should:
-1. Look up citizens assigned to that segment index from its own dictionary.
-2. Mark them unhoused.
-3. Attempt reassignment to other rooms (using its own room tracking, not HappinessManager's).
+Create a `TestHelper` utility class with a `ResetAllSingletons()` method that restores every autoload to its initial state. Call this in `[Setup]` or `[Cleanup]` of every test suite that touches game state. The reset method must:
 
-The key principle: each handler should be self-contained, mutating only its own state. Cross-singleton queries should happen AFTER the event propagation settles (e.g., next frame or via a deferred call).
+1. Reset EconomyManager: restore credits to starting value, clear working citizens set, reset tier multiplier to 1.0.
+2. Reset HappinessManager: zero lifetime wishes, reset mood system, restore default unlocked rooms, zero milestone count.
+3. Reset HousingManager: clear all room capacities, occupants, citizen homes. Reset `StateLoaded` to false.
+4. Reset BuildManager: call `ClearAllRooms()` to remove all placed rooms, reset mode to Normal.
+5. Reset CitizenManager: call `ClearCitizens()` to free all citizen nodes, reset `StateLoaded` to false.
+6. Reset WishBoard: clear active wishes, placed room types, segment room IDs.
+7. Reset SaveManager: null out `PendingLoad`, stop debounce timer.
+8. Reset GameEvents: this one is subtle -- see Pitfall 2.
+
+Some singletons lack public reset APIs. You will need to add `internal` or `public` reset methods specifically for testing. Do NOT use reflection to set private fields -- it couples tests to implementation details and breaks on refactor. Instead, add explicit `ResetForTesting()` methods on each singleton, guarded by `#if DEBUG` or a `[Conditional]` attribute.
 
 **Warning signs:**
-- Citizens remain "assigned" to a demolished room (ghost assignments).
-- Capacity count becomes negative or desynchronized between HappinessManager and HousingManager.
-- Reassignment silently fails because HousingManager thought there was capacity that HappinessManager already decremented.
+- Tests pass when run individually via `--run-tests=MySuite.MyTest` but fail when run as a full suite.
+- Flaky tests that pass/fail depending on which test ran before them.
+- Tests that work on first run but fail on second run without restarting Godot.
+- Economy tests showing unexpected credit balances.
 
 **Phase to address:**
-Phase 1 (HousingManager core) -- the very first phase must establish the principle that HousingManager tracks its own room-to-citizen map independently.
+Phase 1 (Framework Setup) -- the `ResetForTesting()` infrastructure must exist before ANY test is written. This is foundational. Every subsequent phase depends on reliable test isolation.
 
 ---
 
-### Pitfall 2: Demolish-Then-Rebuild Cascade Creates Phantom Assignments
+### Pitfall 2: C# Event Delegate Subscriber Accumulation Across Tests
 
 **What goes wrong:**
-When a housing room is demolished, citizens are evicted and reassignment is attempted. If all other housing is full, those citizens become unhoused. But `RoomPlaced` also triggers reassignment of unhoused citizens to newly built rooms. If a player rapidly demolishes one room and places another in the same frame group (remember: the debounce timer batches saves at 0.5s), the event sequence becomes `RoomDemolished -> evict -> RoomPlaced -> reassign`. The citizen could be mid-eviction-tween (returning to walkway) when reassignment fires, sending them to a new room before they visually finished leaving the old one.
+GameEvents uses pure C# `event Action<...>` delegates (not Godot signals). When a test creates a node (e.g., a mock listener or a real CitizenNode) and subscribes it to `GameEvents.Instance.WishFulfilled += handler`, that subscription persists on the GameEvents instance even after the test's `[Cleanup]` frees the node. C# delegates hold strong references to subscriber objects. If the subscriber node is freed via `QueueFree()`, the delegate still holds a reference to the now-disposed C# wrapper. The next time the event fires, it invokes the handler on a disposed object, causing `ObjectDisposedException: Cannot access a disposed object`.
+
+This is especially dangerous because the codebase intentionally uses C# events instead of Godot signals (GameEvents.cs:17-20 documents this decision), meaning Godot's automatic signal disconnection on node free does NOT apply.
 
 **Why it happens:**
-The existing visit system in CitizenNode uses a single `_activeTween` with kill-before-create pattern (CitizenNode.cs:425). A return-home tween would need to follow the same pattern. But if HousingManager reassigns mid-animation, the citizen's home segment changes while a tween referencing the old segment is still running.
+The existing codebase handles this correctly in production through the `SafeNode` pattern (SafeNode.cs) which pairs `_EnterTree` subscription with `_ExitTree` unsubscription. But test code creates nodes dynamically and may not follow this pattern. A test might:
+1. Create a node and manually subscribe to GameEvents.
+2. Run assertions.
+3. Call `node.QueueFree()` in cleanup.
+4. `QueueFree` is deferred -- the node isn't actually freed until the next frame.
+5. Between cleanup and the next test, an event fires and hits the pending-free node.
+
+Even worse: if the test doesn't clean up at all (common first mistake), subscribers accumulate. By test 50, an event fires and invokes 49 stale handlers.
 
 **How to avoid:**
-1. HousingManager should track a `_isReturningHome` state on citizen nodes (or a flag on HousingManager's side).
-2. On demolish eviction, if the citizen is mid-return-home-tween, kill the tween first, snap citizen to walkway, THEN mark unhoused.
-3. On reassignment, don't start a new return-home cycle immediately -- just update the assignment data. The next natural home timer tick will use the new assignment.
+1. Never manually subscribe to GameEvents in tests. If you need to observe events, create a purpose-built `EventSpy` helper class that subscribes in its constructor and unsubscribes in an explicit `Dispose()` method.
+2. The `ResetAllSingletons()` method from Pitfall 1 should also clear all event delegate subscriber lists on GameEvents. This requires adding a `ClearAllSubscribers()` method to GameEvents that sets every event field to null: `WishFulfilled = null; RoomPlaced = null;` etc. This is safe because `ResetAllSingletons()` also reinitializes all the singletons that were subscribed.
+3. After calling `ClearAllSubscribers()`, re-subscribe all singletons that need events (SaveManager, HousingManager, etc.) by calling their subscription methods. Alternatively, design the reset so each singleton re-subscribes itself during its own reset.
+4. For nodes created in tests, always use `GodotTestDriver.Fixture` to manage lifecycle -- it handles cleanup automatically.
 
 **Warning signs:**
-- Citizens teleport or disappear during demolish-rebuild sequences.
-- The `_activeTween` is killed mid-fade, leaving a citizen with alpha=0 (invisible) on the walkway.
-- Citizen appears to "visit" a room that no longer exists.
+- `ObjectDisposedException` during test runs, especially in later test suites.
+- Event handler invocation count increasing with each test (e.g., `WishFulfilled` fires once but 5 handlers run).
+- Autosave triggers during tests (SaveManager's debounce timer responding to stale event subscriptions).
+- Tests that "work" but leave GD.PrintErr warnings about accessing freed objects.
 
 **Phase to address:**
-Phase 2 (return-home behavior) -- the tween interruption logic must be designed alongside the behavior, not bolted on after.
+Phase 1 (Framework Setup) -- the `EventSpy` pattern and `ClearAllSubscribers()` must be designed alongside `ResetForTesting()`. These are inseparable concerns.
 
 ---
 
-### Pitfall 3: Home Timer Interfering With Existing Visit/Wish Cycle
+### Pitfall 3: Scene Tree Lifecycle Mismatch in Test Environment
 
 **What goes wrong:**
-CitizenNode already has `_visitTimer` (20-40s, periodic) and `_wishTimer` (30-60s, one-shot). Adding a `_homeTimer` (90-150s) creates three independent timers that can fire simultaneously or in rapid succession. The PRD says home return is lower priority than wish visits, but the existing visit system doesn't have a priority concept -- `_isVisiting` is a simple boolean guard. If `_homeTimer` fires while `_isVisiting` is false but `_visitTimer` fires 0.1s later with a wish-matching room nearby, the citizen starts going home and misses the wish visit.
+GoDotTest provides the test runner scene as a `Node` to each `TestClass` constructor. Tests can add child nodes to this scene to get them into the tree. But the test scene is NOT the game scene. It does not contain:
+- A `RingVisual` node (CitizenManager._Ready() searches for `Ring` via `GetTree().Root.FindChild("Ring")`)
+- A `Camera3D` (CitizenManager caches `GetViewport().GetCamera3D()`)
+- Any `CanvasLayer` for UI (HappinessManager creates one, CitizenManager creates one)
+- The segment grid, room visuals, or walkway mesh
+
+Singletons that search the scene tree in `_Ready()` will get null references. Some fail silently (null-conditional `?.` throughout the codebase), others crash. The autoloads were designed for the game scene, not a blank test scene.
 
 **Why it happens:**
-Timer-based systems have inherent race conditions. The existing system works because visit and wish timers cooperate -- a visit CAN fulfill a wish. But a home-return visit cannot fulfill a wish (different destination), so it directly competes with the wish system.
+The autoloads initialize before the game scene loads, but they expect the game scene to exist by the time `_Process` runs. In tests, the "game scene" is the test runner scene, which has none of the expected structure. The codebase uses lazy discovery in some places (CitizenManager._Process() retries finding RingVisual every frame), but this pattern still requires the actual node to eventually exist.
 
 **How to avoid:**
-Do NOT implement home return as a separate timer that independently starts tweens. Instead:
-1. Add home-return as an alternative destination within the existing `OnVisitTimerTimeout` logic.
-2. When the home timer fires, set a `_wantsToGoHome` flag.
-3. On the next `OnVisitTimerTimeout`, if `_wantsToGoHome` is true AND no wish-matching room is nearby, execute the home visit. If a wish-matching room IS nearby, clear the flag and visit the wish room instead (home timer resets).
-4. This preserves the existing single-tween-at-a-time architecture.
+Categorize tests into three tiers with different approaches:
 
-Alternatively, keep separate timers but add a priority check: when home timer fires, check if `_currentWish != null` and a fulfilling room is nearby. If yes, skip and reset. This is simpler but less elegant.
+**Tier 1 -- Pure Logic Tests (no scene tree needed):**
+Test POCOs and pure calculation methods directly without any Godot nodes:
+- `MoodSystem` (already a POCO, takes `HappinessConfig` in constructor)
+- `EconomyManager.CalculateRoomCost()`, `CalculateTickIncome()`, `CalculateDemolishRefund()`
+- `HousingManager.ComputeCapacity()`
+- `SaveData` serialization/deserialization round-trips
+- Tier promotion/demotion logic
+
+These tests should NOT touch singletons at all. Instantiate the POCO directly with test data.
+
+**Tier 2 -- Singleton Logic Tests (singletons needed, scene tree minimal):**
+For testing singleton behavior (e.g., "EconomyManager.TrySpend deducts credits"), ensure singletons are initialized by the autoload system but don't rely on scene tree nodes. Use `ResetForTesting()` before each test.
+
+**Tier 3 -- Integration Tests (scene tree needed):**
+For testing cross-system flows (e.g., "place room -> citizen visits -> wish fulfilled"), use GodotTestDriver fixtures to load minimal test scenes. Create stripped-down `.tscn` files that contain only the nodes needed for the specific test, not the full game scene.
 
 **Warning signs:**
-- Citizens go home right after getting a wish (should visit the wish room instead).
-- Three active tweens fighting over `_activeTween` (kill-create-kill-create churn).
-- Wish fulfillment rate drops after housing is implemented (citizens spending too much time going home).
+- NullReferenceException on `GetTree().Root.FindChild(...)` calls.
+- Tests hang waiting for a scene node that will never appear.
+- `_Process` methods running in tests and performing unexpected scene tree searches each frame.
+- Autoload Timers firing during tests (income timer, arrival timer, debounce timer).
 
 **Phase to address:**
-Phase 2 (return-home behavior) -- the priority rules must be implemented as part of the core behavior, not patched after.
+Phase 1 (Framework Setup) -- the test tier structure must be established upfront to prevent confusion about which approach to use for each test type.
 
 ---
 
-### Pitfall 4: Save Format v3 Breaking v2 Load Path
+### Pitfall 4: Autoload Timers Firing During Tests
 
 **What goes wrong:**
-The save system currently handles v1->v2 migration via `data.Version >= 2` guard (SaveManager.cs:389). Adding `CitizenHomes` (Dictionary<string, int>) to SaveData creates a v3 format. If the new field is added without a version bump, old v2 saves will deserialize `CitizenHomes` as null (System.Text.Json default for missing dictionary fields is null, not empty). Every null-check-free access crashes. If the version IS bumped to 3, the existing v2 restore path needs to handle the missing field.
+Three autoloads create child `Timer` nodes that tick continuously:
+- `EconomyManager._incomeTimer` (5.5s interval, triggers `OnIncomeTick` which modifies credits)
+- `HappinessManager._arrivalTimer` (60s interval, triggers citizen spawn attempts)
+- `SaveManager._debounceTimer` (0.5s one-shot, triggers `PerformSave` which writes to disk)
+
+GoDotTest runs tests in the Godot main loop, meaning `_Process` runs between test methods and Timers continue ticking. A test that sets credits to 100 and then waits a few seconds (e.g., for an async operation or frame delays) may find credits at 104 because the income timer fired. Worse, `SaveManager._debounceTimer` will write save files to disk during tests, corrupting any real save data.
 
 **Why it happens:**
-System.Text.Json deserializes missing properties as their C# default value. For `Dictionary<string, int>`, the default is `null` (not an empty dictionary), unlike the `List<T>` fields which are initialized in the class definition with `= new()`. The existing SaveData initializes lists with `= new()` but a developer adding a dictionary might forget this pattern.
+Timers are scene tree nodes that tick automatically when the tree is processing. The test runner scene processes normally. Autoloads are part of the scene tree root, so their child Timers process alongside test nodes.
 
 **How to avoid:**
-1. Initialize the new field in SaveData class definition: `public Dictionary<string, int> CitizenHomes { get; set; } = new();`
-2. Bump version to 3 in `CollectGameState`.
-3. In `ApplySceneState`, after restoring citizens, call `HousingManager.RestoreAssignments(data.CitizenHomes)` -- but guard it: if `data.Version < 3` or `CitizenHomes` is null/empty, skip and let HousingManager auto-assign on first frame (the same path as a new game).
-4. Keep the v2 restore path untouched -- it already works.
+1. In `ResetForTesting()`, stop all autoload timers: `_incomeTimer.Stop()`, `_arrivalTimer.Stop()`, `_debounceTimer.Stop()`.
+2. For integration tests that need timers to fire, provide explicit `AdvanceTimer()` helper methods that manually trigger the timer callback without waiting for real time to pass.
+3. Consider setting `ProcessMode = ProcessModeEnum.Disabled` on autoloads during tests, then re-enabling only the ones under test. But this breaks `_Process`-based logic (HappinessManager mood decay), so use it selectively.
+4. For SaveManager specifically, either:
+   a. Override the save path to a temp directory during tests, OR
+   b. Stop the debounce timer and only call `PerformSave()` explicitly when testing save functionality.
 
 **Warning signs:**
-- NullReferenceException on load with old saves.
-- Citizens all become unhoused after loading a save from before housing was implemented.
-- Version check cascading: adding v3 guard makes the code confusing if v4 comes later.
+- Credits changing between test setup and assertion.
+- Random citizens spawning during test runs.
+- `user://save.json` being overwritten during tests, destroying real save data.
+- Tests that pass quickly but fail when CI is slow (more time for timers to fire).
+- Mood values drifting during test execution due to `_Process` decay.
 
 **Phase to address:**
-Phase for save/load integration -- must be designed with backward compatibility from the start. Do NOT add the dictionary field without the `= new()` initializer.
+Phase 1 (Framework Setup) -- timer management must be part of `ResetForTesting()`. This is critical for test determinism.
 
 ---
 
-### Pitfall 5: Capacity Scaling Changing BaseCapacity Interpretation Globally
+### Pitfall 5: Save/Load Tests Writing to Real User Directory
 
 **What goes wrong:**
-The PRD recommends size-scaled capacity: `BaseCapacity + (segmentCount - 1)`. But `BaseCapacity` is already used by HappinessManager to track housing capacity (HappinessManager.cs:373-376). HappinessManager's `OnRoomPlaced` reads `def.BaseCapacity` directly and adds it to `_housingCapacity`. If HousingManager uses the scaled formula `BaseCapacity + (segmentCount - 1)` but HappinessManager continues using raw `BaseCapacity`, the two will track different capacity numbers. Player sees "5/7" but HousingManager thinks capacity is 8.
+`SaveManager` writes to `user://save.json` via Godot's `FileAccess.Open()`. The `user://` prefix resolves to the OS-specific user data directory (e.g., `~/.local/share/godot/app_userdata/Orbital Rings/` on Linux). When tests exercise save/load paths, they read and write the player's real save file. A test could:
+1. Overwrite the player's save with test data.
+2. Read the player's save and get unexpected values that cause test failures.
+3. Delete the save file via `ClearSave()`.
+4. In CI, the `user://` path may not exist or may lack write permissions.
 
 **Why it happens:**
-`BaseCapacity` currently means "max occupants for this room type" and is treated as a fixed value in HappinessManager. The scaling formula changes its meaning to "base occupants for the smallest version of this room type." This semantic change affects every consumer of `BaseCapacity`.
+`SavePath` is a `const string` (`"user://save.json"`) in SaveManager with no configuration point. There's no dependency injection or path override mechanism. The save system was designed for production use, not testability.
 
 **How to avoid:**
-The capacity scaling formula must be centralized in ONE place. Two approaches:
+Two approaches (use both):
 
-**Option A (recommended):** Add a static helper method `HousingManager.CalculateCapacity(RoomDefinition def, int segmentCount)` that returns `def.BaseCapacity + (segmentCount - 1)`. Both HousingManager and HappinessManager call this method. HappinessManager's `OnRoomPlaced` and `OnRoomDemolished` are updated to use the scaled value.
+**Approach A -- Test-specific save path:**
+Add a `public static string SavePathOverride` property to SaveManager. In `ResetForTesting()`, set it to a temp path like `"user://test_save.json"`. Modify all `FileAccess.Open(SavePath, ...)` calls to use `SavePathOverride ?? SavePath`. In test cleanup, delete the test save file.
 
-**Option B:** Move all capacity tracking into HousingManager and have HappinessManager query `HousingManager.TotalCapacity` instead of tracking its own `_housingCapacity`. This is cleaner but requires more refactoring of HappinessManager.
-
-Either way, the `_housingRoomCapacities` dictionary in HappinessManager (which stores capacity per anchor index for demolish lookup) must store the SCALED value, not the raw BaseCapacity.
+**Approach B -- Bypass FileAccess entirely for unit tests:**
+For save/load round-trip tests, don't test through SaveManager at all. Test the serialization layer directly:
+```csharp
+var saveData = new SaveData { Credits = 500, Version = 3, ... };
+string json = JsonSerializer.Serialize(saveData);
+var loaded = JsonSerializer.Deserialize<SaveData>(json);
+Assert.Equal(500, loaded.Credits);
+```
+This tests the data contract without touching the filesystem. Reserve full SaveManager tests for integration tests that use an isolated temp path.
 
 **Warning signs:**
-- PopulationDisplay shows different numbers than what gates citizen arrivals.
-- Building a 2-segment Bunk Pod shows capacity +2 in one place and +3 in another.
-- Demolishing a room subtracts the wrong capacity amount.
+- Real save file disappears after running tests.
+- Tests fail in CI with `FileAccess.Open returned null` errors.
+- Test data showing up in the real game after running tests.
+- Tests passing locally (save file exists) but failing in CI (no save file).
 
 **Phase to address:**
-Phase 1 (HousingManager core) -- capacity calculation must be centralized BEFORE any assignment logic uses it.
+Phase 1 (Framework Setup) -- the save path isolation must be configured before any save/load tests are written. Phase 2 or 3 (save/load test suite) uses this infrastructure.
 
 ---
 
-### Pitfall 6: Autoload Initialization Order Dependency
+### Pitfall 6: SaveData Serialization Tests Missing Nullable/Default Edge Cases
 
 **What goes wrong:**
-HousingManager is the 8th autoload. It needs references to CitizenManager (to get citizen list for assignment), BuildManager (to query placed rooms), and HappinessManager (for capacity coordination). If HousingManager is listed before any of these in project.godot's autoload order, their `.Instance` properties will be null when HousingManager's `_Ready()` runs. The existing autoloads work because they were carefully ordered: GameEvents first, then domain singletons, SaveManager last.
+System.Text.Json has specific behaviors with nullable types and default values that bite in round-trip testing:
+
+1. `SavedCitizen.HomeSegmentIndex` is `int?` (nullable). `JsonSerializer` serializes `null` as the JSON literal `null`, which deserializes back correctly. But if a test constructs a `SavedCitizen` without setting `HomeSegmentIndex`, it defaults to `null` implicitly -- the test appears to work but didn't actually test the null path explicitly.
+
+2. `SaveData.PlacedRoomTypes` is `Dictionary<string, int>` but unlike the `List<T>` fields, it is NOT initialized with `= new()` in the class definition. It IS initialized (`= new()`) in the current code, but a future developer might add a new dictionary field without the initializer. Old saves that lack the field would deserialize it as `null`, not empty.
+
+3. The `Version` field defaults to `3` in the class definition (`public int Version { get; set; } = 3`). If a test serializes a v1 save scenario but forgets to explicitly set `Version = 1`, it will silently use version 3, and the version-gated restore paths won't be exercised.
 
 **Why it happens:**
-Godot initializes autoloads in the order they appear in project.godot. The existing codebase documents this (SaveManager comment: "Registered as Autoload in project.godot (last, after all other singletons)"). A new autoload inserted at the wrong position breaks this chain.
+System.Text.Json's default value handling is different from Newtonsoft.Json. Missing JSON properties get C# default values: 0 for int, null for nullable/reference types, false for bool. The codebase compensates with field initializers (`= new()`, `= 3`), but tests must verify these edge cases, not rely on them.
 
 **How to avoid:**
-1. HousingManager must be registered AFTER CitizenManager and BuildManager but BEFORE SaveManager in project.godot.
-2. In HousingManager._Ready(), assert that required singletons are non-null: `if (CitizenManager.Instance == null) GD.PushError(...)`.
-3. SaveManager must be updated to also subscribe to housing-related events for autosave triggers, and its `CollectGameState` / `ApplySceneState` must include housing data.
-4. Document the required order in a comment at the top of HousingManager, matching the existing pattern (e.g., HappinessManager.cs:16: "Registered as an Autoload in project.godot (6th, after all other singletons)").
+1. Create explicit test fixtures for each save format version:
+   - `v1_save.json` -- real v1 format with `Happiness` field, no `LifetimeHappiness`/`Mood`/`MoodBaseline`, no `HomeSegmentIndex`.
+   - `v2_save.json` -- v2 format with mood fields, no `HomeSegmentIndex`.
+   - `v3_save.json` -- current format with all fields.
+2. Include a test that deserializes raw JSON strings (not round-tripped C# objects) to verify that missing fields produce correct defaults.
+3. Test the boundary explicitly: serialize with `Version = 1`, deserialize, verify `LifetimeHappiness == 0` and `Mood == 0` and `HomeSegmentIndex == null`.
+4. Add a "canary" test that verifies all `SaveData` properties have field initializers where expected -- this catches future fields added without initializers.
 
 **Warning signs:**
-- NullReferenceException in HousingManager._Ready() on first launch.
-- Housing assignments silently fail (null-conditional `?.` swallows the error).
-- Save file never includes housing data because SaveManager doesn't know about HousingManager.
+- Save/load tests pass but actual old saves crash on load.
+- A NullReferenceException in `ApplySceneState` when loading a v2 save (missing `HomeSegmentIndex`).
+- Tests that construct `SaveData` with all fields set, which never exercises the default/missing path.
 
 **Phase to address:**
-Phase 1 (HousingManager core) -- autoload registration is literally the first thing to get right.
+Phase 2 or 3 (save/load test suite) -- the test fixtures for each version must be created as test data files, not generated programmatically.
 
 ---
 
-### Pitfall 7: FloatingText Reuse for Zzz Creates Wrong Visual Layer
+### Pitfall 7: Testing Event-Driven Chains Without Frame Advancement
 
 **What goes wrong:**
-The existing `FloatingText` is a 2D `Label` that lives on a `CanvasLayer` (HappinessManager creates `_arrivalCanvasLayer` at layer 5, CreditHUD uses layer 5). It takes a `Vector2 startPosition` in screen space. The Zzz floater needs to appear at a 3D world position (above the citizen or at the room entrance). Using FloatingText directly requires projecting the 3D position to screen space, which looks wrong when the camera orbits -- the text stays at a fixed screen position while the 3D world rotates.
+The game's architecture uses event cascades: `RoomPlaced` -> `WishBoard.OnRoomPlaced` -> `NudgeCitizensForRoom` -> `WishNudgeRequested`. Some of these chains are synchronous (C# events invoke immediately), but the side effects may depend on frame processing. For example:
+- `SaveManager._Process` checks `_pendingLoadFrames` and waits 2 frames before calling `ApplySceneState`.
+- `CitizenManager._Process` retries finding `RingVisual` each frame.
+- `HappinessManager._Process` runs mood decay via `MoodSystem.Update()`.
+- Tweens advance in `_Process`.
+
+A test that calls `GameEvents.Instance.EmitRoomPlaced("bunk_pod", 5)` and immediately asserts that WishBoard tracked the room type will likely pass (synchronous chain). But a test that loads a save via `SaveManager.ApplyState()` and immediately checks if rooms are restored will fail -- the frame-delay pattern means `ApplySceneState` hasn't run yet.
 
 **Why it happens:**
-FloatingText was designed for HUD notifications (screen-center arrival text, credit +/- amounts). It self-destructs after 0.9s. The Zzz visual needs to be anchored in 3D space (billboarded, like the wish badge), not screen space.
+GoDotTest test methods are `async Task` and can `await` things, but there's no built-in "wait N frames" utility. GodotTestDriver provides `Fixture.WaitForFrames()` but only if you're using fixtures. Developers writing quick unit tests forget that some operations are deferred.
 
 **How to avoid:**
-Two approaches:
-
-**Option A (PRD suggestion, simpler):** Use FloatingText but spawn it with a projected screen position and accept it won't track camera movement (it's only visible for ~1s, camera rarely moves that fast). This is acceptable if the float duration is short enough.
-
-**Option B (better visual):** Create the Zzz as a `Label3D` or `Sprite3D` (like the wish badge) attached to the citizen node. Billboard mode makes it always face the camera. This is consistent with the existing badge system and doesn't fight the 3D camera.
-
-Option B is recommended because the PRD says "same style as the existing FloatingText but smaller and lighter colored" -- this means matching the AESTHETIC, not the implementation class. The wish badge (Sprite3D, billboard) is the better pattern to follow for 3D-anchored indicators.
+1. Create a `TestHelper.WaitFrames(SceneTree tree, int count)` async utility that awaits `tree.ToSignal(tree, SceneTree.SignalName.ProcessFrame)` the specified number of times.
+2. Document which operations are synchronous (safe to assert immediately) and which are deferred (require frame advancement):
+   - **Synchronous:** Event emission and handler invocation, dictionary mutations, property changes.
+   - **Deferred (1+ frames):** `QueueFree` node removal, `SaveManager.ScheduleSceneRestore()` (2 frames), Tween progress, Timer timeouts, `_Process` updates.
+3. For save/load integration tests, always await at least 3 frames after `ScheduleSceneRestore()` before asserting scene state.
+4. Use GodotTestDriver's `Fixture` class for integration tests -- it handles frame management correctly.
 
 **Warning signs:**
-- Zzz text appears at screen center instead of near the citizen.
-- Zzz text doesn't move with camera orbit (frozen in screen space).
-- Multiple Zzz labels stack on top of each other when many citizens go home simultaneously.
+- Save/load tests pass sometimes and fail other times (race with frame processing).
+- Assertions on node state after `QueueFree` succeed because the node isn't freed yet (false positive).
+- Tests pass locally (fast machine, frames process quickly) but fail in CI (slower, timing differs).
 
 **Phase to address:**
-Phase 2 (return-home behavior) -- the Zzz visual is part of the return-home sequence and should be designed alongside it.
+Phase 1 (Framework Setup) -- the `WaitFrames` helper is foundational. Phase 2+ uses it extensively.
 
 ---
 
-### Pitfall 8: Stale Home Assignment After Save/Load With Room Layout Changes
+### Pitfall 8: Testing MoodSystem Decay Without Controlling Delta Time
 
 **What goes wrong:**
-The save file stores `CitizenHomes` as `citizenName -> segmentIndex`. On load, if the player demolished and rebuilt rooms between the save and the load (possible if autosave fires mid-session and player continues playing), the segment index might now point to a different room type or an empty segment. The PRD edge case table mentions this: "Save/load with demolished home -- citizen's saved homeSegmentIndex won't match a placed room." But the implementation must actively validate, not just document.
+`MoodSystem.Update(float delta, int lifetimeHappiness)` uses exponential smoothing with `alpha = 1 - exp(-decayRate * delta)`. In production, `delta` comes from `HappinessManager._Process(double delta)`, which is frame-time-dependent. In tests, if you call `MoodSystem.Update()` directly with a fabricated delta, the results depend on the exact delta value. If you let `_Process` run during tests (because the autoload is active), the delta is real wall-clock time, making decay amounts non-deterministic.
+
+A test like "mood should decay from 0.5 to below 0.45 after 10 seconds" will be flaky because the actual decay depends on frame rate, test execution speed, and whether the CI runner is under load.
 
 **Why it happens:**
-Segment indices are positional, not room-identity-based. There's no room UUID. A room at segment 5 today might be a different room (or no room) after demolish+rebuild. The existing save system has a similar implicit coupling -- `SavedRoom` stores position, not ID-based references -- but rooms are rebuilt from scratch on load so it works. Citizen home assignments reference rooms by position, and positions can be reused.
+`MoodSystem` is a POCO that receives delta from its owner. This is actually good design for testability -- but only if tests bypass the `HappinessManager._Process` path and call `MoodSystem.Update()` directly with controlled deltas. The danger is that a developer writes an integration test that relies on real time passing.
 
 **How to avoid:**
-On load, after restoring rooms and citizens, HousingManager must VALIDATE every assignment:
-1. For each `citizenName -> segmentIndex` in the loaded data, check if `BuildManager.GetPlacedRoom(segmentIndex)` returns a Housing-category room.
-2. If yes, assign. If no (room gone, or now a non-Housing room), mark citizen as unhoused.
-3. After validation, run reassignment for all unhoused citizens (same logic as new game).
-4. This validation loop is the same logic used when a room is demolished at runtime -- reuse it.
+1. Test MoodSystem directly as a POCO (Tier 1 test). Construct it with a known `HappinessConfig`, call `Update()` with exact delta values, assert exact results:
+   ```csharp
+   var config = new HappinessConfig();
+   var mood = new MoodSystem(config);
+   mood.OnWishFulfilled(); // mood jumps to 0.06
+   mood.Update(1.0f, 0);  // 1 second of decay
+   // Assert mood is between expected bounds
+   ```
+2. Never test mood decay via wall-clock time. If you need to test the full HappinessManager pipeline, stop the autoload's processing and manually invoke `_Process` with controlled deltas.
+3. For the tier threshold tests (Quiet->Cozy at 0.2, Cozy->Lively at 0.4, etc.), set mood directly via `RestoreState()` to just above/below thresholds rather than trying to reach them through decay simulation.
 
 **Warning signs:**
-- Citizens "assigned" to a Workshop or Air Recycler after load.
-- Citizens assigned to empty segments (no room there).
-- Population display shows assigned citizens but no home-return behavior occurs.
+- Mood tests with exact equality assertions (`Assert.Equal(0.437f, mood.Mood)`) that fail due to floating-point drift.
+- Tests with `Thread.Sleep()` or `await Task.Delay()` to "wait for decay" -- these are always wrong.
+- Flaky CI failures in mood tests that pass locally.
 
 **Phase to address:**
-Save/load integration phase -- validation must be part of the restore path.
+Phase 2 or 3 (mood system test suite) -- but the principle of "test POCOs directly with controlled inputs" should be established in Phase 1.
 
 ---
 
@@ -213,92 +303,130 @@ Save/load integration phase -- validation must be part of the restore path.
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Duplicating capacity tracking in both HappinessManager and HousingManager | Quick implementation, no refactoring | Two sources of truth that drift apart; every future capacity change must update both | Never -- centralize from day one |
-| Storing home assignment on CitizenNode directly (not in HousingManager) | Fewer cross-references, simpler citizen code | Assignment logic scattered across CitizenNode and HousingManager; save/load must reach into CitizenNode to serialize | Never -- HousingManager should be the single source of truth for assignments |
-| Hardcoding home timer constants in CitizenNode instead of HousingConfig | Faster first implementation | Tuning requires code changes and recompilation, breaks the established Config resource pattern | Only in initial prototype, must extract to HousingConfig before merge |
-| Using `_isVisiting` flag for both regular visits and home visits | Avoids adding a new state field | Cannot distinguish "visiting a room" from "returning home" for priority logic, tooltip display, or save/load | Only if home visits and regular visits are truly identical in every external-facing way (they are not -- Zzz visual, wish timer pause, longer duration) |
-| Skipping unsubscribe for HousingManager events | Saves a few lines | Memory leak if HousingManager is ever re-created (unlikely for autoload but violates SafeNode pattern established in codebase) | Never -- follow the established SubscribeEvents/UnsubscribeEvents pattern |
+| Testing singletons via static Instance instead of injected dependencies | No refactoring needed, tests work immediately | Tests are coupled to global state, can't run in parallel, require explicit reset between tests | Acceptable for this project -- 8 singletons, single-player game, sequential test runner. Dependency injection would be over-engineering |
+| Putting ResetForTesting() methods directly on production singletons | Clean API, easy to call | Test-only code in production classes, risk of accidentally calling in production | Acceptable with `#if DEBUG` guard or `[Conditional("DEBUG")]` attribute. The alternative (test-only subclasses) adds complexity for no real benefit |
+| Hardcoding JSON test fixtures as string literals in test files | Fast to write, no external files to manage | Long strings in test code are hard to read and maintain, duplicate the save format definition | Only in initial implementation. Move to embedded resource files once you have 3+ fixture strings |
+| Skipping integration tests for UI components (tooltip, info panel, HUD) | Faster test suite, fewer brittle tests | UI bugs not caught until manual testing | Acceptable for v1.3 -- focus on logic tests. UI integration tests are a v1.4+ concern |
+| Not mocking Godot API calls (ResourceLoader, FileAccess, GD.Randi) | No mocking framework complexity | Tests depend on res:// filesystem existing, random values are non-deterministic | Acceptable if: (a) pure logic tests avoid Godot APIs entirely, (b) integration tests accept non-determinism in GD.Randi by testing ranges not exact values, (c) ResourceLoader tests use real .tres files |
 
 ## Integration Gotchas
 
 | Integration Point | Common Mistake | Correct Approach |
 |-------------------|----------------|------------------|
-| HousingManager + GameEvents | Adding new events to GameEvents without Emit helper methods | Follow the established pattern: add `event Action<...>` field AND `EmitX()` method. Every existing event has both (see GameEvents.cs structure) |
-| HousingManager + SaveManager | Forgetting to add housing events to SaveManager's autosave trigger subscriptions | SaveManager subscribes to state-change events for debounced autosave (SaveManager.cs:144-152). Housing assignment changes MUST trigger autosave. Add subscriber delegates for any new housing events |
-| HousingManager + CitizenManager.SpawnCitizen | Calling HousingManager.AssignHome inside CitizenManager.SpawnCitizen, creating a circular dependency | SpawnCitizen should emit CitizenArrived event (it already does). HousingManager subscribes to CitizenArrived and handles assignment. This follows the existing event-driven pattern |
-| HousingConfig + ResourceLoader | Creating HousingConfig.tres in a different directory than existing configs | Follow existing pattern: `res://Resources/Housing/default_housing.tres` (parallel to `res://Resources/Happiness/default_happiness.tres`). Load with same fallback pattern as HappinessManager.cs:202-208 |
-| SegmentTooltip + resident list | Appending resident names directly in SegmentGrid.GetLabel() | GetLabel is a pure data method on SegmentGrid (no UI concerns). Add resident info in SegmentInteraction.UpdateHover() where the tooltip text is composed, querying HousingManager for residents at that segment |
-| CitizenInfoPanel + home display | Querying BuildManager for room name in CitizenInfoPanel.ShowForCitizen | CitizenInfoPanel should query HousingManager for the citizen's home segment, then query BuildManager for the room definition at that segment. Two-step lookup, not one |
+| GoDotTest + project.godot | Changing `run/main_scene` to the test scene permanently | Keep the game's main scene as default. Use command-line `--run-tests` flag detection in the main scene script to redirect to test scene. Or use a separate Godot project profile |
+| GoDotTest + Godot 4.4 exit codes | Godot prints ObjectDB leak warnings on exit that look like errors | These are cosmetic. Godot's shutdown prints "Leaked instance" for autoloads that outlive the test runner. Suppress in CI by checking test output, not exit code alone. Use `--coverage` flag which force-exits cleanly |
+| GodotTestDriver Fixture + autoload singletons | Using Fixture to load the full game scene for every test | Fixtures should load minimal test scenes. Full game scene pulls in all UI, audio, ring mesh -- 90% irrelevant to the test and slow to load |
+| GoDotTest TestClass + async tests | Forgetting that test methods must return `Task` (not `void`) to be properly awaited | All test methods with `[Test]` attribute must be `public async Task MethodName()`. If they return void, exceptions are swallowed silently |
+| SaveManager + test file paths | Tests calling `SaveManager.Instance.Load()` which reads the real save file | Either override save path for tests, or bypass SaveManager entirely by testing serialization directly with `JsonSerializer.Serialize/Deserialize` |
+| GameEvents + test assertions | Subscribing to events for assertions but forgetting to unsubscribe | Use a disposable `EventSpy<T>` wrapper that tracks invocations and unsubscribes on Dispose. Pattern: `using var spy = new EventSpy(() => GameEvents.Instance.CreditsChanged += spy.Handler, () => GameEvents.Instance.CreditsChanged -= spy.Handler);` |
 
 ## Performance Traps
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| Iterating all citizens on every RoomPlaced/RoomDemolished to find affected assignments | Unnoticeable at 5-20 citizens, frame hitch at 50+ | HousingManager maintains a `Dictionary<int, List<string>>` mapping segment index to citizen names. O(1) lookup on demolish instead of O(n) scan | 50+ citizens (unlikely in current design but good practice) |
-| Running reassignment algorithm (find room with fewest occupants) on every citizen arrival | Linear scan of all housing rooms per arrival | Cache a sorted/priority structure or just scan the `_housingRoomCapacities` dict -- with max 24 rooms, this is not a real problem. Do NOT over-engineer | Never breaks at 24-room scale. This is a non-issue but noted to prevent premature optimization |
-| Creating new Timer nodes for each home-return cycle instead of reusing one | Timer node count grows, tree overhead | Create ONE `_homeTimer` per citizen in Initialize() (same pattern as `_visitTimer`), reuse with WaitTime reset. Never `new Timer()` per cycle | Immediately -- Godot Timer creation has scene tree overhead |
-| Spawning Zzz Label3D/Sprite3D nodes that aren't freed | Node tree grows unboundedly as citizens go home repeatedly | Use self-destructing pattern (FloatingText's `TweenCallback(QueueFree)`) or reuse a single Zzz node per citizen | After 20+ home cycles per citizen (~30 min play session) |
+| Loading full game scene in every integration test | Test suite takes 30+ seconds, CI timeout | Create minimal `.tscn` files for testing (just the nodes needed). Most tests need zero scene -- test POCOs directly | Immediately -- first test suite will be painfully slow |
+| Not stopping autoload Timers during test runs | Income timer fires dozens of times during a long test suite, economy tests become flaky | Stop all Timers in `ResetForTesting()`. Only start timers explicitly when testing timer-dependent behavior | After 10+ tests that each take 1+ second (cumulative timer firings) |
+| WishBoard loading all .tres templates from disk on every test reset | Each `_Ready()` call triggers filesystem scan of `res://Resources/Wishes/` | Don't re-initialize WishBoard between tests unless testing wish-related features. For wish tests, cache templates on first load | At 20+ test suites with full reset (disk I/O adds up) |
+| Creating and freeing dozens of CitizenNode instances per test without cleanup | Orphan nodes accumulate in scene tree, Godot logs "Leaked instance" warnings on exit | Use `QueueFree()` in `[Cleanup]` and await one frame for deferred deletion. Or use GodotTestDriver Fixture which handles this | After 100+ citizen node creations across all tests |
 
-## UX Pitfalls
+## Testing Anti-Patterns Specific to This Architecture
 
-| Pitfall | User Impact | Better Approach |
-|---------|-------------|-----------------|
-| Showing "Unhoused" with negative connotation in citizen info panel | Players feel guilty, breaks cozy philosophy | Show `Home: --` (em dash) with no label text, matching the PRD. No drama, no negative framing |
-| Zzz floater being too prominent (large text, bright color) | Visual noise when 10+ citizens go home simultaneously | Keep it small (smaller than wish badge), muted color (light gray/lavender), short duration (0.5-0.8s). Subtle > noticeable |
-| Room tooltip showing long resident lists for Sky Loft (up to 6 names) | Tooltip becomes unwieldy, overlaps other UI | Cap display at 3-4 names + "and 2 more" truncation. Or use first-name-only display |
-| No visual feedback when citizen is assigned to a new home | Player builds housing but doesn't see the connection to citizens | Consider a brief subtle highlight or the first home-return happening promptly (not waiting 90-150s). Use a short initial delay (5-10s) for the very first home return after assignment |
-| Home-return timer resetting on save/load | Citizens all go home simultaneously after loading (timer synchronization) | On load, randomize home timer's remaining time (same as the existing visit timer randomization in CitizenNode.Initialize) |
+### Anti-Pattern 1: Testing Cross-Singleton Chains as Unit Tests
+
+**What it looks like:**
+A test titled "test_room_placement_triggers_housing_assignment" that calls `BuildManager.Instance.PlaceRoom(...)`, then asserts `HousingManager.Instance.GetOccupantCount(segment) > 0`. This is testing the entire event chain: BuildManager -> GameEvents.RoomPlaced -> HousingManager.OnRoomPlaced -> AssignUnhousedCitizens.
+
+**Why it's bad:**
+If this test fails, you don't know which link in the chain broke. Is the event not firing? Is HousingManager not subscribed? Is the assignment algorithm wrong? Is the capacity not tracked? The test is an integration test pretending to be a unit test.
+
+**Instead:**
+- Unit test HousingManager.FindBestRoom logic with controlled room capacity data.
+- Unit test that calling AssignCitizen updates all three data structures.
+- Integration test that the event chain works end-to-end (clearly labeled as integration).
+
+### Anti-Pattern 2: Asserting Exact Floating-Point Values from Mood System
+
+**What it looks like:**
+`Assert.Equal(0.06f, moodSystem.Mood)` after `OnWishFulfilled()`.
+
+**Why it's bad:**
+`MoodSystem.OnWishFulfilled()` does `_mood = MathF.Min(1.0f, _mood + _config.MoodGainPerWish)`. If `_mood` was 0f and `MoodGainPerWish` is 0.06f, the result IS exactly 0.06f. But after any `Update()` call with decay, floating-point arithmetic makes exact equality unreliable.
+
+**Instead:**
+Use tolerance-based assertions: `Assert.InRange(moodSystem.Mood, 0.055f, 0.065f)`. For tier threshold tests, test the tier enum directly: `Assert.Equal(MoodTier.Quiet, moodSystem.CurrentTier)`.
+
+### Anti-Pattern 3: Testing Save Round-Trip Through SaveManager Instead of Serialization
+
+**What it looks like:**
+```csharp
+SaveManager.Instance.PerformSave(); // writes to disk
+var loaded = SaveManager.Instance.Load(); // reads from disk
+Assert.Equal(expectedCredits, loaded.Credits);
+```
+
+**Why it's bad:**
+This tests the filesystem, JSON serialization, AND SaveManager orchestration all at once. If it fails, is it a serialization bug, a file permission issue, or a data collection bug? It also writes to the real save path (Pitfall 5).
+
+**Instead:**
+- Test serialization directly: `JsonSerializer.Serialize(saveData)` -> `JsonSerializer.Deserialize<SaveData>(json)`.
+- Test `CollectGameState()` separately (set singleton state, verify the returned SaveData has correct values).
+- Test `ApplyState()`/`ApplySceneState()` separately (provide known SaveData, verify singletons have correct state after).
+- Reserve full round-trip for one integration test with isolated file path.
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **Home assignment:** Verify citizens are EVENLY distributed across rooms (not all crammed into first-built room) -- test with multiple housing rooms of different sizes
-- [ ] **Demolish reassignment:** Verify citizens from demolished room are reassigned to remaining housing, not just marked unhoused permanently -- test demolish-with-alternatives-available
-- [ ] **Unhoused graceful handling:** Verify unhoused citizens still walk, visit rooms, generate wishes, and fulfill them identically to housed citizens -- test with zero housing rooms
-- [ ] **Save/load round-trip:** Verify housing assignments survive save-quit-load cycle AND that loading old v2 saves without housing data doesn't crash -- test with a pre-housing save file
-- [ ] **Capacity arithmetic:** Verify `PopulationDisplay` count matches `HappinessManager._housingCapacity` matches `HousingManager` room capacity tracking -- test after building/demolishing mixed room types
-- [ ] **Timer independence:** Verify home timer doesn't block wish fulfillment -- test by giving citizen a wish, confirming they visit the wish room even when home timer has fired
-- [ ] **Starter citizens:** Verify the 5 starter citizens (spawned before any rooms exist) get assigned when first housing room is built -- test fresh game with first build being a Bunk Pod
-- [ ] **Multi-segment capacity:** Verify a 2-segment Bunk Pod holds 3 citizens (base 2 + 1) and a 3-segment Sky Loft holds 6 (base 4 + 2) -- test exact capacity boundaries
-- [ ] **Zzz visual:** Verify Zzz appears at room/citizen position in 3D space, not screen center -- test with camera at different orbit angles
-- [ ] **Room tooltip residents:** Verify tooltip shows current residents and updates when citizens are reassigned -- test after demolish/rebuild
+- [ ] **Test runner scene:** The `.tscn` file exists and `--run-tests` flag detection works -- verify it runs from BOTH command line AND editor play button
+- [ ] **Singleton reset:** ResetForTesting() clears ALL mutable state on ALL 8 singletons -- verify by printing state after reset, comparing to fresh-launch state
+- [ ] **Timer suppression:** All autoload Timers stopped during tests -- verify by checking `Timer.IsStopped()` in a test assertion
+- [ ] **Event cleanup:** GameEvents subscriber lists cleared between suites -- verify by checking that event invocations in test N+1 don't trigger handlers from test N
+- [ ] **Save path isolation:** Tests never touch `user://save.json` -- verify by checking file modification timestamp before and after test run
+- [ ] **v1 save compat:** Test loads actual v1-format JSON (not a v3 object serialized with Version=1) -- verify by hand-crafting JSON without v2/v3 fields
+- [ ] **v2 save compat:** Test loads actual v2-format JSON without HomeSegmentIndex -- verify citizens become unhoused (auto-assigned) on load
+- [ ] **CI readiness:** Tests run and pass in headless Godot (`--headless` flag) -- verify by running `godot --headless --run-tests` before pushing CI config
+- [ ] **Frame advancement:** All deferred operations have corresponding frame waits -- verify by removing waits and confirming tests fail (test the tests)
+- [ ] **Coverage collection:** `--coverage` flag works with coverlet and produces coverage report -- verify report includes game code namespaces, not just test code
 
 ## Recovery Strategies
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Dual capacity tracking divergence | LOW | Add a `SyncCapacity()` method that recalculates from BuildManager scan. Call on save/load as a consistency check. Similar to existing `InitializeHousingCapacity()` pattern |
-| Event ordering race on demolish | MEDIUM | Refactor to use a single "process housing changes" method called once per frame (collect events, process in batch) instead of immediate event handlers. Only if the race actually manifests |
-| Save format v3 crashes on old saves | LOW | Add null-coalescing: `data.CitizenHomes ?? new()`. Initialize field in SaveData class. No migration code needed since missing = unhoused = auto-assign |
-| Home timer fighting wish timer | MEDIUM | Add explicit state machine (Walking, Visiting, ReturningHome, Resting) instead of boolean `_isVisiting`. Bigger refactor but eliminates all timer races. Only if simple priority check proves insufficient |
-| Zzz visual implementation wrong | LOW | Swap from FloatingText to Sprite3D/Label3D. Localized change in the return-home tween sequence, no architectural impact |
+| Singleton state leaking between tests | LOW | Add ResetForTesting() methods, call in [Cleanup]. Can be done incrementally per singleton as tests are written |
+| Event subscriber accumulation | LOW | Add ClearAllSubscribers() to GameEvents, call in ResetForTesting(). All singletons re-subscribe in their own reset |
+| Scene tree mismatch crashes | LOW | Categorize failing tests into tiers, move scene-dependent tests to integration tier with minimal test scenes |
+| Timer interference making tests flaky | LOW | Add Timer.Stop() calls in ResetForTesting(). Immediate fix, no architectural change |
+| Save file corruption during tests | MEDIUM | Implement SavePathOverride. Requires modifying SaveManager (production code change), but small and safe |
+| Save format version tests incomplete | LOW | Add JSON fixture files for v1/v2/v3. Pure test-data work, no production code changes |
+| Frame advancement missing | MEDIUM | Audit all async test methods for operations that need frame waits. Add WaitFrames helper. May require rewriting some tests |
+| Mood tests flaky due to timing | LOW | Refactor to test MoodSystem POCO directly with controlled deltas. No production code change needed |
 
 ## Pitfall-to-Phase Mapping
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| Event ordering race (demolish) | Phase 1: HousingManager core | Unit test: demolish room, verify citizens evicted AND capacity decremented correctly in both managers |
-| Demolish-rebuild cascade | Phase 2: Return-home behavior | Manual test: demolish housing, immediately build new housing, verify no visual glitches |
-| Home timer vs wish/visit priority | Phase 2: Return-home behavior | Manual test: give citizen wish, wait for home timer, verify wish visit takes priority |
-| Save format v3 backward compat | Save/load integration phase | Automated test: load v2 save file, verify no crash, citizens auto-assigned |
-| Capacity scaling interpretation | Phase 1: HousingManager core | Verify capacity formula in one central method, all consumers use it |
-| Autoload initialization order | Phase 1: HousingManager core | Verify project.godot ordering, add null-check assertions in _Ready() |
-| FloatingText vs 3D Zzz visual | Phase 2: Return-home behavior | Visual test: orbit camera during home return, verify Zzz tracks 3D position |
-| Stale assignment on load | Save/load integration phase | Manual test: save, demolish room, load, verify evicted citizens are properly unhoused |
+| Singleton state leaking (Pitfall 1) | Phase 1: Framework Setup | Run full test suite 3 times consecutively -- all must pass |
+| Event subscriber accumulation (Pitfall 2) | Phase 1: Framework Setup | Add an assertion counting GameEvents subscribers at start of each suite -- must be baseline count |
+| Scene tree lifecycle mismatch (Pitfall 3) | Phase 1: Framework Setup | Document test tiers in test project README. Pure logic tests must not import Godot namespaces |
+| Timer interference (Pitfall 4) | Phase 1: Framework Setup | Assert all Timers are stopped at test suite start |
+| Save path isolation (Pitfall 5) | Phase 1: Framework Setup | CI run must not create/modify user://save.json |
+| Save format edge cases (Pitfall 6) | Phase 2-3: Save/Load Tests | v1, v2, v3 JSON fixtures all load without exceptions |
+| Frame advancement (Pitfall 7) | Phase 1: Framework Setup | WaitFrames helper exists and is documented |
+| MoodSystem timing (Pitfall 8) | Phase 2-3: Mood Tests | Zero use of Thread.Sleep or Task.Delay in mood tests |
 
 ## Sources
 
-- Direct codebase analysis of `/workspace/Scripts/Autoloads/GameEvents.cs` (event bus with 15+ event delegates)
-- Direct codebase analysis of `/workspace/Scripts/Citizens/CitizenNode.cs` (visit tween architecture, timer patterns)
-- Direct codebase analysis of `/workspace/Scripts/Autoloads/SaveManager.cs` (save format versioning, frame-delay restore)
-- Direct codebase analysis of `/workspace/Scripts/Autoloads/HappinessManager.cs` (housing capacity tracking, event subscriptions)
-- Direct codebase analysis of `/workspace/Scripts/Build/BuildManager.cs` (room placement/demolish flow, PlacedRoom record)
-- Direct codebase analysis of `/workspace/Scripts/UI/FloatingText.cs` (2D Label, screen-space positioning)
-- Direct codebase analysis of `/workspace/Scripts/UI/SegmentTooltip.cs` (tooltip text composition)
-- Direct codebase analysis of `/workspace/Scripts/UI/CitizenInfoPanel.cs` (citizen panel structure)
-- Direct codebase analysis of `/workspace/Scripts/Data/RoomDefinition.cs` (BaseCapacity field, RoomCategory enum)
-- Direct codebase analysis of `/workspace/Scripts/Ring/SegmentGrid.cs` (flat index system, 24 total segments)
-- PRD analysis of `/workspace/docs/prd-housing.md` (design decisions, edge cases, open questions)
+- [GoDotTest GitHub repository](https://github.com/chickensoft-games/GoDotTest) -- test runner architecture, TestClass lifecycle, command-line flags
+- [GodotTestDriver GitHub repository](https://github.com/chickensoft-games/GodotTestDriver) -- Fixture class, input simulation, test driver pattern
+- [GoDotTest README](https://github.com/chickensoft-games/GoDotTest/blob/main/README.md) -- [Setup]/[Cleanup] attributes, sequential execution, --run-tests flag
+- [Godot Forum: Using GUT to test autoload singletons](https://forum.godotengine.org/t/using-gut-to-test-instantiating-scenes-via-autoload-singleton-event-bus-rootscene/86974) -- nodes not in tree during tests, explicit add_child required
+- [Godot Forum: C# Event Handlers ObjectDisposedException](https://forum.godotengine.org/t/c-event-handlers-triggering-unhandled-exception-system-objectdisposedexception-cannot-access-a-disposed-object/17794) -- disposed node event handler invocation
+- [Godot GitHub Issue #66319](https://github.com/godotengine/godot/issues/66319) -- signal delegates not disconnecting on node free
+- [Godot GitHub Issue #74984](https://github.com/godotengine/godot/issues/74984) -- signal trying to access freed listeners
+- [DEV Community: Don't use Singleton Pattern in your unit tests](https://dev.to/bacarpereira/don-t-use-singleton-pattern-in-your-unit-tests-8p7) -- state leaking between tests
+- [Understanding tree order (Godot 4 Recipes)](https://kidscancode.org/godot_recipes/4.x/basics/tree_ready_order/index.html) -- _EnterTree vs _Ready lifecycle
+- [Godot Documentation: Node Lifecycle](https://deepwiki.com/godotengine/godot-docs/5.4-node-lifecycle-and-processing) -- _EnterTree, _Ready, _Process order
+- Direct codebase analysis of all 8 autoload singletons: GameEvents.cs, EconomyManager.cs, BuildManager.cs, CitizenManager.cs, WishBoard.cs, HappinessManager.cs, HousingManager.cs, SaveManager.cs
+- Direct codebase analysis of MoodSystem.cs (POCO testability pattern), SafeNode.cs (event lifecycle pattern), SaveData/SavedCitizen/SavedRoom (serialization contracts)
 
 ---
-*Pitfalls research for: Orbital Rings v1.2 Housing System*
-*Researched: 2026-03-05*
+*Pitfalls research for: Orbital Rings v1.3 Testing Infrastructure*
+*Researched: 2026-03-07*
