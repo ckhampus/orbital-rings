@@ -11,7 +11,7 @@ Requirements for Citizen AI & Day/Night Cycle milestone. Each maps to roadmap ph
 
 - [x] **CLOCK-01**: Station cycles through Morning, Day, Evening, and Night periods in an 8-minute real-time loop
 - [x] **CLOCK-02**: Clock cycle length and period proportions are configurable via Inspector resource
-- [ ] **CLOCK-03**: Player can see the current station period via an ambient icon in the HUD
+- [x] **CLOCK-03**: Player can see the current station period via an ambient icon in the HUD
 
 ### Lighting
 
@@ -87,7 +87,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | CLOCK-01 | Phase 26 | Complete |
 | CLOCK-02 | Phase 26 | Complete |
-| CLOCK-03 | Phase 26 | Pending |
+| CLOCK-03 | Phase 26 | Complete |
 | LIT-01 | Phase 27 | Pending |
 | LIT-02 | Phase 27 | Pending |
 | TRAIT-01 | Phase 28 | Pending |

@@ -63,7 +63,7 @@
 
 **Milestone Goal:** Make citizens feel alive with observable daily routines shaped by personal traits, layered on a visible day/night cycle that gives the station rhythm.
 
-- [ ] **Phase 26: Station Clock Foundation** — Time authority singleton with four periods, configurable timing, and HUD indicator
+- [x] **Phase 26: Station Clock Foundation** — Time authority singleton with four periods, configurable timing, and HUD indicator (completed 2026-03-07)
 - [ ] **Phase 27: Day/Night Visuals** — Lighting and atmosphere transitions that make the station's time of day visible to the player
 - [ ] **Phase 28: Citizen Traits** — Interest and Rhythm trait assignment at creation with info panel display
 - [ ] **Phase 29: Schedule and Scoring** — Period-weighted activity templates and utility-based room selection
@@ -205,7 +205,7 @@ Note: Phases 27 and 28 are independent and may execute in parallel.
 | 23. Economy and Housing Unit Tests | v1.3 | 1/1 | Complete | 2026-03-07 |
 | 24. Save/Load Serialization Tests | v1.3 | 1/1 | Complete | 2026-03-07 |
 | 25. Singleton Integration Tests | v1.3 | 2/2 | Complete | 2026-03-07 |
-| 26. Station Clock Foundation | 1/2 | In Progress|  | - |
+| 26. Station Clock Foundation | 2/2 | Complete   | 2026-03-07 | - |
 | 27. Day/Night Visuals | v1.4 | 0/TBD | Not started | - |
 | 28. Citizen Traits | v1.4 | 0/TBD | Not started | - |
 | 29. Schedule and Scoring | v1.4 | 0/TBD | Not started | - |
