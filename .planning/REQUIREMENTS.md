@@ -35,9 +35,9 @@ Requirements for the Testing milestone. Each maps to roadmap phases.
 
 ### Unit Tests — Save/Load
 
-- [ ] **SAVE-01**: SaveData round-trips through JSON serialization without data loss
-- [ ] **SAVE-02**: v1 format JSON deserializes with correct defaults for missing v2/v3 fields
-- [ ] **SAVE-03**: v2 format JSON deserializes with correct defaults for missing v3 fields
+- [x] **SAVE-01**: SaveData round-trips through JSON serialization without data loss
+- [x] **SAVE-02**: v1 format JSON deserializes with correct defaults for missing v2/v3 fields
+- [x] **SAVE-03**: v2 format JSON deserializes with correct defaults for missing v3 fields
 
 ### Integration Infrastructure
 
@@ -95,9 +95,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ECON-02 | Phase 23 | Complete |
 | ECON-03 | Phase 23 | Complete |
 | HOUS-01 | Phase 23 | Complete |
-| SAVE-01 | Phase 24 | Pending |
-| SAVE-02 | Phase 24 | Pending |
-| SAVE-03 | Phase 24 | Pending |
+| SAVE-01 | Phase 24 | Complete |
+| SAVE-02 | Phase 24 | Complete |
+| SAVE-03 | Phase 24 | Complete |
 | INTG-01 | Phase 21 | Complete |
 | INTG-02 | Phase 21 | Complete |
 | INTG-03 | Phase 21 | Complete |

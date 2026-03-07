@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Testing
 status: completed
-stopped_at: Phase 24 context gathered
-last_updated: "2026-03-07T14:55:10.447Z"
-last_activity: 2026-03-07 — Completed Phase 23 Plan 01 (Economy and Housing Unit Tests)
+stopped_at: Completed 24-01-PLAN.md
+last_updated: "2026-03-07T15:45:08.701Z"
+last_activity: 2026-03-07 — Completed Phase 24 Plan 01 (Save/Load Serialization Tests)
 progress:
   total_phases: 6
-  completed_phases: 4
-  total_plans: 6
-  completed_plans: 6
+  completed_phases: 5
+  total_plans: 7
+  completed_plans: 7
   percent: 100
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-07)
 
 **Core value:** The wish-driven building loop: citizens express wishes, the player builds rooms to fulfill them, happiness rises, new citizens arrive, new wishes emerge.
-**Current focus:** v1.3 Testing — Phase 23 (Economy and Housing Unit Tests) complete
+**Current focus:** v1.3 Testing — Phase 24 (Save/Load Serialization Tests) complete
 
 ## Current Position
 
-Phase: 23 of 25 (Economy and Housing Unit Tests)
+Phase: 24 of 25 (Save/Load Serialization Tests)
 Plan: 1 of 1
-Status: Phase 23 complete
-Last activity: 2026-03-07 — Completed Phase 23 Plan 01 (Economy and Housing Unit Tests)
+Status: Phase 24 complete
+Last activity: 2026-03-07 — Completed Phase 24 Plan 01 (Save/Load Serialization Tests)
 
 Progress: [██████████] 100%
 
@@ -57,6 +57,9 @@ All v1.0, v1.1, and v1.2 decisions logged in PROJECT.md Key Decisions table with
 - [Phase 23]: Pre-computed all expected values from production config defaults with banker's rounding for .5 edge cases
 - [Phase 23]: Used GameTestClass for EconomyTests (singleton-dependent) and TestClass for HousingTests (static method)
 - [Phase 23]: Pre-computed all expected values from production config defaults with banker's rounding for .5 edge cases
+- [Phase 24]: Used TestClass base (not GameTestClass) for pure POCO serialization tests with no singleton interaction
+- [Phase 24]: Used exact float equality (no tolerance) since System.Text.Json preserves float values exactly through JSON round-trip
+- [Phase 24]: Inline raw string literal JSON for v1/v2 backward compat tests for maximum readability
 
 ### Pending Todos
 
@@ -80,9 +83,10 @@ None.
 | 7 | Fix Zzz label visibility by reparenting to CitizenManager | 2026-03-06 | c2761b3 | [7-the-zzz-isn-t-showing-when-a-citizen-goe](./quick/7-the-zzz-isn-t-showing-when-a-citizen-goe/) |
 | 8 | Fix citizen arrival gate to check actual housing vacancy | 2026-03-06 | 9f73a28 | [8-fix-new-citizens-arriving-when-no-housin](./quick/8-fix-new-citizens-arriving-when-no-housin/) |
 | Phase 23 P01 | 10min | 2 tasks | 3 files |
+| Phase 24 P01 | 34min | 1 task | 1 file |
 
 ## Session Continuity
 
-Last session: 2026-03-07T14:55:10.443Z
-Stopped at: Phase 24 context gathered
-Next: Phase 23 complete. Proceed to Phase 24 (Save/Load Unit Tests).
+Last session: 2026-03-07T15:45:08.695Z
+Stopped at: Completed 24-01-PLAN.md
+Next: Phase 24 complete. Proceed to Phase 25 (Housing Integration Tests).

@@ -52,7 +52,7 @@
 - [x] **Phase 21: Integration Test Infrastructure** - Singleton reset, event cleanup, timer suppression for reliable test isolation (completed 2026-03-07)
 - [x] **Phase 22: Mood System Unit Tests** - Pure POCO tests for decay, tiers, hysteresis, wish gain, and state restore (completed 2026-03-07)
 - [x] **Phase 23: Economy and Housing Unit Tests** - Pure formula tests for room costs, tick income, demolish refunds, and capacity scaling (completed 2026-03-07)
-- [ ] **Phase 24: Save/Load Serialization Tests** - JSON round-trip and backward-compatible deserialization across v1/v2/v3 formats
+- [x] **Phase 24: Save/Load Serialization Tests** - JSON round-trip and backward-compatible deserialization across v1/v2/v3 formats (completed 2026-03-07)
 - [ ] **Phase 25: Singleton Integration Tests** - Housing assignment, demolition reassignment, and mood-economy propagation through live singletons
 
 ## Phase Details
@@ -172,7 +172,7 @@ Note: Phases 22, 23, and 24 depend only on Phase 20 and could execute in paralle
 | 21. Integration Test Infrastructure | v1.3 | 2/2 | Complete | 2026-03-07 |
 | 22. Mood System Unit Tests | v1.3 | 1/1 | Complete | 2026-03-07 |
 | 23. Economy and Housing Unit Tests | v1.3 | 1/1 | Complete | 2026-03-07 |
-| 24. Save/Load Serialization Tests | v1.3 | 1/1 | Not started | - |
+| 24. Save/Load Serialization Tests | 1/1 | Complete   | 2026-03-07 | - |
 | 25. Singleton Integration Tests | v1.3 | 0/0 | Not started | - |
 
 ---
