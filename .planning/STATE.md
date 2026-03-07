@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Testing
-status: completed
-stopped_at: Completed 25-02-PLAN.md
-last_updated: "2026-03-07T16:37:43.890Z"
-last_activity: 2026-03-07 - Completed quick task 9: Set up GodotEnv in devcontainer for installing and managing Godot
+status: archived
+stopped_at: Milestone v1.3 archived
+last_updated: "2026-03-07T21:20:00.000Z"
+last_activity: 2026-03-07 - Archived v1.3 Testing milestone
 progress:
   total_phases: 6
   completed_phases: 6
@@ -21,16 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-07)
 
 **Core value:** The wish-driven building loop: citizens express wishes, the player builds rooms to fulfill them, happiness rises, new citizens arrive, new wishes emerge.
-**Current focus:** v1.3 Testing -- Milestone complete
+**Current focus:** Planning next milestone
 
 ## Current Position
 
-Phase: 25 of 25 (Singleton Integration Tests)
-Plan: 2 of 2
-Status: Phase 25 complete. v1.3 milestone complete.
-Last activity: 2026-03-07 - Completed quick task 9: Set up GodotEnv in devcontainer for installing and managing Godot
-
-Progress: [██████████] 100%
+Milestone v1.3 Testing shipped and archived.
+25 phases complete across 4 milestones (v1.0-v1.3).
+Next: `/gsd:new-milestone` to define v1.4 or v2.0.
 
 ## Performance Metrics
 
@@ -38,33 +35,14 @@ Progress: [██████████] 100%
 - v1.0: 9 phases, 25 plans, ~3.2 min avg, 3 days
 - v1.1: 4 phases, 7 plans, ~2 min avg, 2 days
 - v1.2: 6 phases, 8 plans, ~4 min avg, 2 days
-- Total: 19 phases, 40 plans
+- v1.3: 6 phases, 9 plans, 1 day
+- Total: 25 phases, 49 plans
 
 ## Accumulated Context
 
 ### Decisions
 
-All v1.0, v1.1, and v1.2 decisions logged in PROJECT.md Key Decisions table with outcomes.
-- [Phase 20]: Kept all five test package references explicit for clarity and version pinning
-- [Phase 20]: Used Chickensoft.GoDotTest namespace (v2.0.30, not the old GoDotTest namespace from outdated README examples)
-- [Phase 21]: GameEvents has 34 event delegates (not 32); ClearAllSubscribers() covers all
-- [Phase 21]: Singleton Reset() pattern: clears mutable state + stops timers, preserves Instance/Config/caches
-- [Phase 21]: SingletonResetTests extends TestClass (not GameTestClass) to avoid auto-reset hiding reset infrastructure bugs
-- [Phase 21]: Verification tests use only public APIs to dirty/verify state -- validates actual public contract
-- [Phase 22]: Corrected wish promotion sequence for float32 precision: 5*0.06f < 0.30f so Lively promotion at wish 6
-- [Phase 22]: POCO unit test pattern: CreateMoodSystem() helper, RestoreState pre-seeding, ShouldBe(expected, 0.001f) tolerance
-- [Phase 23]: Used GameTestClass for EconomyTests (singleton-dependent) and TestClass for HousingTests (static method)
-- [Phase 23]: Pre-computed all expected values from production config defaults with banker's rounding for .5 edge cases
-- [Phase 23]: Used GameTestClass for EconomyTests (singleton-dependent) and TestClass for HousingTests (static method)
-- [Phase 23]: Pre-computed all expected values from production config defaults with banker's rounding for .5 edge cases
-- [Phase 24]: Used TestClass base (not GameTestClass) for pure POCO serialization tests with no singleton interaction
-- [Phase 24]: Used exact float equality (no tolerance) since System.Text.Json preserves float values exactly through JSON round-trip
-- [Phase 24]: Inline raw string literal JSON for v1/v2 backward compat tests for maximum readability
-- [Phase 25]: SubscribeToEvents() mirrors _Ready() event wiring for idempotent re-subscription after ClearAllSubscribers()
-- [Phase 25]: SeedRoomForTest() bypasses BuildManager dependency for headless room state in integration tests
-- [Phase 25]: ResubscribeAllSingletons() in GameTestClass [Setup] for automatic integration test event chain support
-- [Phase 25]: Assert distribution properties (occupancy spread <= 1) rather than exact room assignments due to GD.Randi() tiebreaking
-- [Phase 25]: Pre-computed income values (Quiet=5, Cozy=6) for deterministic mood-economy integration test assertions
+All decisions through v1.3 logged in PROJECT.md Key Decisions table with outcomes.
 
 ### Pending Todos
 
@@ -72,8 +50,7 @@ None.
 
 ### Blockers/Concerns
 
-- Phase 20: Godot 4.6 / .NET 10 has an open issue (godotengine/godot#112701) about shared framework assembly probing on Windows. Flag for validation during NuGet restore. Likely does not affect testing packages.
-- Phase 25: BuildManager's `_ringVisual` dependency may complicate housing integration tests. May need SaveData-based approach or minimal game scene.
+None active.
 
 ### Quick Tasks Completed
 
@@ -88,13 +65,9 @@ None.
 | 7 | Fix Zzz label visibility by reparenting to CitizenManager | 2026-03-06 | c2761b3 | [7-the-zzz-isn-t-showing-when-a-citizen-goe](./quick/7-the-zzz-isn-t-showing-when-a-citizen-goe/) |
 | 8 | Fix citizen arrival gate to check actual housing vacancy | 2026-03-06 | 9f73a28 | [8-fix-new-citizens-arriving-when-no-housin](./quick/8-fix-new-citizens-arriving-when-no-housin/) |
 | 9 | Set up GodotEnv in devcontainer for Godot version management | 2026-03-07 | 792d12e | [9-set-up-godotenv-in-devcontainer-for-inst](./quick/9-set-up-godotenv-in-devcontainer-for-inst/) |
-| Phase 23 P01 | 10min | 2 tasks | 3 files |
-| Phase 24 P01 | 34min | 1 task | 1 file |
-| Phase 25 P01 | 2min | 2 tasks | 5 files |
-| Phase 25 P02 | 2min | 1 tasks | 1 files |
 
 ## Session Continuity
 
-Last session: 2026-03-07T19:30:17Z
-Stopped at: Completed quick task 9 (GodotEnv devcontainer setup)
-Next: v1.3 Testing milestone complete. All 9 plans across 6 phases executed successfully. 85 tests passing.
+Last session: 2026-03-07
+Stopped at: v1.3 milestone archived
+Next: `/gsd:new-milestone` to plan next milestone

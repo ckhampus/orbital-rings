@@ -141,6 +141,52 @@
 
 ---
 
+## Milestone: v1.3 — Testing
+
+**Shipped:** 2026-03-07
+**Phases:** 6 | **Plans:** 9 | **Tests:** 85
+
+### What Was Built
+- GoDotTest + GodotTestDriver + Shouldly test framework with conditional compilation and export exclusion
+- Test runner scene with CLI headless execution (`--run-tests --quit-on-finish`)
+- Singleton reset infrastructure (Reset() on 7 singletons, ClearAllSubscribers, timer suppression)
+- TestHelper and GameTestClass base classes for state isolation between test suites
+- 17 MoodSystem unit tests covering decay math, tier transitions, hysteresis, wish gain, and state restore
+- 47 Economy/Housing unit tests covering all room cost/size combinations, tick income per tier, demolish refunds, and capacity scaling
+- 4 SaveData serialization tests covering v3 round-trip, v1/v2 backward compatibility, and edge cases
+- 8 singleton integration tests verifying housing assignment, demolition reassignment, and mood-economy propagation through live event chains
+
+### What Worked
+- **POCO-first test strategy**: Starting with pure POCO tests (Phases 22, 24) before integration tests (Phase 25) meant 80% of tests needed zero singleton state, keeping test execution fast
+- **Conditional compilation over separate .csproj**: Using RunTests property and Compile Remove kept test code in the main project while cleanly excluding it from exports — no internal member access issues
+- **SubscribeToEvents() mirrors _Ready()**: Providing idempotent event re-subscription after ClearAllSubscribers() enabled integration tests to exercise real singleton event chains
+- **SeedRoomForTest() bypass**: Creating a purpose-built room seeding method avoided BuildManager's _ringVisual dependency in headless integration tests
+- **Pre-computed expected values**: Calculating expected test values from production config defaults (with banker's rounding) eliminated false test failures and made assertions self-documenting
+
+### What Was Inefficient
+- **Summary frontmatter still missing `one_liner`**: Fourth milestone in a row where automated extraction fails — the executor never generates this field
+- **Phase 25 plan checkboxes not updated in ROADMAP.md**: Plans 25-01 and 25-02 still show `- [ ]` in ROADMAP.md despite having SUMMARY.md files — manual checkbox tracking remains fragile
+- **Nyquist validation incomplete**: All 6 phases have draft VALIDATION.md with `nyquist_compliant: false` — the wave-0 test generation step was skipped throughout
+
+### Patterns Established
+- **TestClass for POCO, GameTestClass for singletons**: Clear rule for choosing test base class — no singleton interaction means use TestClass (faster, no reset overhead)
+- **Inline JSON string literals for backward compat tests**: Raw string JSON avoids serialization assumptions — test reads exactly what a legacy save file contains
+- **Property-based assertions for randomized behavior**: Assert distribution properties (e.g., occupancy spread <= 1) rather than exact outcomes when algorithms use RNG tiebreaking
+- **ResubscribeAllSingletons() in [Setup]**: Automatic event re-subscription after reset ensures integration tests exercise real event chains without manual wiring
+
+### Key Lessons
+1. **Test infrastructure is a feature, not overhead**: Phase 21's reset/resubscribe infrastructure took 2 plans but enabled all integration tests to run reliably without process restarts
+2. **Pre-compute expected values**: Hard-coding expected values from production config (not from code) catches regressions when config changes — tests should be independent truth sources
+3. **GoDotTest namespace changed in v2**: Chickensoft.GoDotTest (not GoDotTest) — outdated README examples cause compilation errors, always check actual package source
+4. **Float32 precision matters in tests**: 5 * 0.06f < 0.30f due to float32 representation — use tolerance-based assertions (ShouldBe with 0.001f) for computed float values
+
+### Cost Observations
+- Model mix: 85% opus, 10% sonnet, 5% haiku (quality profile)
+- Sessions: ~2 sessions in 1 day
+- Notable: 9 plans across 6 phases completed in a single day. Phases 22-24 (unit tests) averaged ~2 min each. Phase 25 (integration) required 2 plans for infrastructure + tests.
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -150,6 +196,7 @@
 | v1.0 | ~8 | 9 | Full GSD workflow with research → plan → execute → verify per phase |
 | v1.1 | ~4 | 4 | Contracts-first plan ordering, milestone audit before completion |
 | v1.2 | ~4 | 6 | PRD-first design, dedicated capacity transfer phase, three-path save/load verification |
+| v1.3 | ~2 | 6 | Test infrastructure as foundational phase, POCO-first test strategy, pre-computed expected values |
 
 ### Cumulative Quality
 
@@ -158,6 +205,7 @@
 | v1.0 | 25/25 | 25/25 satisfied | 6/6 complete | 4 info-level items |
 | v1.1 | 12/12 | 12/12 satisfied | 3/3 complete | 1 item (resolved before ship) |
 | v1.2 | 38/38 | 17/17 satisfied | 1/1 complete | 4 items (non-blocking) |
+| v1.3 | 23/23 | 23/23 satisfied | 5/5 complete | 1 cosmetic item |
 
 ### Top Lessons (Verified Across Milestones)
 
@@ -165,5 +213,7 @@
 2. Per-instance materials in Godot 4 C# — always, no exceptions
 3. Event-driven architecture with typed C# delegates scales cleanly across 8+ singletons (v1.2 added HousingManager)
 4. Contracts-first plan ordering (enums/configs/events before logic) eliminates merge conflicts between plans (v1.0 Phase 1, v1.1 Phase 10, v1.2 Phase 14)
-5. POCO simulation objects keep Autoload Nodes thin and logic testable (v1.1 MoodSystem)
+5. POCO simulation objects keep Autoload Nodes thin and logic testable (v1.1 MoodSystem, v1.3 proved with 85 tests)
 6. Ownership transfer deserves its own phase — moving state between singletons touches multiple files and needs isolated verification (v1.2 Phase 16)
+7. Test infrastructure is a feature phase, not overhead — singleton reset/resubscribe infrastructure (v1.3 Phase 21) enabled all integration tests without process restarts
+8. POCO-first test strategy: test pure logic without singletons first, saving integration tests for last — 80% of tests run without Godot state (v1.3)

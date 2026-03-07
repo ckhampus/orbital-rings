@@ -2,20 +2,11 @@
 
 ## What This Is
 
-A cozy space station builder where players construct a modular orbital ring one room at a time. The ring is a flat donut divided into 24 segments (12 outer, 12 inner) where rooms attract citizens who express wishes via speech bubbles. Fulfilling wishes grows lifetime happiness (permanent progress) and raises station mood (dynamic feel), with five mood tiers driving citizen arrivals and economy. Citizens are assigned home rooms and visibly return to rest, making the station feel alive and personal. There is no fail state — the station always grows. Built in Godot 4 with C#, targeting PC (itch.io). v1.2 shipped with the complete housing system.
+A cozy space station builder where players construct a modular orbital ring one room at a time. The ring is a flat donut divided into 24 segments (12 outer, 12 inner) where rooms attract citizens who express wishes via speech bubbles. Fulfilling wishes grows lifetime happiness (permanent progress) and raises station mood (dynamic feel), with five mood tiers driving citizen arrivals and economy. Citizens are assigned home rooms and visibly return to rest, making the station feel alive and personal. There is no fail state — the station always grows. Built in Godot 4 with C#, targeting PC (itch.io). v1.3 shipped with a comprehensive test suite (85 tests) covering all critical game systems.
 
 ## Core Value
 
 The wish-driven building loop: citizens express wishes, the player builds rooms to fulfill them, happiness rises, new citizens arrive, new wishes emerge. This loop must feel satisfying and alive.
-
-## Current Milestone: v1.3 Testing
-
-**Goal:** Introduce GoDotTest + GodotTestDriver testing framework and cover critical paths (save/load, housing, economy, mood, wishes) for confidence as the codebase grows.
-
-**Target features:**
-- Testing framework integration (GoDotTest + GodotTestDriver)
-- Test runner scene for in-editor and CI execution
-- Critical path test suites for core game systems
 
 ## Requirements
 
@@ -49,15 +40,16 @@ The wish-driven building loop: citizens express wishes, the player builds rooms 
 - ✓ HousingConfig resource for Inspector-tunable timing constants — v1.2
 - ✓ Unhoused citizens handled gracefully (no penalty) — v1.2
 - ✓ Save/load housing assignments with backward compatibility (v3 format) — v1.2
+- ✓ GoDotTest + GodotTestDriver framework wired up with test runner scene — v1.3
+- ✓ Save/load round-trip tests across all format versions (v1, v2, v3) — v1.3
+- ✓ Housing assignment tests (fewest-occupants-first, capacity scaling, demolish/reassign) — v1.3
+- ✓ Economy calculation tests (income multipliers, room costs, demolish refunds) — v1.3
+- ✓ Mood system tests (decay, tier transitions, hysteresis) — v1.3
+- ✓ Singleton integration tests (housing assignment, demolition, mood-economy propagation) — v1.3
 
 ### Active
 
-- [ ] GoDotTest + GodotTestDriver framework wired up with test runner scene
-- [ ] Save/load round-trip tests across all format versions (v1, v2, v3)
-- [ ] Housing assignment tests (fewest-occupants-first, capacity scaling, demolish/reassign)
-- [ ] Economy calculation tests (income multipliers, room costs, work bonuses)
-- [ ] Mood system tests (decay, tier transitions, hysteresis)
-- [ ] Wish fulfillment loop tests (wish → build → satisfy → happiness)
+(None — awaiting next milestone definition)
 
 ### Out of Scope
 
@@ -75,21 +67,22 @@ The wish-driven building loop: citizens express wishes, the player builds rooms 
 - Player-managed room assignments — fully automatic, no micromanagement
 - Citizen preferences or roommate compatibility — deferred complexity
 - Room interior customization — placeholder interiors sufficient
-- Tier change notification — deferred, potential v1.3+
+- Tier change notification — deferred, potential future milestone
 - Save migration v1→v2 — deferred, not blocking (v1 saves load safely with defaults)
-- Additional blueprint unlocks (30, 50, 100) — deferred, potential v1.3+
-- Cosmetic unlocks tied to lifetime milestones — deferred, potential v1.3+
-- Home-return path indicator / visual trail — polish, defer to v1.3+
-- Citizen roommate display in info panel — minor UI scope, defer to v1.3+
+- Additional blueprint unlocks (30, 50, 100) — deferred, potential future milestone
+- Cosmetic unlocks tied to lifetime milestones — deferred, potential future milestone
+- Home-return path indicator / visual trail — polish, deferred
+- Citizen roommate display in info panel — minor UI scope, deferred
 
 ## Context
 
-Shipped v1.2 with 9,508 LOC C# across 19 phases (40 plans) in 5 days.
+Shipped v1.3 with 11,380 LOC C# across 25 phases (49 plans) in 6 days.
 Tech stack: Godot 4.4, C#, .NET 8, procedural mesh/audio generation.
+Testing: GoDotTest 2.0.30, GodotTestDriver 3.1.62, Shouldly 4.3.0 — 85 tests across 7 test files.
 Architecture: 8 Autoload singletons (GameEvents, EconomyManager, BuildManager, CitizenManager, WishBoard, HappinessManager, SaveManager, HousingManager) coordinated via typed C# event delegates.
 Art style: Soft 3D with pastel palette, rounded capsule citizens, warm segment colors.
 Full design document at `IDEA.md` covers multi-ring expansion, proc gen interiors, citizen personalities, day/night cycle — all deferred.
-v1.2 added HousingManager as 8th autoload with fewest-occupants-first assignment, periodic Zzz rest cycle, three UI components (info panel, tooltip, population display), and save format v3 with nullable HomeSegmentIndex. Capacity ownership transferred from HappinessManager to HousingManager.
+v1.3 added comprehensive testing infrastructure: conditional test compilation, singleton reset/re-subscription for test isolation, and 85 unit/integration tests covering mood, economy, housing, save/load, and cross-singleton event chains.
 
 ## Constraints
 
@@ -108,7 +101,7 @@ v1.2 added HousingManager as 8th autoload with fewest-occupants-first assignment
 | Start with empty ring, no tutorial | Cozy games teach through play; keeps first milestone lean | ✓ Good — wishes serve as implicit tutorial |
 | Defer day/night cycle | Cosmetic system, not needed to prove core loop | ✓ Good — ambient drone provides atmosphere without visual complexity |
 | Single ring for first milestone | Prove the core loop before adding vertical expansion | ✓ Good — loop is complete and satisfying on one ring |
-| Pure C# events (not Godot signals) | Avoids marshalling overhead and IsConnected bugs | ✓ Good — zero signal connection issues across 19 phases |
+| Pure C# events (not Godot signals) | Avoids marshalling overhead and IsConnected bugs | ✓ Good — zero signal connection issues across 25 phases |
 | Polar math picking (not trimesh collision) | Zero physics overhead, no phantom hits | ✓ Good — reliable segment selection at any camera angle |
 | Spreadsheet-first economy | Calibrate numbers before coding to avoid rework | ✓ Good — sqrt scaling + 1.3x happiness cap created balanced progression |
 | Procedural audio (no .wav assets) | Zero external asset dependencies | ✓ Good — placement chime + wish celebration chime feel distinct and satisfying |
@@ -126,6 +119,10 @@ v1.2 added HousingManager as 8th autoload with fewest-occupants-first assignment
 | Capacity transfer from HappinessManager | Single source of truth eliminates desynchronization | ✓ Good — occupancy-based arrival gating is simpler than additive formula |
 | Nullable int? HomeSegmentIndex (not int) | Distinguish "no home" from "segment 0" in save format | ✓ Good — System.Text.Json serializes null correctly, no sentinel values needed |
 | XML doc audit trail for save/load | Document verified code paths for future readers | ✓ Good — Phase 19 audit added RestoreFromSave comments with zero code changes |
+| GoDotTest + GodotTestDriver (not xUnit) | Runs inside Godot process with full scene tree access | ✓ Good — 85 tests run headless, singleton state accessible in integration tests |
+| Conditional test compilation (RunTests property) | Exclude test code from release builds without separate .csproj | ✓ Good — no test DLLs in export, no accidental test code in production |
+| Singleton Reset() + ClearAllSubscribers() | State isolation between test suites without process restart | ✓ Good — 7 singletons reset cleanly, zero stale delegate leaks |
+| SubscribeToEvents() mirrors _Ready() | Idempotent re-subscription after ClearAllSubscribers in integration tests | ✓ Good — event chains verified through live singleton code paths |
 
 ---
-*Last updated: 2026-03-07 after v1.3 milestone started*
+*Last updated: 2026-03-07 after v1.3 milestone*

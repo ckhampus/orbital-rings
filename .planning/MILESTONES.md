@@ -1,5 +1,25 @@
 # Milestones
 
+## v1.3 Testing (Shipped: 2026-03-07)
+
+**Phases:** 6 | **Plans:** 9 | **Tests:** 85
+**Lines of code:** 11,380 C# | **Timeline:** 1 day (2026-03-07)
+**Git range:** `docs(20)` to `docs(25-02)` | **Requirements:** 23/23 satisfied
+
+**Delivered:** Introduced a complete testing framework (GoDotTest + GodotTestDriver + Shouldly) with 85 tests covering mood decay, economy formulas, housing capacity, save/load serialization, and cross-singleton integration — providing regression safety as the codebase grows.
+
+**Key accomplishments:**
+1. GoDotTest + GodotTestDriver + Shouldly framework wired with conditional compilation and export exclusion
+2. Test runner scene with CLI headless execution (`--run-tests --quit-on-finish`)
+3. Singleton reset infrastructure (Reset() on 7 singletons, ClearAllSubscribers, timer suppression) + GameTestClass base
+4. 17 MoodSystem unit tests covering decay, tiers, hysteresis, wish gain, and state restore
+5. 47 Economy/Housing unit tests covering room costs, tick income, demolish refunds, and capacity scaling
+6. 8 singleton integration tests verifying housing assignment, demolition reassignment, and mood-economy propagation through live event chains
+
+**Archive:** `.planning/milestones/v1.3-ROADMAP.md` | `.planning/milestones/v1.3-REQUIREMENTS.md`
+
+---
+
 ## v1.2 Housing (Shipped: 2026-03-06)
 
 **Phases:** 6 | **Plans:** 8 | **Tasks:** 16
