@@ -41,9 +41,9 @@ Requirements for the Testing milestone. Each maps to roadmap phases.
 
 ### Integration Infrastructure
 
-- [ ] **INTG-01**: Singleton reset infrastructure clears state between test suites
-- [ ] **INTG-02**: GameEvents subscribers cleared between test suites (no stale delegates)
-- [ ] **INTG-03**: Singleton timers suppressed during test execution
+- [x] **INTG-01**: Singleton reset infrastructure clears state between test suites
+- [x] **INTG-02**: GameEvents subscribers cleared between test suites (no stale delegates)
+- [x] **INTG-03**: Singleton timers suppressed during test execution
 
 ### Integration Tests
 
@@ -98,9 +98,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SAVE-01 | Phase 24 | Pending |
 | SAVE-02 | Phase 24 | Pending |
 | SAVE-03 | Phase 24 | Pending |
-| INTG-01 | Phase 21 | Pending |
-| INTG-02 | Phase 21 | Pending |
-| INTG-03 | Phase 21 | Pending |
+| INTG-01 | Phase 21 | Complete |
+| INTG-02 | Phase 21 | Complete |
+| INTG-03 | Phase 21 | Complete |
 | INTG-04 | Phase 25 | Pending |
 | INTG-05 | Phase 25 | Pending |
 | INTG-06 | Phase 25 | Pending |

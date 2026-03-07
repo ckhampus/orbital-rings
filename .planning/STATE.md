@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Testing
 status: completed
-stopped_at: Phase 21 context gathered
-last_updated: "2026-03-07T10:05:48.160Z"
-last_activity: 2026-03-07 — Completed 20-02 Test Runner + Smoke Test
+stopped_at: Completed 21-01-PLAN.md
+last_updated: "2026-03-07T12:49:07.982Z"
+last_activity: 2026-03-07 — Completed 21-01 Singleton Reset Infrastructure
 progress:
   total_phases: 6
   completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
-  percent: 100
+  total_plans: 4
+  completed_plans: 3
+  percent: 75
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-07)
 
 **Core value:** The wish-driven building loop: citizens express wishes, the player builds rooms to fulfill them, happiness rises, new citizens arrive, new wishes emerge.
-**Current focus:** v1.3 Testing — Phase 20 (Test Framework Wiring) complete, Phase 21 next
+**Current focus:** v1.3 Testing — Phase 21 (Integration Test Infrastructure) in progress
 
 ## Current Position
 
-Phase: 20 of 25 (Test Framework Wiring) -- COMPLETE
-Plan: 2 of 2
-Status: Phase 20 complete
-Last activity: 2026-03-07 — Completed 20-02 Test Runner + Smoke Test
+Phase: 21 of 25 (Integration Test Infrastructure)
+Plan: 1 of 2
+Status: Plan 01 complete, Plan 02 next
+Last activity: 2026-03-07 — Completed 21-01 Singleton Reset Infrastructure
 
-Progress: [██████████] 100%
+Progress: [████████░░] 75%
 
 ## Performance Metrics
 
@@ -47,6 +47,8 @@ Progress: [██████████] 100%
 All v1.0, v1.1, and v1.2 decisions logged in PROJECT.md Key Decisions table with outcomes.
 - [Phase 20]: Kept all five test package references explicit for clarity and version pinning
 - [Phase 20]: Used Chickensoft.GoDotTest namespace (v2.0.30, not the old GoDotTest namespace from outdated README examples)
+- [Phase 21]: GameEvents has 34 event delegates (not 32); ClearAllSubscribers() covers all
+- [Phase 21]: Singleton Reset() pattern: clears mutable state + stops timers, preserves Instance/Config/caches
 
 ### Pending Todos
 
@@ -72,6 +74,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-07T10:05:48.156Z
-Stopped at: Phase 21 context gathered
-Next: `/gsd:execute-phase 21` to begin Phase 21 (Integration Test Infrastructure)
+Last session: 2026-03-07T12:49:07.979Z
+Stopped at: Completed 21-01-PLAN.md
+Next: Continue Phase 21 with Plan 02 (TestHelper, GameTestClass, verification tests)
