@@ -113,7 +113,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 23-01-PLAN.md — EconomyTests.cs with ~44 test methods (room costs, tick income, demolish refund) + HousingTests.cs expansion (capacity for all segment sizes)
+- [x] 23-01-PLAN.md — EconomyTests.cs with ~44 test methods (room costs, tick income, demolish refund) + HousingTests.cs expansion (capacity for all segment sizes)
 
 ### Phase 24: Save/Load Serialization Tests
 **Goal**: Save data integrity is regression-proof — JSON round-trips preserve all fields and legacy formats deserialize with correct defaults
@@ -123,10 +123,10 @@ Plans:
   1. A v3 SaveData round-trips through JSON serialization and deserialization with every field value preserved exactly
   2. Hand-crafted v1 JSON (missing MoodValue, MoodTier, HomeSegmentIndex fields) deserializes with correct v2/v3 defaults
   3. Hand-crafted v2 JSON (missing HomeSegmentIndex field) deserializes with correct v3 default (null)
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 24-01: TBD
+- [ ] 24-01-PLAN.md — SaveDataTests.cs with 4 test methods (v3 round-trip, v1 backward compat, v2 backward compat, empty collections edge case)
 
 ### Phase 25: Singleton Integration Tests
 **Goal**: Cross-singleton coordination is verified — housing assignment, demolition reassignment, and mood-economy propagation work through live autoload singletons
@@ -171,10 +171,10 @@ Note: Phases 22, 23, and 24 depend only on Phase 20 and could execute in paralle
 | 20. Test Framework Wiring | v1.3 | 2/2 | Complete | 2026-03-07 |
 | 21. Integration Test Infrastructure | v1.3 | 2/2 | Complete | 2026-03-07 |
 | 22. Mood System Unit Tests | v1.3 | 1/1 | Complete | 2026-03-07 |
-| 23. Economy and Housing Unit Tests | 1/1 | Complete    | 2026-03-07 | - |
-| 24. Save/Load Serialization Tests | v1.3 | 0/0 | Not started | - |
+| 23. Economy and Housing Unit Tests | v1.3 | 1/1 | Complete | 2026-03-07 |
+| 24. Save/Load Serialization Tests | v1.3 | 1/1 | Not started | - |
 | 25. Singleton Integration Tests | v1.3 | 0/0 | Not started | - |
 
 ---
 *Roadmap created: 2026-03-02*
-*Last updated: 2026-03-07 after Phase 23 planning*
+*Last updated: 2026-03-07 after Phase 24 planning*
