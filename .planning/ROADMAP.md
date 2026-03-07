@@ -48,7 +48,7 @@
 
 ### v1.3 Testing (In Progress)
 
-- [ ] **Phase 20: Test Framework Wiring** - GoDotTest + GodotTestDriver + Shouldly packages, test runner scene, CLI execution, export exclusion
+- [x] **Phase 20: Test Framework Wiring** - GoDotTest + GodotTestDriver + Shouldly packages, test runner scene, CLI execution, export exclusion (completed 2026-03-07)
 - [ ] **Phase 21: Integration Test Infrastructure** - Singleton reset, event cleanup, timer suppression for reliable test isolation
 - [ ] **Phase 22: Mood System Unit Tests** - Pure POCO tests for decay, tiers, hysteresis, wish gain, and state restore
 - [ ] **Phase 23: Economy and Housing Unit Tests** - Pure formula tests for room costs, tick income, demolish refunds, and capacity scaling
@@ -167,7 +167,7 @@ Note: Phases 22, 23, and 24 depend only on Phase 20 and could execute in paralle
 | 17. Return-Home Behavior | v1.2 | 1/1 | Complete | 2026-03-06 |
 | 18. Housing UI | v1.2 | 1/1 | Complete | 2026-03-06 |
 | 19. Save/Load Integration | v1.2 | 1/1 | Complete | 2026-03-06 |
-| 20. Test Framework Wiring | 1/2 | In Progress|  | - |
+| 20. Test Framework Wiring | 2/2 | Complete   | 2026-03-07 | - |
 | 21. Integration Test Infrastructure | v1.3 | 0/0 | Not started | - |
 | 22. Mood System Unit Tests | v1.3 | 0/0 | Not started | - |
 | 23. Economy and Housing Unit Tests | v1.3 | 0/0 | Not started | - |

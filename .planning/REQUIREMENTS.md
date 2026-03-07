@@ -9,9 +9,9 @@ Requirements for the Testing milestone. Each maps to roadmap phases.
 
 ### Framework Setup
 
-- [ ] **FRMW-01**: Test runner scene discovers and executes test classes via GoDotTest
-- [ ] **FRMW-02**: Tests run headless via command-line (`--run-tests --quit-on-finish`)
-- [ ] **FRMW-03**: Shouldly assertion library available in test code
+- [x] **FRMW-01**: Test runner scene discovers and executes test classes via GoDotTest
+- [x] **FRMW-02**: Tests run headless via command-line (`--run-tests --quit-on-finish`)
+- [x] **FRMW-03**: Shouldly assertion library available in test code
 - [x] **FRMW-04**: Test files excluded from release/export builds
 - [x] **FRMW-05**: NuGet.Config updated to restore testing packages from nuget.org
 
@@ -81,9 +81,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FRMW-01 | Phase 20 | Pending |
-| FRMW-02 | Phase 20 | Pending |
-| FRMW-03 | Phase 20 | Pending |
+| FRMW-01 | Phase 20 | Complete |
+| FRMW-02 | Phase 20 | Complete |
+| FRMW-03 | Phase 20 | Complete |
 | FRMW-04 | Phase 20 | Complete |
 | FRMW-05 | Phase 20 | Complete |
 | MOOD-01 | Phase 22 | Pending |
