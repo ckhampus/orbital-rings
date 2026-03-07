@@ -148,6 +148,34 @@ public partial class HousingManager : Node
         StateLoaded = false;
     }
 
+    /// <summary>
+    /// Re-subscribes to GameEvents after ClearAllSubscribers(). Called by
+    /// TestHelper for integration tests.
+    /// </summary>
+    public void SubscribeToEvents()
+    {
+        if (GameEvents.Instance == null) return;
+
+        _onRoomPlaced = OnRoomPlaced;
+        _onRoomDemolished = OnRoomDemolished;
+        _onCitizenArrived = OnCitizenArrived;
+
+        GameEvents.Instance.RoomPlaced += _onRoomPlaced;
+        GameEvents.Instance.RoomDemolished += _onRoomDemolished;
+        GameEvents.Instance.CitizenArrived += _onCitizenArrived;
+    }
+
+    /// <summary>
+    /// Seeds a housing room directly into internal tracking, bypassing
+    /// BuildManager. For integration tests that need room state without
+    /// a visual scene.
+    /// </summary>
+    public void SeedRoomForTest(int anchorIndex, int capacity)
+    {
+        _housingRoomCapacities[anchorIndex] = capacity;
+        _roomOccupants[anchorIndex] = new List<string>();
+    }
+
     // -------------------------------------------------------------------------
     // Public API
     // -------------------------------------------------------------------------

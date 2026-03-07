@@ -130,6 +130,17 @@ public partial class HappinessManager : Node
         _arrivalTimer?.Stop();
     }
 
+    /// <summary>
+    /// Re-subscribes to GameEvents after ClearAllSubscribers(). Called by
+    /// TestHelper for integration tests.
+    /// </summary>
+    public void SubscribeToEvents()
+    {
+        if (GameEvents.Instance == null) return;
+
+        GameEvents.Instance.WishFulfilled += OnWishFulfilled;
+    }
+
     // -------------------------------------------------------------------------
     // Save/Load API
     // -------------------------------------------------------------------------

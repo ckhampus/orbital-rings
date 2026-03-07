@@ -336,6 +336,18 @@ public partial class EconomyManager : Node
         StateLoaded = false;
     }
 
+    /// <summary>
+    /// Re-subscribes to GameEvents after ClearAllSubscribers(). Called by
+    /// TestHelper for integration tests.
+    /// </summary>
+    public void SubscribeToEvents()
+    {
+        if (GameEvents.Instance == null) return;
+
+        GameEvents.Instance.CitizenEnteredRoom += OnCitizenEnteredRoom;
+        GameEvents.Instance.CitizenExitedRoom += OnCitizenExitedRoom;
+    }
+
     // -------------------------------------------------------------------------
     // Save/Load API
     // -------------------------------------------------------------------------
