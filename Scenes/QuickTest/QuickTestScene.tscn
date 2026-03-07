@@ -11,6 +11,7 @@
 [ext_resource type="Script" uid="uid://cds8mammupx8n" path="res://Scripts/Audio/AmbientDrone.cs" id="9_ambientdrone"]
 [ext_resource type="Script" uid="uid://bgwvj1ip0munn" path="res://Scripts/Audio/WishCelebration.cs" id="10_wishcelebration"]
 [ext_resource type="Script" uid="uid://bxxttphraqblk" path="res://Scripts/UI/MuteToggle.cs" id="11_mutetoggle"]
+[ext_resource type="Script" path="res://Scripts/UI/ClockHUD.cs" id="12_clockhud"]
 
 [node name="QuickTestScene" type="Node3D" unique_id=884004654]
 
@@ -60,6 +61,15 @@ offset_left = -200.0
 offset_bottom = 50.0
 grow_horizontal = 0
 script = ExtResource("7_moodhud")
+
+[node name="ClockHUD" type="MarginContainer" parent="HUDLayer"]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -80.0
+offset_bottom = 50.0
+grow_horizontal = 0
+script = ExtResource("12_clockhud")
 
 [node name="BuildUILayer" type="CanvasLayer" parent="." unique_id=487987922]
 layer = 8
