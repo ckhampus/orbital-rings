@@ -8,6 +8,22 @@ A cozy space station builder where players construct a modular orbital ring one 
 
 The wish-driven building loop: citizens express wishes, the player builds rooms to fulfill them, happiness rises, new citizens arrive, new wishes emerge. This loop must feel satisfying and alive.
 
+## Current Milestone: v1.4 Citizen AI
+
+**Goal:** Make citizens feel alive with observable daily routines shaped by personal traits, layered on a visible day/night cycle that gives the station rhythm.
+
+**Target features:**
+- Station clock with four periods (Morning/Day/Evening/Night) and configurable timing
+- Day/night visual atmosphere (lighting, backdrop, room window emissives)
+- Citizen traits (1 Interest + 1 Rhythm per citizen) biasing behavior
+- Schedule templates with period-weighted activity pools
+- Utility scoring for room selection (trait affinity, proximity, recency, wish bonus)
+- Citizen state machine (Walking/Evaluating/Visiting/Resting) replacing flat visit timer
+- Clock UI (sun/moon icon in HUD)
+- Citizen info panel showing traits
+- Room tooltip showing current visitors
+- Save/load for clock position and citizen traits (save format v4)
+
 ## Requirements
 
 ### Validated
@@ -49,7 +65,16 @@ The wish-driven building loop: citizens express wishes, the player builds rooms 
 
 ### Active
 
-(None — awaiting next milestone definition)
+- [ ] Station clock autoload with four periods and configurable timing
+- [ ] Day/night lighting and atmosphere transitions
+- [ ] Citizen traits (Interest + Rhythm) assigned at creation
+- [ ] Schedule templates with period-weighted activity pools
+- [ ] Utility scoring for intelligent room selection
+- [ ] Citizen state machine replacing flat visit timer
+- [ ] Clock UI indicator in HUD
+- [ ] Trait display in citizen info panel
+- [ ] Room tooltip visitor display
+- [ ] Save/load for clock and traits with backward compatibility
 
 ### Out of Scope
 
@@ -125,4 +150,4 @@ v1.3 added comprehensive testing infrastructure: conditional test compilation, s
 | SubscribeToEvents() mirrors _Ready() | Idempotent re-subscription after ClearAllSubscribers in integration tests | ✓ Good — event chains verified through live singleton code paths |
 
 ---
-*Last updated: 2026-03-07 after v1.3 milestone*
+*Last updated: 2026-03-07 after v1.4 milestone start*

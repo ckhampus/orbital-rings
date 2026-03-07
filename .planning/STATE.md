@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.3
-milestone_name: Testing
-status: archived
-stopped_at: Milestone v1.3 archived
-last_updated: "2026-03-07T21:20:00.000Z"
-last_activity: 2026-03-07 - Archived v1.3 Testing milestone
+milestone: v1.4
+milestone_name: Citizen AI
+status: defining_requirements
+stopped_at: Defining requirements
+last_updated: "2026-03-07T22:00:00.000Z"
+last_activity: 2026-03-07 - Milestone v1.4 started
 progress:
-  total_phases: 6
-  completed_phases: 6
-  total_plans: 9
-  completed_plans: 9
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -21,13 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-07)
 
 **Core value:** The wish-driven building loop: citizens express wishes, the player builds rooms to fulfill them, happiness rises, new citizens arrive, new wishes emerge.
-**Current focus:** Planning next milestone
+**Current focus:** Defining requirements for v1.4 Citizen AI
 
 ## Current Position
 
-Milestone v1.3 Testing shipped and archived.
-25 phases complete across 4 milestones (v1.0-v1.3).
-Next: `/gsd:new-milestone` to define v1.4 or v2.0.
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-07 — Milestone v1.4 started
 
 ## Performance Metrics
 
@@ -69,5 +70,5 @@ None active.
 ## Session Continuity
 
 Last session: 2026-03-07
-Stopped at: v1.3 milestone archived
-Next: `/gsd:new-milestone` to plan next milestone
+Stopped at: Milestone v1.4 started — defining requirements
+Next: Complete requirements definition → roadmap creation
