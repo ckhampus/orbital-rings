@@ -85,31 +85,31 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CLOCK-01 | — | Pending |
-| CLOCK-02 | — | Pending |
-| CLOCK-03 | — | Pending |
-| LIT-01 | — | Pending |
-| LIT-02 | — | Pending |
-| TRAIT-01 | — | Pending |
-| TRAIT-02 | — | Pending |
-| TRAIT-03 | — | Pending |
-| BHV-01 | — | Pending |
-| BHV-02 | — | Pending |
-| BHV-03 | — | Pending |
-| BHV-04 | — | Pending |
-| BHV-05 | — | Pending |
-| BHV-06 | — | Pending |
-| BHV-07 | — | Pending |
-| SAVE-01 | — | Pending |
-| SAVE-02 | — | Pending |
-| SAVE-03 | — | Pending |
-| UI-01 | — | Pending |
+| CLOCK-01 | Phase 26 | Pending |
+| CLOCK-02 | Phase 26 | Pending |
+| CLOCK-03 | Phase 26 | Pending |
+| LIT-01 | Phase 27 | Pending |
+| LIT-02 | Phase 27 | Pending |
+| TRAIT-01 | Phase 28 | Pending |
+| TRAIT-02 | Phase 28 | Pending |
+| TRAIT-03 | Phase 28 | Pending |
+| BHV-01 | Phase 30 | Pending |
+| BHV-02 | Phase 30 | Pending |
+| BHV-03 | Phase 29 | Pending |
+| BHV-04 | Phase 29 | Pending |
+| BHV-05 | Phase 29 | Pending |
+| BHV-06 | Phase 29 | Pending |
+| BHV-07 | Phase 30 | Pending |
+| SAVE-01 | Phase 31 | Pending |
+| SAVE-02 | Phase 31 | Pending |
+| SAVE-03 | Phase 31 | Pending |
+| UI-01 | Phase 32 | Pending |
 
 **Coverage:**
 - v1.4 requirements: 19 total
-- Mapped to phases: 0
-- Unmapped: 19 ⚠️
+- Mapped to phases: 19
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-07*
-*Last updated: 2026-03-07 after initial definition*
+*Last updated: 2026-03-07 after roadmap creation (traceability complete)*
