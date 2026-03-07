@@ -126,7 +126,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 24-01-PLAN.md — SaveDataTests.cs with 4 test methods (v3 round-trip, v1 backward compat, v2 backward compat, empty collections edge case)
+- [x] 24-01-PLAN.md — SaveDataTests.cs with 4 test methods (v3 round-trip, v1 backward compat, v2 backward compat, empty collections edge case)
 
 ### Phase 25: Singleton Integration Tests
 **Goal**: Cross-singleton coordination is verified — housing assignment, demolition reassignment, and mood-economy propagation work through live autoload singletons
@@ -136,10 +136,11 @@ Plans:
   1. After adding housing rooms and triggering citizen assignment, citizens distribute with fewest-occupants-first (no room exceeds others by more than 1 occupant)
   2. After demolishing a room with assigned citizens, those citizens are reassigned to remaining rooms (no orphaned assignments)
   3. After changing mood tier via wish fulfillment, the economy manager applies the new tier's income multiplier on the next tick
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 25-01: TBD
+- [ ] 25-01-PLAN.md — Event re-subscription infrastructure (SubscribeToEvents, SeedRoomForTest, ResubscribeAllSingletons)
+- [ ] 25-02-PLAN.md — SingletonIntegrationTests.cs with ~8 tests for housing assignment, demolition, and mood-economy propagation
 
 ## Progress
 
@@ -172,9 +173,9 @@ Note: Phases 22, 23, and 24 depend only on Phase 20 and could execute in paralle
 | 21. Integration Test Infrastructure | v1.3 | 2/2 | Complete | 2026-03-07 |
 | 22. Mood System Unit Tests | v1.3 | 1/1 | Complete | 2026-03-07 |
 | 23. Economy and Housing Unit Tests | v1.3 | 1/1 | Complete | 2026-03-07 |
-| 24. Save/Load Serialization Tests | 1/1 | Complete    | 2026-03-07 | - |
-| 25. Singleton Integration Tests | v1.3 | 0/0 | Not started | - |
+| 24. Save/Load Serialization Tests | v1.3 | 1/1 | Complete | 2026-03-07 |
+| 25. Singleton Integration Tests | v1.3 | 0/2 | Not started | - |
 
 ---
 *Roadmap created: 2026-03-02*
-*Last updated: 2026-03-07 after Phase 24 planning*
+*Last updated: 2026-03-07 after Phase 25 planning*
