@@ -205,7 +205,7 @@ Note: Phases 27 and 28 are independent and may execute in parallel.
 | 23. Economy and Housing Unit Tests | v1.3 | 1/1 | Complete | 2026-03-07 |
 | 24. Save/Load Serialization Tests | v1.3 | 1/1 | Complete | 2026-03-07 |
 | 25. Singleton Integration Tests | v1.3 | 2/2 | Complete | 2026-03-07 |
-| 26. Station Clock Foundation | v1.4 | 0/2 | Not started | - |
+| 26. Station Clock Foundation | 1/2 | In Progress|  | - |
 | 27. Day/Night Visuals | v1.4 | 0/TBD | Not started | - |
 | 28. Citizen Traits | v1.4 | 0/TBD | Not started | - |
 | 29. Schedule and Scoring | v1.4 | 0/TBD | Not started | - |
