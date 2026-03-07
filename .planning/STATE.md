@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Testing
 status: completed
-stopped_at: Completed 25-01-PLAN.md
-last_updated: "2026-03-07T16:29:09.367Z"
-last_activity: 2026-03-07 — Completed Phase 25 Plan 01 (Event Re-subscription Infrastructure)
+stopped_at: Completed 25-02-PLAN.md
+last_updated: "2026-03-07T16:33:31.589Z"
+last_activity: 2026-03-07 — Completed Phase 25 Plan 02 (Singleton Integration Tests)
 progress:
   total_phases: 6
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 9
-  completed_plans: 8
-  percent: 89
+  completed_plans: 9
+  percent: 100
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-07)
 
 **Core value:** The wish-driven building loop: citizens express wishes, the player builds rooms to fulfill them, happiness rises, new citizens arrive, new wishes emerge.
-**Current focus:** v1.3 Testing — Phase 25 (Singleton Integration Tests) in progress
+**Current focus:** v1.3 Testing -- Milestone complete
 
 ## Current Position
 
 Phase: 25 of 25 (Singleton Integration Tests)
-Plan: 1 of 2
-Status: Plan 01 complete, Plan 02 pending
-Last activity: 2026-03-07 — Completed Phase 25 Plan 01 (Event Re-subscription Infrastructure)
+Plan: 2 of 2
+Status: Phase 25 complete. v1.3 milestone complete.
+Last activity: 2026-03-07 — Completed Phase 25 Plan 02 (Singleton Integration Tests)
 
-Progress: [█████████░] 89%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -63,6 +63,8 @@ All v1.0, v1.1, and v1.2 decisions logged in PROJECT.md Key Decisions table with
 - [Phase 25]: SubscribeToEvents() mirrors _Ready() event wiring for idempotent re-subscription after ClearAllSubscribers()
 - [Phase 25]: SeedRoomForTest() bypasses BuildManager dependency for headless room state in integration tests
 - [Phase 25]: ResubscribeAllSingletons() in GameTestClass [Setup] for automatic integration test event chain support
+- [Phase 25]: Assert distribution properties (occupancy spread <= 1) rather than exact room assignments due to GD.Randi() tiebreaking
+- [Phase 25]: Pre-computed income values (Quiet=5, Cozy=6) for deterministic mood-economy integration test assertions
 
 ### Pending Todos
 
@@ -88,9 +90,10 @@ None.
 | Phase 23 P01 | 10min | 2 tasks | 3 files |
 | Phase 24 P01 | 34min | 1 task | 1 file |
 | Phase 25 P01 | 2min | 2 tasks | 5 files |
+| Phase 25 P02 | 2min | 1 tasks | 1 files |
 
 ## Session Continuity
 
-Last session: 2026-03-07T16:29:09.363Z
-Stopped at: Completed 25-01-PLAN.md
-Next: Execute Phase 25 Plan 02 (Singleton Integration Tests).
+Last session: 2026-03-07T16:33:31.585Z
+Stopped at: Completed 25-02-PLAN.md
+Next: v1.3 Testing milestone complete. All 9 plans across 6 phases executed successfully. 85 tests passing.

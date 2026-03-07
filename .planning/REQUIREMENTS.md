@@ -47,9 +47,9 @@ Requirements for the Testing milestone. Each maps to roadmap phases.
 
 ### Integration Tests
 
-- [ ] **INTG-04**: Housing assignment distributes citizens with fewest-occupants-first
-- [ ] **INTG-05**: Housing reassignment handles room demolition gracefully
-- [ ] **INTG-06**: Mood tier change propagates correct economy multiplier
+- [x] **INTG-04**: Housing assignment distributes citizens with fewest-occupants-first
+- [x] **INTG-05**: Housing reassignment handles room demolition gracefully
+- [x] **INTG-06**: Mood tier change propagates correct economy multiplier
 
 ## Future Requirements
 
@@ -101,9 +101,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | INTG-01 | Phase 21 | Complete |
 | INTG-02 | Phase 21 | Complete |
 | INTG-03 | Phase 21 | Complete |
-| INTG-04 | Phase 25 | Pending |
-| INTG-05 | Phase 25 | Pending |
-| INTG-06 | Phase 25 | Pending |
+| INTG-04 | Phase 25 | Complete |
+| INTG-05 | Phase 25 | Complete |
+| INTG-06 | Phase 25 | Complete |
 
 **Coverage:**
 - v1.3 requirements: 23 total
