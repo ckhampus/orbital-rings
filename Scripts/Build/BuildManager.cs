@@ -72,6 +72,34 @@ public partial class BuildManager : Node
     private RingVisual _ringVisual;
 
     // -------------------------------------------------------------------------
+    // Test Infrastructure
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Returns this singleton to a clean "just loaded, no game data" state.
+    /// Clears all mutable build state and frees the ghost mesh if valid.
+    /// Does NOT touch Instance, _ringVisual, or _roomDefinitions (read-only cache).
+    /// Called by TestHelper.ResetAllSingletons() between tests.
+    /// </summary>
+    public void Reset()
+    {
+        _mode = BuildMode.Normal;
+        _selectedRoom = null;
+        _anchorFlatIndex = -1;
+        _currentSize = 1;
+        _startPos = 0;
+        _anchorRow = default;
+        _pendingDemolishIndex = -1;
+        _placedRooms.Clear();
+
+        if (_ghostMesh != null && IsInstanceValid(_ghostMesh))
+        {
+            _ghostMesh.QueueFree();
+            _ghostMesh = null;
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // Public properties
     // -------------------------------------------------------------------------
 

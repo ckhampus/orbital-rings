@@ -127,6 +127,28 @@ public partial class HousingManager : Node
     }
 
     // -------------------------------------------------------------------------
+    // Test Infrastructure
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Returns this singleton to a clean "just loaded, no game data" state.
+    /// Clears all mutable state and nulls cached delegate references. Does NOT
+    /// touch Instance or Config.
+    /// Called by TestHelper.ResetAllSingletons() between tests.
+    /// </summary>
+    public void Reset()
+    {
+        _housingRoomCapacities.Clear();
+        _roomOccupants.Clear();
+        _citizenHomes.Clear();
+        _isRestoring = false;
+        _onRoomPlaced = null;
+        _onRoomDemolished = null;
+        _onCitizenArrived = null;
+        StateLoaded = false;
+    }
+
+    // -------------------------------------------------------------------------
     // Public API
     // -------------------------------------------------------------------------
 

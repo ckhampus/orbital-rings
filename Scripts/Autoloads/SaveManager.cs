@@ -131,6 +131,34 @@ public partial class SaveManager : Node
     private Action<string> _onCitizenUnhoused;
 
     // -------------------------------------------------------------------------
+    // Test Infrastructure
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Returns this singleton to a clean "just loaded, no game data" state.
+    /// Clears pending load data, stops the debounce timer, and nulls all cached
+    /// delegate references. Does NOT touch Instance or the Timer node reference.
+    /// Called by TestHelper.ResetAllSingletons() between tests.
+    /// </summary>
+    public void Reset()
+    {
+        PendingLoad = null;
+        _saving = false;
+        _pendingLoadFrames = -1;
+        _debounceTimer?.Stop();
+        _onRoomPlaced = null;
+        _onRoomDemolished = null;
+        _onWishFulfilled = null;
+        _onCitizenArrived = null;
+        _onMoodTierChanged = null;
+        _onWishCountChanged = null;
+        _onCreditsChanged = null;
+        _onBlueprintUnlocked = null;
+        _onCitizenAssignedHome = null;
+        _onCitizenUnhoused = null;
+    }
+
+    // -------------------------------------------------------------------------
     // Lifecycle
     // -------------------------------------------------------------------------
 

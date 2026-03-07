@@ -316,6 +316,27 @@ public partial class EconomyManager : Node
     };
 
     // -------------------------------------------------------------------------
+    // Test Infrastructure
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Returns this singleton to a clean "just loaded, no game data" state.
+    /// Clears all mutable state and stops owned timers. Does NOT touch Instance,
+    /// Config, or the Timer node reference itself.
+    /// Called by TestHelper.ResetAllSingletons() between tests.
+    /// </summary>
+    public void Reset()
+    {
+        _credits = 0;
+        _citizenCount = 0;
+        _workingCitizenCount = 0;
+        _workingCitizens.Clear();
+        _currentTierMultiplier = 1.0f;
+        _incomeTimer?.Stop();
+        StateLoaded = false;
+    }
+
+    // -------------------------------------------------------------------------
     // Save/Load API
     // -------------------------------------------------------------------------
 

@@ -82,6 +82,25 @@ public partial class CitizenManager : SafeNode
     private const float ClickProximityThreshold = 0.8f;
 
     // -------------------------------------------------------------------------
+    // Test Infrastructure
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Returns this singleton to a clean "just loaded, no game data" state.
+    /// Clears citizen list (does NOT QueueFree citizen nodes -- they may not
+    /// exist in test context). Does NOT touch Instance, _camera, _ringPlane,
+    /// or _infoPanel (UI/scene references).
+    /// Called by TestHelper.ResetAllSingletons() between tests.
+    /// </summary>
+    public void Reset()
+    {
+        _citizens.Clear();
+        _selectedCitizen = null;
+        _grid = null;
+        StateLoaded = false;
+    }
+
+    // -------------------------------------------------------------------------
     // Lifecycle
     // -------------------------------------------------------------------------
 

@@ -106,6 +106,31 @@ public partial class HappinessManager : Node
     public bool IsRoomUnlocked(string roomId) => _unlockedRooms.Contains(roomId);
 
     // -------------------------------------------------------------------------
+    // Test Infrastructure
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Returns this singleton to a clean "just loaded, no game data" state.
+    /// Recreates MoodSystem fresh, resets unlocked rooms to starter set, stops
+    /// the arrival timer. Does NOT touch Instance, Config, or _arrivalCanvasLayer.
+    /// Called by TestHelper.ResetAllSingletons() between tests.
+    /// </summary>
+    public void Reset()
+    {
+        _lifetimeHappiness = 0;
+        _moodSystem = new MoodSystem(Config ?? new HappinessConfig());
+        _lastReportedTier = MoodTier.Quiet;
+        _unlockedRooms.Clear();
+        _unlockedRooms.UnionWith(new[]
+        {
+            "bunk_pod", "air_recycler", "workshop",
+            "reading_nook", "storage_bay", "garden_nook"
+        });
+        _crossedMilestoneCount = 0;
+        _arrivalTimer?.Stop();
+    }
+
+    // -------------------------------------------------------------------------
     // Save/Load API
     // -------------------------------------------------------------------------
 

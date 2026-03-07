@@ -68,6 +68,25 @@ public partial class WishBoard : SafeNode
     public event Action<string> WishNudgeRequested;
 
     // -------------------------------------------------------------------------
+    // Test Infrastructure
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Returns this singleton to a clean "just loaded, no game data" state.
+    /// Clears all mutable tracking dictionaries and nulls the WishNudgeRequested
+    /// event (WishBoard-owned, not a GameEvents event).
+    /// Does NOT touch Instance, _allTemplates, or _templatesByCategory (read-only caches).
+    /// Called by TestHelper.ResetAllSingletons() between tests.
+    /// </summary>
+    public void Reset()
+    {
+        _activeWishes.Clear();
+        _placedRoomTypes.Clear();
+        _segmentRoomIds.Clear();
+        WishNudgeRequested = null;
+    }
+
+    // -------------------------------------------------------------------------
     // Lifecycle
     // -------------------------------------------------------------------------
 
