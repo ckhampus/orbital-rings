@@ -49,6 +49,7 @@
   "containerEnv": {
     "NODE_OPTIONS": "--max-old-space-size=4096",
     "CLAUDE_CONFIG_DIR": "/home/node/.claude",
+    "GODOT": "/home/node/.config/godotenv/godot/bin/godot",
     "POWERLEVEL9K_DISABLE_GITSTATUS": "true",
     "GH_TOKEN": "${localEnv:GH_TOKEN}"
   },
