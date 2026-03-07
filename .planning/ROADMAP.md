@@ -69,8 +69,8 @@
 **Plans**: 2 plans
 
 Plans:
-- [ ] 20-01-PLAN.md — NuGet config, .csproj conditional test compilation, export exclusion
-- [ ] 20-02-PLAN.md — Test runner scene/script, ComputeCapacity smoke test, CLI verification
+- [x] 20-01-PLAN.md — NuGet config, .csproj conditional test compilation, export exclusion
+- [x] 20-02-PLAN.md — Test runner scene/script, ComputeCapacity smoke test, CLI verification
 
 ### Phase 21: Integration Test Infrastructure
 **Goal**: Singleton state isolation is reliable — tests that touch game singletons cannot corrupt each other
@@ -80,10 +80,11 @@ Plans:
   1. Calling ResetAllSingletons restores every singleton to a clean initial state (verified by checking fields after reset)
   2. GameEvents has zero subscribers after ClearAllSubscribers is called (no stale delegate leaks between test suites)
   3. Singleton timers (autosave, housing cycle) do not fire during test execution
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 21-01: TBD
+- [ ] 21-01-PLAN.md — Reset() methods on all 7 singletons + ClearAllSubscribers() on GameEvents
+- [ ] 21-02-PLAN.md — TestHelper, GameTestClass, and verification tests proving infrastructure works
 
 ### Phase 22: Mood System Unit Tests
 **Goal**: MoodSystem POCO logic is regression-proof — decay math, tier transitions, hysteresis, wish gain, and save restore all have passing tests
@@ -167,8 +168,8 @@ Note: Phases 22, 23, and 24 depend only on Phase 20 and could execute in paralle
 | 17. Return-Home Behavior | v1.2 | 1/1 | Complete | 2026-03-06 |
 | 18. Housing UI | v1.2 | 1/1 | Complete | 2026-03-06 |
 | 19. Save/Load Integration | v1.2 | 1/1 | Complete | 2026-03-06 |
-| 20. Test Framework Wiring | 2/2 | Complete    | 2026-03-07 | - |
-| 21. Integration Test Infrastructure | v1.3 | 0/0 | Not started | - |
+| 20. Test Framework Wiring | v1.3 | 2/2 | Complete | 2026-03-07 |
+| 21. Integration Test Infrastructure | v1.3 | 0/2 | Not started | - |
 | 22. Mood System Unit Tests | v1.3 | 0/0 | Not started | - |
 | 23. Economy and Housing Unit Tests | v1.3 | 0/0 | Not started | - |
 | 24. Save/Load Serialization Tests | v1.3 | 0/0 | Not started | - |
@@ -176,4 +177,4 @@ Note: Phases 22, 23, and 24 depend only on Phase 20 and could execute in paralle
 
 ---
 *Roadmap created: 2026-03-02*
-*Last updated: 2026-03-07 after Phase 20 planning*
+*Last updated: 2026-03-07 after Phase 21 planning*
