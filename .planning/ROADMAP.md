@@ -83,8 +83,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 21-01-PLAN.md — Reset() methods on all 7 singletons + ClearAllSubscribers() on GameEvents
-- [ ] 21-02-PLAN.md — TestHelper, GameTestClass, and verification tests proving infrastructure works
+- [x] 21-01-PLAN.md — Reset() methods on all 7 singletons + ClearAllSubscribers() on GameEvents
+- [x] 21-02-PLAN.md — TestHelper, GameTestClass, and verification tests proving infrastructure works
 
 ### Phase 22: Mood System Unit Tests
 **Goal**: MoodSystem POCO logic is regression-proof — decay math, tier transitions, hysteresis, wish gain, and save restore all have passing tests
@@ -96,10 +96,10 @@ Plans:
   3. Hysteresis test confirms a mood value just below a tier boundary does not demote until crossing the hysteresis gap
   4. Wish gain test confirms mood increments by the correct amount per wish fulfilled
   5. Restore test confirms MoodSystem reconstructs correct mood value and tier from saved data
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 22-01: TBD
+- [ ] 22-01-PLAN.md — MoodSystemTests.cs with ~15 test methods covering decay, tiers, hysteresis, wish gain, restore, and edge cases
 
 ### Phase 23: Economy and Housing Unit Tests
 **Goal**: Economy formulas and housing capacity math are regression-proof — all pure calculations have passing tests
@@ -169,12 +169,12 @@ Note: Phases 22, 23, and 24 depend only on Phase 20 and could execute in paralle
 | 18. Housing UI | v1.2 | 1/1 | Complete | 2026-03-06 |
 | 19. Save/Load Integration | v1.2 | 1/1 | Complete | 2026-03-06 |
 | 20. Test Framework Wiring | v1.3 | 2/2 | Complete | 2026-03-07 |
-| 21. Integration Test Infrastructure | 2/2 | Complete    | 2026-03-07 | - |
-| 22. Mood System Unit Tests | v1.3 | 0/0 | Not started | - |
+| 21. Integration Test Infrastructure | v1.3 | 2/2 | Complete | 2026-03-07 |
+| 22. Mood System Unit Tests | v1.3 | 0/1 | Not started | - |
 | 23. Economy and Housing Unit Tests | v1.3 | 0/0 | Not started | - |
 | 24. Save/Load Serialization Tests | v1.3 | 0/0 | Not started | - |
 | 25. Singleton Integration Tests | v1.3 | 0/0 | Not started | - |
 
 ---
 *Roadmap created: 2026-03-02*
-*Last updated: 2026-03-07 after Phase 21 planning*
+*Last updated: 2026-03-07 after Phase 22 planning*
