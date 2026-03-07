@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Testing
 status: completed
-stopped_at: Phase 25 context gathered
-last_updated: "2026-03-07T16:09:38.818Z"
-last_activity: 2026-03-07 — Completed Phase 24 Plan 01 (Save/Load Serialization Tests)
+stopped_at: Completed 25-01-PLAN.md
+last_updated: "2026-03-07T16:29:09.367Z"
+last_activity: 2026-03-07 — Completed Phase 25 Plan 01 (Event Re-subscription Infrastructure)
 progress:
   total_phases: 6
   completed_phases: 5
-  total_plans: 7
-  completed_plans: 7
-  percent: 100
+  total_plans: 9
+  completed_plans: 8
+  percent: 89
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-07)
 
 **Core value:** The wish-driven building loop: citizens express wishes, the player builds rooms to fulfill them, happiness rises, new citizens arrive, new wishes emerge.
-**Current focus:** v1.3 Testing — Phase 24 (Save/Load Serialization Tests) complete
+**Current focus:** v1.3 Testing — Phase 25 (Singleton Integration Tests) in progress
 
 ## Current Position
 
-Phase: 24 of 25 (Save/Load Serialization Tests)
-Plan: 1 of 1
-Status: Phase 24 complete
-Last activity: 2026-03-07 — Completed Phase 24 Plan 01 (Save/Load Serialization Tests)
+Phase: 25 of 25 (Singleton Integration Tests)
+Plan: 1 of 2
+Status: Plan 01 complete, Plan 02 pending
+Last activity: 2026-03-07 — Completed Phase 25 Plan 01 (Event Re-subscription Infrastructure)
 
-Progress: [██████████] 100%
+Progress: [█████████░] 89%
 
 ## Performance Metrics
 
@@ -60,6 +60,9 @@ All v1.0, v1.1, and v1.2 decisions logged in PROJECT.md Key Decisions table with
 - [Phase 24]: Used TestClass base (not GameTestClass) for pure POCO serialization tests with no singleton interaction
 - [Phase 24]: Used exact float equality (no tolerance) since System.Text.Json preserves float values exactly through JSON round-trip
 - [Phase 24]: Inline raw string literal JSON for v1/v2 backward compat tests for maximum readability
+- [Phase 25]: SubscribeToEvents() mirrors _Ready() event wiring for idempotent re-subscription after ClearAllSubscribers()
+- [Phase 25]: SeedRoomForTest() bypasses BuildManager dependency for headless room state in integration tests
+- [Phase 25]: ResubscribeAllSingletons() in GameTestClass [Setup] for automatic integration test event chain support
 
 ### Pending Todos
 
@@ -84,9 +87,10 @@ None.
 | 8 | Fix citizen arrival gate to check actual housing vacancy | 2026-03-06 | 9f73a28 | [8-fix-new-citizens-arriving-when-no-housin](./quick/8-fix-new-citizens-arriving-when-no-housin/) |
 | Phase 23 P01 | 10min | 2 tasks | 3 files |
 | Phase 24 P01 | 34min | 1 task | 1 file |
+| Phase 25 P01 | 2min | 2 tasks | 5 files |
 
 ## Session Continuity
 
-Last session: 2026-03-07T16:09:38.811Z
-Stopped at: Phase 25 context gathered
-Next: Phase 24 complete. Proceed to Phase 25 (Housing Integration Tests).
+Last session: 2026-03-07T16:29:09.363Z
+Stopped at: Completed 25-01-PLAN.md
+Next: Execute Phase 25 Plan 02 (Singleton Integration Tests).
