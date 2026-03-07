@@ -59,7 +59,7 @@
 
 </details>
 
-### 🚧 v1.4 Citizen AI (In Progress)
+### v1.4 Citizen AI (In Progress)
 
 **Milestone Goal:** Make citizens feel alive with observable daily routines shaped by personal traits, layered on a visible day/night cycle that gives the station rhythm.
 
@@ -82,11 +82,11 @@
   2. Player can see the current period via an icon/label in the HUD at all times
   3. Period durations and cycle length are tunable in the Inspector without code changes
   4. Other systems can query StationClock.Instance.CurrentPeriod and subscribe to PeriodChanged events
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 26-01: TBD
-- [ ] 26-02: TBD
+- [ ] 26-01-PLAN.md — Clock core: StationPeriod enum, ClockConfig resource, StationClock autoload, GameEvents PeriodChanged, unit tests
+- [ ] 26-02-PLAN.md — HUD + wiring: ClockHUD widget, QuickTestScene integration, autoload registration, visual verification
 
 ### Phase 27: Day/Night Visuals
 **Goal**: The station's appearance changes with the time of day, making the clock feel real and the station feel alive
@@ -205,7 +205,7 @@ Note: Phases 27 and 28 are independent and may execute in parallel.
 | 23. Economy and Housing Unit Tests | v1.3 | 1/1 | Complete | 2026-03-07 |
 | 24. Save/Load Serialization Tests | v1.3 | 1/1 | Complete | 2026-03-07 |
 | 25. Singleton Integration Tests | v1.3 | 2/2 | Complete | 2026-03-07 |
-| 26. Station Clock Foundation | v1.4 | 0/TBD | Not started | - |
+| 26. Station Clock Foundation | v1.4 | 0/2 | Not started | - |
 | 27. Day/Night Visuals | v1.4 | 0/TBD | Not started | - |
 | 28. Citizen Traits | v1.4 | 0/TBD | Not started | - |
 | 29. Schedule and Scoring | v1.4 | 0/TBD | Not started | - |
@@ -215,4 +215,4 @@ Note: Phases 27 and 28 are independent and may execute in parallel.
 
 ---
 *Roadmap created: 2026-03-02*
-*Last updated: 2026-03-07 after v1.4 roadmap created*
+*Last updated: 2026-03-07 after Phase 26 planning*
