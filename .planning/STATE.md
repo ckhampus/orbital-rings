@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Testing
-status: planning
-stopped_at: Phase 20 context gathered
-last_updated: "2026-03-07T09:08:29.332Z"
-last_activity: 2026-03-07 — Roadmap created for v1.3
+status: executing
+stopped_at: Completed 20-01-PLAN.md
+last_updated: "2026-03-07T09:29:59.294Z"
+last_activity: 2026-03-07 — Completed 20-01 NuGet + conditional test compilation
 progress:
   total_phases: 6
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_plans: 2
+  completed_plans: 1
+  percent: 50
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-07)
 
 **Core value:** The wish-driven building loop: citizens express wishes, the player builds rooms to fulfill them, happiness rises, new citizens arrive, new wishes emerge.
-**Current focus:** v1.3 Testing — Phase 20 (Test Framework Wiring) ready to plan
+**Current focus:** v1.3 Testing — Phase 20 (Test Framework Wiring) plan 01 complete, plan 02 next
 
 ## Current Position
 
 Phase: 20 of 25 (Test Framework Wiring)
-Plan: —
-Status: Ready to plan
-Last activity: 2026-03-07 — Roadmap created for v1.3
+Plan: 1 of 2
+Status: Executing
+Last activity: 2026-03-07 — Completed 20-01 NuGet + conditional test compilation
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 
@@ -45,6 +45,7 @@ Progress: [░░░░░░░░░░] 0%
 ### Decisions
 
 All v1.0, v1.1, and v1.2 decisions logged in PROJECT.md Key Decisions table with outcomes.
+- [Phase 20]: Kept all five test package references explicit for clarity and version pinning
 
 ### Pending Todos
 
@@ -70,6 +71,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-07T09:08:29.321Z
-Stopped at: Phase 20 context gathered
-Next: `/gsd:plan-phase 20` to plan Test Framework Wiring
+Last session: 2026-03-07T09:29:59Z
+Stopped at: Completed 20-01-PLAN.md
+Next: `/gsd:execute-phase 20` to execute plan 20-02 (Test Runner + Example Tests)
