@@ -52,7 +52,7 @@ All decisions through v1.3 logged in PROJECT.md Key Decisions table with outcome
 
 ### Pending Todos
 
-None.
+1. Manually test Phase 26 ClockHUD in-game (ui) — 4 human verification items auto-approved
 
 ### Blockers/Concerns
 
