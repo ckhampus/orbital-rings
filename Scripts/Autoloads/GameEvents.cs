@@ -35,6 +35,79 @@ public partial class GameEvents : Node
     }
 
     // ---------------------------------------------------------------------------
+    // Test Infrastructure
+    // ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// Nulls all event delegate fields, guaranteeing zero stale delegate leaks
+    /// between test suites. Must be called BEFORE singleton Reset() methods to
+    /// prevent Reset() side effects from triggering stale handlers.
+    /// Called by TestHelper.ResetAllSingletons() between tests.
+    /// </summary>
+    public void ClearAllSubscribers()
+    {
+        // Camera Events
+        CameraOrbitStarted = null;
+        CameraOrbitStopped = null;
+
+        // Segment Events
+        SegmentHovered = null;
+        SegmentUnhovered = null;
+        SegmentSelected = null;
+        SegmentDeselected = null;
+
+        // Room Events
+        RoomPlaced = null;
+        RoomDemolished = null;
+
+        // Build Mode Events
+        BuildModeChanged = null;
+        PlacementPreviewUpdated = null;
+        PlacementPreviewCleared = null;
+
+        // Placement Feedback Events
+        RoomPlacementConfirmed = null;
+        RoomDemolishConfirmed = null;
+        PlacementInvalid = null;
+
+        // Demolish Hover Events
+        DemolishHoverUpdated = null;
+        DemolishHoverCleared = null;
+
+        // Citizen Events
+        CitizenArrived = null;
+        CitizenClicked = null;
+        CitizenEnteredRoom = null;
+        CitizenExitedRoom = null;
+
+        // Wish Events
+        WishGenerated = null;
+        WishFulfilled = null;
+
+        // Economy Events
+        CreditsChanged = null;
+        IncomeTicked = null;
+        CreditsSpent = null;
+        CreditsRefunded = null;
+
+        // Progression Events
+        BlueprintUnlocked = null;
+
+        // Happiness v2 Events
+        MoodTierChanged = null;
+        WishCountChanged = null;
+
+        // Housing Events
+        CitizenAssignedHome = null;
+        CitizenUnhoused = null;
+        HousingStateChanged = null;
+
+        // Home Visit Events
+        CitizenEnteredHome = null;
+        CitizenExitedHome = null;
+    }
+
+    // ---------------------------------------------------------------------------
     // Camera Events
     // ---------------------------------------------------------------------------
 
