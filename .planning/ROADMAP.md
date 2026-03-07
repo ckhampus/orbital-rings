@@ -99,7 +99,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 22-01-PLAN.md — MoodSystemTests.cs with ~15 test methods covering decay, tiers, hysteresis, wish gain, restore, and edge cases
+- [x] 22-01-PLAN.md — MoodSystemTests.cs with ~15 test methods covering decay, tiers, hysteresis, wish gain, restore, and edge cases
 
 ### Phase 23: Economy and Housing Unit Tests
 **Goal**: Economy formulas and housing capacity math are regression-proof — all pure calculations have passing tests
@@ -110,10 +110,10 @@ Plans:
   2. CalculateTickIncome applies the correct multiplier for each of the 5 mood tiers
   3. CalculateDemolishRefund returns the correct partial refund for each room type and size
   4. ComputeCapacity returns 2 for 1-segment, 3 for 2-segment, and 4 for 3-segment rooms
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 23-01: TBD
+- [ ] 23-01-PLAN.md — EconomyTests.cs with ~44 test methods (room costs, tick income, demolish refund) + HousingTests.cs expansion (capacity for all segment sizes)
 
 ### Phase 24: Save/Load Serialization Tests
 **Goal**: Save data integrity is regression-proof — JSON round-trips preserve all fields and legacy formats deserialize with correct defaults
@@ -170,11 +170,11 @@ Note: Phases 22, 23, and 24 depend only on Phase 20 and could execute in paralle
 | 19. Save/Load Integration | v1.2 | 1/1 | Complete | 2026-03-06 |
 | 20. Test Framework Wiring | v1.3 | 2/2 | Complete | 2026-03-07 |
 | 21. Integration Test Infrastructure | v1.3 | 2/2 | Complete | 2026-03-07 |
-| 22. Mood System Unit Tests | 1/1 | Complete    | 2026-03-07 | - |
-| 23. Economy and Housing Unit Tests | v1.3 | 0/0 | Not started | - |
+| 22. Mood System Unit Tests | v1.3 | 1/1 | Complete | 2026-03-07 |
+| 23. Economy and Housing Unit Tests | v1.3 | 0/1 | Not started | - |
 | 24. Save/Load Serialization Tests | v1.3 | 0/0 | Not started | - |
 | 25. Singleton Integration Tests | v1.3 | 0/0 | Not started | - |
 
 ---
 *Roadmap created: 2026-03-02*
-*Last updated: 2026-03-07 after Phase 22 planning*
+*Last updated: 2026-03-07 after Phase 23 planning*
