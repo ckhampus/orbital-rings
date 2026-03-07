@@ -21,13 +21,47 @@ public class HousingTests : TestClass
         capacity.ShouldBe(2);
     }
 
-    // ---------------------------------------------------------------
-    // DELIBERATE FAILURE -- Uncomment to verify Shouldly error messages
-    // ---------------------------------------------------------------
-    // [Test]
-    // public void ShouldlyErrorMessageDemo()
-    // {
-    //     int actual = 42;
-    //     actual.ShouldBe(99, "This should fail with a readable message");
-    // }
+    // --- ComputeCapacity: Multi-Segment --- (HOUS-01)
+
+    [Test]
+    public void ComputeCapacityTwoSegments()
+    {
+        // BaseCapacity + (2 - 1) = 2 + 1 = 3
+        var definition = new RoomDefinition { BaseCapacity = 2 };
+        HousingManager.ComputeCapacity(definition, 2).ShouldBe(3);
+    }
+
+    [Test]
+    public void ComputeCapacityThreeSegments()
+    {
+        // BaseCapacity + (3 - 1) = 2 + 2 = 4
+        var definition = new RoomDefinition { BaseCapacity = 2 };
+        HousingManager.ComputeCapacity(definition, 3).ShouldBe(4);
+    }
+
+    // --- ComputeCapacity: Varied BaseCapacity --- (HOUS-01)
+
+    [Test]
+    public void ComputeCapacityHigherBase1Seg()
+    {
+        // BaseCapacity + (1 - 1) = 3 + 0 = 3
+        var definition = new RoomDefinition { BaseCapacity = 3 };
+        HousingManager.ComputeCapacity(definition, 1).ShouldBe(3);
+    }
+
+    [Test]
+    public void ComputeCapacityHigherBase2Seg()
+    {
+        // BaseCapacity + (2 - 1) = 3 + 1 = 4
+        var definition = new RoomDefinition { BaseCapacity = 3 };
+        HousingManager.ComputeCapacity(definition, 2).ShouldBe(4);
+    }
+
+    [Test]
+    public void ComputeCapacityHigherBase3Seg()
+    {
+        // BaseCapacity + (3 - 1) = 3 + 2 = 5
+        var definition = new RoomDefinition { BaseCapacity = 3 };
+        HousingManager.ComputeCapacity(definition, 3).ShouldBe(5);
+    }
 }
