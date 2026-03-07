@@ -73,8 +73,27 @@ ENV PATH="$PATH:/usr/local/share/dotnet-global-tools"
 USER node
 
 # Install Godot via GodotEnv (manages versions via symlinks)
+# GodotEnv v2.16.2 bug: always downloads linux_x86_64 even on ARM64.
+# Work around by manually installing the ARM64 binary into GodotEnv's
+# expected directory structure so all GodotEnv commands still work.
 ARG GODOT_VERSION=4.6.1
-RUN godotenv godot install ${GODOT_VERSION}
+RUN ARCH=$(uname -m) && \
+  if [ "$ARCH" = "x86_64" ]; then \
+    godotenv godot install ${GODOT_VERSION}; \
+  else \
+    GODOT_VER_UNDERSCORED=$(echo "${GODOT_VERSION}" | tr '.' '_') && \
+    VERSION_DIR="$HOME/.config/godotenv/godot/versions/godot_dotnet_${GODOT_VER_UNDERSCORED}_stable" && \
+    BIN_DIR="$HOME/.config/godotenv/godot/bin" && \
+    DOWNLOAD_URL="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_mono_linux_arm64.zip" && \
+    wget -q -O /tmp/godot.zip "$DOWNLOAD_URL" && \
+    unzip -q /tmp/godot.zip -d /tmp/godot && \
+    mkdir -p "$VERSION_DIR" "$BIN_DIR" && \
+    mv /tmp/godot/Godot_v${GODOT_VERSION}-stable_mono_linux_arm64/* "$VERSION_DIR/" && \
+    ln -sf "$VERSION_DIR/Godot_v${GODOT_VERSION}-stable_mono_linux.arm64" "$BIN_DIR/godot" && \
+    ln -sf "$VERSION_DIR/GodotSharp" "$BIN_DIR/GodotSharp" && \
+    rm -rf /tmp/godot.zip /tmp/godot && \
+    godotenv godot env setup; \
+  fi
 
 # Add GodotEnv's Godot symlink to PATH and set GODOT env var
 ENV GODOT_BIN="/home/node/.config/godotenv/godot/bin"
@@ -100,6 +119,7 @@ RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/
   -a "source /usr/share/doc/fzf/examples/key-bindings.zsh" \
   -a "source /usr/share/doc/fzf/examples/completion.zsh" \
   -a "export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhistory/.bash_history" \
+  -a '. "$HOME/.config/godotenv/env"' \
   -x
 
 # Install Claude using native installer
