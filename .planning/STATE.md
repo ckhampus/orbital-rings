@@ -5,9 +5,9 @@ milestone_name: Testing
 status: active
 stopped_at: null
 last_updated: "2026-03-07T00:00:00.000Z"
-last_activity: 2026-03-07 -- Milestone v1.3 started
+last_activity: 2026-03-07 -- Roadmap created for v1.3 Testing (6 phases, 23 requirements)
 progress:
-  total_phases: 0
+  total_phases: 6
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -21,14 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-07)
 
 **Core value:** The wish-driven building loop: citizens express wishes, the player builds rooms to fulfill them, happiness rises, new citizens arrive, new wishes emerge.
-**Current focus:** v1.3 Testing — framework setup + critical path coverage
+**Current focus:** v1.3 Testing — Phase 20 (Test Framework Wiring) ready to plan
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 20 of 25 (Test Framework Wiring)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-03-07 — Milestone v1.3 started
+Status: Ready to plan
+Last activity: 2026-03-07 — Roadmap created for v1.3
+
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
@@ -50,7 +52,8 @@ None.
 
 ### Blockers/Concerns
 
-None.
+- Phase 20: Godot 4.6 / .NET 10 has an open issue (godotengine/godot#112701) about shared framework assembly probing on Windows. Flag for validation during NuGet restore. Likely does not affect testing packages.
+- Phase 25: BuildManager's `_ringVisual` dependency may complicate housing integration tests. May need SaveData-based approach or minimal game scene.
 
 ### Quick Tasks Completed
 
@@ -68,5 +71,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-07
-Stopped at: Defining v1.3 requirements
-Next: Complete requirements and roadmap
+Stopped at: Roadmap created for v1.3 Testing milestone
+Next: `/gsd:plan-phase 20` to plan Test Framework Wiring

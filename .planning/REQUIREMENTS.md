@@ -81,35 +81,35 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FRMW-01 | — | Pending |
-| FRMW-02 | — | Pending |
-| FRMW-03 | — | Pending |
-| FRMW-04 | — | Pending |
-| FRMW-05 | — | Pending |
-| MOOD-01 | — | Pending |
-| MOOD-02 | — | Pending |
-| MOOD-03 | — | Pending |
-| MOOD-04 | — | Pending |
-| MOOD-05 | — | Pending |
-| ECON-01 | — | Pending |
-| ECON-02 | — | Pending |
-| ECON-03 | — | Pending |
-| HOUS-01 | — | Pending |
-| SAVE-01 | — | Pending |
-| SAVE-02 | — | Pending |
-| SAVE-03 | — | Pending |
-| INTG-01 | — | Pending |
-| INTG-02 | — | Pending |
-| INTG-03 | — | Pending |
-| INTG-04 | — | Pending |
-| INTG-05 | — | Pending |
-| INTG-06 | — | Pending |
+| FRMW-01 | Phase 20 | Pending |
+| FRMW-02 | Phase 20 | Pending |
+| FRMW-03 | Phase 20 | Pending |
+| FRMW-04 | Phase 20 | Pending |
+| FRMW-05 | Phase 20 | Pending |
+| MOOD-01 | Phase 22 | Pending |
+| MOOD-02 | Phase 22 | Pending |
+| MOOD-03 | Phase 22 | Pending |
+| MOOD-04 | Phase 22 | Pending |
+| MOOD-05 | Phase 22 | Pending |
+| ECON-01 | Phase 23 | Pending |
+| ECON-02 | Phase 23 | Pending |
+| ECON-03 | Phase 23 | Pending |
+| HOUS-01 | Phase 23 | Pending |
+| SAVE-01 | Phase 24 | Pending |
+| SAVE-02 | Phase 24 | Pending |
+| SAVE-03 | Phase 24 | Pending |
+| INTG-01 | Phase 21 | Pending |
+| INTG-02 | Phase 21 | Pending |
+| INTG-03 | Phase 21 | Pending |
+| INTG-04 | Phase 25 | Pending |
+| INTG-05 | Phase 25 | Pending |
+| INTG-06 | Phase 25 | Pending |
 
 **Coverage:**
 - v1.3 requirements: 23 total
-- Mapped to phases: 0
-- Unmapped: 23 ⚠️
+- Mapped to phases: 23
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-07*
-*Last updated: 2026-03-07 after initial definition*
+*Last updated: 2026-03-07 after roadmap creation (traceability complete)*
