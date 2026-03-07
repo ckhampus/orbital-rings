@@ -171,7 +171,7 @@ Note: Phases 22, 23, and 24 depend only on Phase 20 and could execute in paralle
 | 20. Test Framework Wiring | v1.3 | 2/2 | Complete | 2026-03-07 |
 | 21. Integration Test Infrastructure | v1.3 | 2/2 | Complete | 2026-03-07 |
 | 22. Mood System Unit Tests | v1.3 | 1/1 | Complete | 2026-03-07 |
-| 23. Economy and Housing Unit Tests | 1/1 | Complete   | 2026-03-07 | - |
+| 23. Economy and Housing Unit Tests | 1/1 | Complete    | 2026-03-07 | - |
 | 24. Save/Load Serialization Tests | v1.3 | 0/0 | Not started | - |
 | 25. Singleton Integration Tests | v1.3 | 0/0 | Not started | - |
 
