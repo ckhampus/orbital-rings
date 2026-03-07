@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.2
-milestone_name: Housing
-status: shipped
-stopped_at: Milestone v1.2 completed and archived
+milestone: v1.3
+milestone_name: Testing
+status: active
+stopped_at: null
 last_updated: "2026-03-07T00:00:00.000Z"
-last_activity: 2026-03-07 -- v1.2 Housing milestone archived
+last_activity: 2026-03-07 -- Milestone v1.3 started
 progress:
-  total_phases: 6
-  completed_phases: 6
-  total_plans: 8
-  completed_plans: 8
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -21,12 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-07)
 
 **Core value:** The wish-driven building loop: citizens express wishes, the player builds rooms to fulfill them, happiness rises, new citizens arrive, new wishes emerge.
-**Current focus:** Planning next milestone
+**Current focus:** v1.3 Testing — framework setup + critical path coverage
 
 ## Current Position
 
-Milestone: v1.2 Housing — SHIPPED 2026-03-06
-Next: Run `/gsd:new-milestone` to start v1.3
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-07 — Milestone v1.3 started
 
 ## Performance Metrics
 
@@ -66,5 +68,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-07
-Stopped at: Milestone v1.2 completed and archived
-Next: `/gsd:new-milestone` to start v1.3
+Stopped at: Defining v1.3 requirements
+Next: Complete requirements and roadmap

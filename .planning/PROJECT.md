@@ -8,6 +8,15 @@ A cozy space station builder where players construct a modular orbital ring one 
 
 The wish-driven building loop: citizens express wishes, the player builds rooms to fulfill them, happiness rises, new citizens arrive, new wishes emerge. This loop must feel satisfying and alive.
 
+## Current Milestone: v1.3 Testing
+
+**Goal:** Introduce GoDotTest + GodotTestDriver testing framework and cover critical paths (save/load, housing, economy, mood, wishes) for confidence as the codebase grows.
+
+**Target features:**
+- Testing framework integration (GoDotTest + GodotTestDriver)
+- Test runner scene for in-editor and CI execution
+- Critical path test suites for core game systems
+
 ## Requirements
 
 ### Validated
@@ -43,7 +52,12 @@ The wish-driven building loop: citizens express wishes, the player builds rooms 
 
 ### Active
 
-(None — next milestone not yet defined)
+- [ ] GoDotTest + GodotTestDriver framework wired up with test runner scene
+- [ ] Save/load round-trip tests across all format versions (v1, v2, v3)
+- [ ] Housing assignment tests (fewest-occupants-first, capacity scaling, demolish/reassign)
+- [ ] Economy calculation tests (income multipliers, room costs, work bonuses)
+- [ ] Mood system tests (decay, tier transitions, hysteresis)
+- [ ] Wish fulfillment loop tests (wish → build → satisfy → happiness)
 
 ### Out of Scope
 
@@ -114,4 +128,4 @@ v1.2 added HousingManager as 8th autoload with fewest-occupants-first assignment
 | XML doc audit trail for save/load | Document verified code paths for future readers | ✓ Good — Phase 19 audit added RestoreFromSave comments with zero code changes |
 
 ---
-*Last updated: 2026-03-07 after v1.2 milestone*
+*Last updated: 2026-03-07 after v1.3 milestone started*
