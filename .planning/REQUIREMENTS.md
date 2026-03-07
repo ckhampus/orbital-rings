@@ -25,13 +25,13 @@ Requirements for the Testing milestone. Each maps to roadmap phases.
 
 ### Unit Tests — Economy
 
-- [ ] **ECON-01**: CalculateRoomCost returns correct costs for all room types and sizes
-- [ ] **ECON-02**: CalculateTickIncome applies tier multiplier correctly across all 5 tiers
-- [ ] **ECON-03**: CalculateDemolishRefund returns correct partial refund
+- [x] **ECON-01**: CalculateRoomCost returns correct costs for all room types and sizes
+- [x] **ECON-02**: CalculateTickIncome applies tier multiplier correctly across all 5 tiers
+- [x] **ECON-03**: CalculateDemolishRefund returns correct partial refund
 
 ### Unit Tests — Housing
 
-- [ ] **HOUS-01**: ComputeCapacity returns correct values for all segment sizes (1/2/3)
+- [x] **HOUS-01**: ComputeCapacity returns correct values for all segment sizes (1/2/3)
 
 ### Unit Tests — Save/Load
 
@@ -91,10 +91,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MOOD-03 | Phase 22 | Complete |
 | MOOD-04 | Phase 22 | Complete |
 | MOOD-05 | Phase 22 | Complete |
-| ECON-01 | Phase 23 | Pending |
-| ECON-02 | Phase 23 | Pending |
-| ECON-03 | Phase 23 | Pending |
-| HOUS-01 | Phase 23 | Pending |
+| ECON-01 | Phase 23 | Complete |
+| ECON-02 | Phase 23 | Complete |
+| ECON-03 | Phase 23 | Complete |
+| HOUS-01 | Phase 23 | Complete |
 | SAVE-01 | Phase 24 | Pending |
 | SAVE-02 | Phase 24 | Pending |
 | SAVE-03 | Phase 24 | Pending |

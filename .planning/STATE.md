@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Testing
 status: completed
-stopped_at: Phase 23 context gathered
-last_updated: "2026-03-07T14:00:59.786Z"
-last_activity: 2026-03-07 — Completed Phase 22 Plan 01 (Mood System Unit Tests)
+stopped_at: Completed 23-01-PLAN.md
+last_updated: "2026-03-07T14:27:37.839Z"
+last_activity: 2026-03-07 — Completed Phase 23 Plan 01 (Economy and Housing Unit Tests)
 progress:
   total_phases: 6
-  completed_phases: 3
-  total_plans: 5
-  completed_plans: 5
+  completed_phases: 4
+  total_plans: 6
+  completed_plans: 6
   percent: 100
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-07)
 
 **Core value:** The wish-driven building loop: citizens express wishes, the player builds rooms to fulfill them, happiness rises, new citizens arrive, new wishes emerge.
-**Current focus:** v1.3 Testing — Phase 22 (Mood System Unit Tests) complete
+**Current focus:** v1.3 Testing — Phase 23 (Economy and Housing Unit Tests) complete
 
 ## Current Position
 
-Phase: 22 of 25 (Mood System Unit Tests)
+Phase: 23 of 25 (Economy and Housing Unit Tests)
 Plan: 1 of 1
-Status: Phase 22 complete
-Last activity: 2026-03-07 — Completed Phase 22 Plan 01 (Mood System Unit Tests)
+Status: Phase 23 complete
+Last activity: 2026-03-07 — Completed Phase 23 Plan 01 (Economy and Housing Unit Tests)
 
 Progress: [██████████] 100%
 
@@ -53,6 +53,10 @@ All v1.0, v1.1, and v1.2 decisions logged in PROJECT.md Key Decisions table with
 - [Phase 21]: Verification tests use only public APIs to dirty/verify state -- validates actual public contract
 - [Phase 22]: Corrected wish promotion sequence for float32 precision: 5*0.06f < 0.30f so Lively promotion at wish 6
 - [Phase 22]: POCO unit test pattern: CreateMoodSystem() helper, RestoreState pre-seeding, ShouldBe(expected, 0.001f) tolerance
+- [Phase 23]: Used GameTestClass for EconomyTests (singleton-dependent) and TestClass for HousingTests (static method)
+- [Phase 23]: Pre-computed all expected values from production config defaults with banker's rounding for .5 edge cases
+- [Phase 23]: Used GameTestClass for EconomyTests (singleton-dependent) and TestClass for HousingTests (static method)
+- [Phase 23]: Pre-computed all expected values from production config defaults with banker's rounding for .5 edge cases
 
 ### Pending Todos
 
@@ -75,9 +79,10 @@ None.
 | 6 | Camera orbit pivot shifted to walkway centerline (radius 4.5) | 2026-03-06 | 773ec9e | [6-camera-should-focus-on-walk-path-rotatin](./quick/6-camera-should-focus-on-walk-path-rotatin/) |
 | 7 | Fix Zzz label visibility by reparenting to CitizenManager | 2026-03-06 | c2761b3 | [7-the-zzz-isn-t-showing-when-a-citizen-goe](./quick/7-the-zzz-isn-t-showing-when-a-citizen-goe/) |
 | 8 | Fix citizen arrival gate to check actual housing vacancy | 2026-03-06 | 9f73a28 | [8-fix-new-citizens-arriving-when-no-housin](./quick/8-fix-new-citizens-arriving-when-no-housin/) |
+| Phase 23 P01 | 10min | 2 tasks | 3 files |
 
 ## Session Continuity
 
-Last session: 2026-03-07T14:00:59.780Z
-Stopped at: Phase 23 context gathered
-Next: Phase 22 complete. Proceed to Phase 23 (Economy System Unit Tests).
+Last session: 2026-03-07T14:27:30.891Z
+Stopped at: Completed 23-01-PLAN.md
+Next: Phase 23 complete. Proceed to Phase 24 (Save/Load Unit Tests).
